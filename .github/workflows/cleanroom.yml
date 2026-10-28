@@ -1,0 +1,40 @@
+name: Cleanroom and Forge port
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        loader: [cleanroom, forge]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: |
+            8
+            25
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build and run focused regressions
+        working-directory: cleanroom
+        run: bash gradlew -PcubicLoader=${{ matrix.loader }} build --console=plain
+      - name: Build optional lab and run its focused checks
+        working-directory: lab
+        run: bash ../cleanroom/gradlew -PcubicLoader=${{ matrix.loader }} build --console=plain
+      - name: Check native lab control code
+        run: python3 -B -m unittest discover -s tools -p test_cubic_lab.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cubicchunks-${{ matrix.loader }}
+          path: |
+            cleanroom/build/${{ matrix.loader }}/libs/*
+            cleanroom/build/${{ matrix.loader }}/reports/tests/
+            lab/build/${{ matrix.loader }}/libs/*
+            lab/build/${{ matrix.loader }}/reports/tests/

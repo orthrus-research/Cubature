@@ -1,0 +1,4 @@
+# Python tools and their tests: python -m pip install -r tools/requirements.txt
+matplotlib==3.11.2
+nbtlib==2.0.4
+numpy==2.5.4

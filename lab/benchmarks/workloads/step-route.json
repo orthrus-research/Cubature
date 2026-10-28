@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "id": "step-route",
+  "description": "Editable load-admission route proposal on the same seed. Site/route coverage is unqualified. Timed spectator jumps do not guarantee view completion at each stop; pair with fixed-view cases.",
+  "tags": ["route", "site-proposal", "offered-load"],
+  "seed": 8675309,
+  "camera": [-111.5, 102, -2044.5, 135, 22],
+  "timeoutSeconds": 840,
+  "route": {
+    "interpolation": "step",
+    "waypoints": [
+      {"pose": [-111.5, 102, -2044.5, 135, 22], "ticks": 80},
+      {"pose": [-367.5, 128, -2044.5, 135, 22], "ticks": 80},
+      {"pose": [-623.5, 160, -2300.5, 135, 22], "ticks": 80}
+    ]
+  },
+  "scenarios": {"write": ["full-view", "route"], "read": ["full-view", "route"]}
+}

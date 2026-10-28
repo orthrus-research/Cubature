@@ -1,0 +1,23 @@
+RegionLib
+Copyright (c) 2016 contributors
+Licensed under the MIT License; the exact upstream license is in LICENSE.txt.
+
+Upstream project: https://github.com/OpenCubicChunks/RegionLib
+Upstream developers listed in the published POM: Barteks2x, xcube16.
+Source commit: e34ec6505cd435d100508a15876dce2314cbd557
+Source: https://github.com/OpenCubicChunks/RegionLib/tree/e34ec6505cd435d100508a15876dce2314cbd557
+
+Maven coordinate: io.github.opencubicchunks:regionlib:0.78.0-SNAPSHOT
+Immutable snapshot: 0.78.0-20210527.114505-2
+Artifact: https://maven.daporkchop.net/io/github/opencubicchunks/regionlib/0.78.0-SNAPSHOT/regionlib-0.78.0-20210527.114505-2.jar
+Artifact SHA-256: 9b4d0f3c6dcb26694f7d347e2ddd4166d76db98f2c9df0dd500add2fd8aa71cd
+Artifact published SHA-1: 01f5c2ed36d6cd481c2e8d82554c4c7a79ecdcc9
+
+Sources: https://maven.daporkchop.net/io/github/opencubicchunks/regionlib/0.78.0-SNAPSHOT/regionlib-0.78.0-20210527.114505-2-sources.jar
+Sources SHA-256: 3a23d8ab3e768db308d05861bce8013522895d91f8ccca0114e7f705e7ba629d
+All 38 Java files in this published sources archive match the source commit
+above byte-for-byte. Both artifact hashes were checked against the maintainer
+repository's published SHA-1 checksums during port preparation.
+
+The build embeds the library's classes. The upstream dependency JAR is
+downloaded unchanged; it is not extracted from a CubicChunks distribution.

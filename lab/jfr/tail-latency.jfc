@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration version="2.0" label="CubicChunks Java 26 tail attribution" description="Optional diagnostic profile. Native timing acceptance uses ordinary profile; stage tracing and lower thresholds add overhead." provider="CubicChunks Lab">
+  <!-- Correlate actual tick/packet CSV timestamps. No heap statistics or forced collection. This profile does not measure GPU completion or SDL swap duration. -->
+  <event name="jdk.MethodTrace">
+    <setting name="enabled">true</setting><setting name="threshold">0 ns</setting><setting name="stackTrace">true</setting>
+    <setting name="filter">net.minecraft.server.MinecraftServer::func_71217_p;io.github.opencubicchunks.cubicchunks.lab.LabJob::tick;io.github.opencubicchunks.cubicchunks.lab.LabJob::lakeWitness;io.github.opencubicchunks.cubicchunks.lab.LabJob::saveAndFlush;io.github.opencubicchunks.cubicchunks.core.server.PlayerCubeMap::func_72693_b;io.github.opencubicchunks.cubicchunks.core.server.CubeProviderServer::func_73156_b;io.github.opencubicchunks.cubicchunks.core.server.chunkio.async.forge.AsyncWorldIOExecutor::tick;io.github.opencubicchunks.cubicchunks.core.network.PacketCubes::toBytes;io.github.opencubicchunks.cubicchunks.core.network.PacketCubes::fromBytes;io.github.opencubicchunks.cubicchunks.core.network.PacketCubes$Handler::handleClientMessage</setting>
+  </event>
+  <event name="jdk.ExecutionSample"><setting name="enabled">true</setting><setting name="period">10 ms</setting></event>
+  <event name="jdk.NativeMethodSample"><setting name="enabled">true</setting><setting name="period">10 ms</setting></event>
+  <event name="jdk.ThreadPark"><setting name="enabled">true</setting><setting name="threshold">1 ms</setting><setting name="stackTrace">true</setting></event>
+  <event name="jdk.JavaMonitorEnter"><setting name="enabled">true</setting><setting name="threshold">1 ms</setting><setting name="stackTrace">true</setting></event>
+  <event name="jdk.JavaMonitorWait"><setting name="enabled">true</setting><setting name="threshold">1 ms</setting><setting name="stackTrace">true</setting></event>
+  <event name="jdk.FileRead"><setting name="enabled">true</setting><setting name="threshold">1 ms</setting><setting name="stackTrace">true</setting></event>
+  <event name="jdk.FileWrite"><setting name="enabled">true</setting><setting name="threshold">1 ms</setting><setting name="stackTrace">true</setting></event>
+  <event name="jdk.FileForce"><setting name="enabled">true</setting><setting name="threshold">1 ms</setting><setting name="stackTrace">true</setting></event>
+  <event name="jdk.GCPhasePause"><setting name="enabled">true</setting></event>
+  <event name="jdk.GarbageCollection"><setting name="enabled">true</setting></event>
+  <event name="jdk.ZAllocationStall"><setting name="enabled">true</setting><setting name="stackTrace">true</setting></event>
+  <event name="jdk.SafepointBegin"><setting name="enabled">true</setting><setting name="threshold">1 ms</setting></event>
+  <event name="jdk.ExecuteVMOperation"><setting name="enabled">true</setting><setting name="threshold">1 ms</setting></event>
+  <event name="jdk.Compilation"><setting name="enabled">true</setting><setting name="threshold">10 ms</setting></event>
+  <event name="jdk.CPULoad"><setting name="enabled">true</setting><setting name="period">1 s</setting></event>
+  <event name="jdk.ThreadCPULoad"><setting name="enabled">true</setting><setting name="period">1 s</setting></event>
+  <event name="jdk.ObjectAllocationSample"><setting name="enabled">true</setting><setting name="throttle">150/s</setting><setting name="stackTrace">true</setting></event>
+</configuration>

@@ -1,0 +1,27 @@
+Distant Horizons -- separate optional upstream dependency
+
+Copyright (C) 2020 James Seibel and contributors, with individual source
+and component notices retained upstream.
+
+Official artifact: DistantHorizons-3.3.3-1.12.2-forge.jar
+Artifact SHA-256: 48c3ace5c35c471893d3dc78de79e3dde229df0179a59352307a2e1c8f60e613
+Release: https://modrinth.com/mod/distanthorizons/version/3.3.3-1.12.2
+Source: https://gitlab.com/distant-horizons-team/distant-horizons
+Source commit: 575517f261dfd04e302a37719f1459e9b5633d9f
+Core source: https://gitlab.com/jeseibel/distant-horizons-core
+Core commit: 6c1be680011194b2cf04ef842ace40c50683b09c
+
+DH's principal source license is GNU LGPL version 3, with separately
+licensed files, libraries and assets. The GPL-3.0 base text and LGPL-3.0
+supplement are reproduced unchanged from the pinned upstream source in
+this directory. They do not replace those component-specific terms.
+
+Cubature uses DH as a separate compile-time and optional runtime dependency.
+No DH implementation is currently bundled in this JAR. Its runtime mixins
+transform selected DH classes while leaving the official JAR unchanged on
+disk. The upstream source and this adapter's source remain separately
+identified; an unchanged upstream artifact does not exempt an adapter or
+combined distribution from applicable license obligations.
+
+This dependency notice is not a complete inventory of DH's embedded
+components and is not blanket permission to redistribute a runtime bundle.

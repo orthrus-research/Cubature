@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "id": "relief-view",
+  "description": "Remote higher-land proposal: one retained native column has surface Y146. Relief across the full footprint, caves, visual output and cold preparation cost are unqualified. Do not select it by its timings.",
+  "tags": ["higher-land", "site-proposal", "cold-prerequisites"],
+  "seed": 8675309,
+  "camera": [17003.5, 176, -19006.5, 135, 28],
+  "timeoutSeconds": 840,
+  "scenarios": {"write": ["full-view", "idle"], "read": ["full-view", "idle"]}
+}

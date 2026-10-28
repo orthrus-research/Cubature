@@ -1,0 +1,73 @@
+{
+    "required": true,
+    "package": "io.github.opencubicchunks.cubicchunks.core.asm.mixin.core",
+    "refmap": "cubicchunks.mixins.refmap.json",
+    "compatibilityLevel": "JAVA_8",
+    "minVersion": "0.7.10",
+    "injectors": {
+        "defaultRequire": 1
+    },
+    "overwrites": {
+        "conformVisibility": true
+    },
+    "mixins": [
+        "common.forge.MixinForgeChunkManager",
+        "common.forge.MixinTicket",
+        "common.IBlockStateContainer",
+        "common.IForgeChunkManager",
+        "common.IGameRegistry",
+        "common.IIntegratedServer",
+        "common.IPlayerChunkMapEntry",
+        "common.MixinAnvilSaveHandler",
+        "common.MixinChunk_Column",
+        "common.MixinChunk_Cubes",
+        "common.MixinChunkCache_HeightLimits",
+        "common.MixinDerivedWorldInfo",
+        "common.MixinEntity_DeathFix",
+        "common.MixinEntityTracker",
+        "common.MixinEntityTrackerEntry",
+        "common.MixinIBlockAccess_MinMaxHeight",
+        "common.MixinMinecraftServer",
+    "common.MixinNetHandlerPlayServer_DeferredArrival",
+        "common.MixinPlayerList",
+        "common.MixinStructureStart",
+        "common.MixinWorld",
+        "common.MixinWorld_HeightLimits",
+        "common.MixinWorld_Tick",
+        "common.MixinWorldEntitySpawner",
+        "common.MixinWorldInfo",
+        "common.MixinWorldProvider",
+        "common.MixinWorldServer",
+        "common.MixinWorldSettings",
+        "common.vanillaclient.ICPacketPlayer",
+        "common.vanillaclient.ICPacketPlayerDigging",
+        "common.vanillaclient.ICPacketPlayerTryUseItemOnBlock",
+        "common.vanillaclient.ICPacketTabComplete",
+        "common.vanillaclient.ICPacketUpdateSign",
+        "common.vanillaclient.ICPacketVehicleMove",
+        "common.vanillaclient.ISPacketChunkData",
+        "common.vanillaclient.ISPacketMultiBlockChange"
+    ],
+    "client": [
+        "client.IChunkProviderClient",
+        "client.IContainerLocalRenderInformation",
+        "client.IGuiCreateWorld",
+        "client.IGuiOptionsRowList",
+        "client.IGuiScreen",
+        "client.INetHandlerPlayClient",
+        "client.IViewFrustum",
+        "client.MixinChunk_Cubes",
+        "client.MixinChunkCache_HeightLimits",
+        "client.MixinDebugRenderChunkBorder",
+        "client.MixinEmptyChunk",
+        "client.MixinRenderGlobal",
+        "client.MixinViewFrustum_RenderHeightFix",
+        "client.MixinWorld_HeightLimits",
+        "client.MixinWorldClient",
+        "client.MixinWorldProvider"
+    ],
+    "server": [
+        "server.MixinDedicatedServer_HeightLimits",
+        "server.MixinDedicatedPlayerList"
+    ]
+}

@@ -1,0 +1,60 @@
+{
+    "required": true,
+    "package": "io.github.opencubicchunks.cubicchunks.core.asm.mixin.selectable",
+    "refmap": "cubicchunks.mixins.refmap.json",
+    "plugin": "io.github.opencubicchunks.cubicchunks.core.asm.CubicChunksMixinConfig",
+    "compatibilityLevel": "JAVA_8",
+    "minVersion": "0.7.10",
+    "injectors": {
+        "defaultRequire": 1
+    },
+    "overwrites": {
+        "conformVisibility": true
+    },
+    "mixins": [
+        "common.MixinDistantHorizonsLevel",
+        "common.MixinDistantHorizonsLighting",
+        "common.MixinDistantHorizonsUpdates",
+        "common.MixinDistantHorizonsPlan",
+        "common.IDistantHorizonsProvider",
+        "common.MixinDistantHorizonsRequests",
+        "common.MixinDistantHorizonsRequestDetail",
+        "common.MixinDistantHorizonsQueueBackoff",
+        "common.MixinDistantHorizonsMaterials",
+        "common.MixinChunkCache",
+        "common.MixinPathNavigate",
+        "common.MixinTileEntityBeaconBetterFps",
+        "common.MixinWalkNodeProcessor",
+        "common.MixinWorld_CollisionCheck",
+        "common.MixinWorld_SlowCollisionCheck",
+        "common.MixinWorldServer_UpdateBlocks"
+    ],
+    "client": [
+        "client.IGuiVideoSettings",
+        "client.celeritas.MixinCeleritasChunkEvents",
+        "client.celeritas.MixinCeleritasClonedSection",
+        "client.celeritas.MixinCeleritasEntityGatherer",
+        "client.celeritas.MixinCeleritasRenderSectionManager",
+        "client.celeritas.MixinCeleritasSectionManager",
+        "client.celeritas.MixinCeleritasWorldRenderer",
+        "client.celeritas.MixinCeleritasWorldSlice",
+        "client.demonica.MixinDemonicaBiomeUniforms",
+        "client.demonica.MixinDemonicaIncludeGraph",
+        "client.demonica.MixinDemonicaWorldInfo",
+        "client.MixinDistantHorizonsCullingBounds",
+        "client.MixinChunkCache_Cubic",
+        "client.MixinChunkCache_Vanilla",
+        "client.MixinRenderGlobalNoOptifine",
+        "client.optifine.MixinChunkVisibility",
+        "client.optifine.MixinExtendedBlockStorage",
+        "client.optifine.MixinRenderChunk",
+        "client.optifine.MixinRenderChunkUtils",
+        "client.optifine.MixinRenderGlobalOptifine_E",
+        "client.optifine.MixinRenderList",
+        "client.optifine.MixinViewFrustum",
+        "client.vertviewdist.MixinEntityRenderer",
+        "client.vertviewdist.MixinRenderGlobal",
+        "client.vertviewdist.MixinRenderGlobalNoOptifine"
+    ],
+    "server": []
+}

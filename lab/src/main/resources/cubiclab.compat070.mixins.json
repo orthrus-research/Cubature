@@ -1,0 +1,8 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "io.github.opencubicchunks.cubicchunks.lab.mixin",
+  "compatibilityLevel": "JAVA_8",
+  "mixins": ["MixinObjectHolderRef"],
+  "injectors": {"defaultRequire": 1}
+}

@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "id": "storage-ownership",
+  "description": "Diagnostic owned-cache qualification: saves, content restart, faults and an isolated synthetic second cubic dimension. Not ordinary latency acceptance.",
+  "tags": ["storage", "diagnostic", "ownership", "land"],
+  "seed": 8675309,
+  "camera": [-111.5, 102, -2044.5, 135, 22],
+  "warmupTicks": 40,
+  "idleTicks": 1200,
+  "timeoutSeconds": 840,
+  "fixture": {"originColumn": [-64, -128], "sizeColumns": [1, 1], "cohortOffset": [8, 0], "batchSize": 4, "asyncConcurrency": 4, "requirement": "LIGHT"},
+  "scenarios": {
+    "write": ["generate", "save-command", "save-clean", "autosave-natural", "storage-fault-matrix", "save", "storage-content-write", "storage-two-worlds"],
+    "read": ["load-sync", "load-async", "storage-content-read", "save-clean"]
+  }
+}

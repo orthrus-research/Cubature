@@ -1,0 +1,22 @@
+[
+    {
+        "modid": "cubicchunks",
+        "name": "Cubature",
+        "description": "Cubic world infrastructure for Minecraft 1.12.2 and Cleanroom, derived from OpenCubicChunks/CubicChunks and maintained by Orthrus Research. Not an official upstream CubicChunks release.",
+        "version": "%%VERSION%%",
+        "mcversion": "1.12.2",
+        "url": "https://orthrus.cc/cubature",
+        "updateUrl": "",
+        "authorList": [
+            "Barteks2x",
+            "Cuchaz",
+            "Razaekel"
+        ],
+        "credits": "Cubature fork maintained by Orthrus Research. Upstream CubicChunks authorship and credits: Based on Cuchaz's TWM mod, initial idea and first implementation by Robinton. Notable contributors: Cyclonit, xcube16, Boreeas, Foghrye4. Special thanks to: jellusquid3 for allowinf Phosphor light engine to be used under the MIT license. MineCrak for help with 1.6.* CubicChunks. Calacbolg - the CubicChunks suggestion inspired me to start working on CubicChunks mod, and made the idea more well known",
+        "logoFile": "",
+        "screenshots": [],
+        "dependencies": [
+            "after:forge@[14.23.5.2859,]"
+        ]
+    }
+]

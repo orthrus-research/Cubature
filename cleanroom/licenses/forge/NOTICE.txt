@@ -1,0 +1,20 @@
+Minecraft Forge-derived asynchronous chunk loading
+
+Copyright (c) 2016 Minecraft Forge, as retained in the covered file headers.
+Cubature modifications copyright (c) 2026 Orthrus Research.
+License: GNU Lesser General Public License, version 2.1.
+The complete license is in LGPL-2.1.txt in this directory.
+
+Covered package:
+io.github.opencubicchunks.cubicchunks.core.server.chunkio.async.forge
+
+Upstream source identified by CubicChunks' retained NOTICE.md:
+https://github.com/MinecraftForge/MinecraftForge/tree/279380b4f1aa02a4df5e2b323c11ca6ab1531431/src/main/java/net/minecraftforge/common/chunkio
+
+The local fork's changes and source requirements are described in the
+packaged MODIFICATIONS.md. The matching Cubature sources JAR contains the
+covered Java files. Distribution must also provide the complete required
+build inputs and modification patches for the released revision.
+
+The full license text was obtained unchanged from:
+https://www.gnu.org/licenses/old-licenses/lgpl-2.1.txt

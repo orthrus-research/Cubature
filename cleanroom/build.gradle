@@ -1,0 +1,267 @@
+plugins {
+    id 'java'
+    id 'xyz.wagyourtail.unimined' version '1.4.43-kappa'
+}
+
+group = 'cc.orthrus.cubature'
+version = cubic_version
+def targetLoader = providers.gradleProperty('cubicLoader').getOrElse('cleanroom')
+if (!(targetLoader in ['cleanroom', 'forge'])) {
+    throw new GradleException('cubicLoader must be cleanroom or forge')
+}
+def testJavaVersion = providers.gradleProperty('cubicTestJava').map { it.toInteger() }
+        .getOrElse(targetLoader == 'cleanroom' ? 25 : 8)
+if (!(testJavaVersion in (targetLoader == 'cleanroom' ? [25, 26] : [8]))) {
+    throw new GradleException('Cleanroom tests support Java 25/26; Forge tests require Java 8')
+}
+base { archivesName = 'Cubature' }
+layout.buildDirectory = layout.projectDirectory.dir("build/${targetLoader}")
+java {
+    toolchain { languageVersion = JavaLanguageVersion.of(25) }
+    withSourcesJar()
+}
+sourceSets {
+    buildSupport {
+        java.srcDirs = ['src/buildSupport/java']
+    }
+    main {
+        java.srcDirs = ['../src/main/java', '../CubicChunksAPI/src/main/java']
+        resources.srcDirs = ['../src/main/resources', '../CubicChunksAPI/src/main/resources']
+    }
+    test {
+        java.srcDirs = ['../src/test/java']
+        java.include 'io/github/opencubicchunks/cubicchunks/core/server/chunkio/async/forge/TestQueuedCubeHash.java'
+        java.include 'io/github/opencubicchunks/cubicchunks/core/server/chunkio/async/forge/QueuedCubeHashDiagnostic.java'
+        java.include 'io/github/opencubicchunks/cubicchunks/core/server/chunkio/async/forge/TestAsyncTaskCompletion.java'
+        java.include 'io/github/opencubicchunks/cubicchunks/core/worldgen/TestWorldgenWatchdogEntry.java'
+        java.include 'io/github/opencubicchunks/cubicchunks/core/server/chunkio/region/TestShadowPagingRegion.java'
+        java.include 'io/github/opencubicchunks/cubicchunks/core/server/chunkio/region/TestRegionHandleCache.java'
+        java.include 'io/github/opencubicchunks/cubicchunks/core/world/TestServerHeightMapSerialization.java'
+        java.include 'io/github/opencubicchunks/cubicchunks/core/world/TestClientHeightMap.java'
+        java.include 'io/github/opencubicchunks/cubicchunks/core/world/column/TestColumnTileEntityMap.java'
+        java.include 'cubicchunks/TestOpacityIndex.java'
+        java.include 'io/github/opencubicchunks/cubicchunks/core/lighting/TestSurfaceHeightUpdates.java'
+        java.include 'io/github/opencubicchunks/cubicchunks/core/lighting/TestFirstLightUpdateRanges.java'
+        java.include 'io/github/opencubicchunks/cubicchunks/core/lighting/TestLightingRules.java'
+        java.include 'io/github/opencubicchunks/cubicchunks/core/asm/TestVerticalRenderDistanceOption.java'
+        java.include 'io/github/opencubicchunks/cubicchunks/core/util/world/TestCubeSplitTicks.java'
+        java.include 'io/github/opencubicchunks/cubicchunks/core/server/chunkio/TestPendingCubeWrites.java'
+        java.include 'io/github/opencubicchunks/cubicchunks/core/server/chunkio/TestStorageCloseState.java'
+        java.include 'io/github/opencubicchunks/cubicchunks/core/server/TestPacedAutosave.java'
+        java.include 'io/github/opencubicchunks/cubicchunks/core/server/TestMaintenanceIndex.java'
+        java.include 'io/github/opencubicchunks/cubicchunks/core/server/TestCubeSendBudget.java'
+        java.include 'io/github/opencubicchunks/cubicchunks/core/server/TestPendingCubeSends.java'
+        java.include 'io/github/opencubicchunks/cubicchunks/core/network/TestWorldEncoderMissingCubes.java'
+        java.include 'io/github/opencubicchunks/cubicchunks/core/network/TestPacketCubesPayload.java'
+        java.include 'io/github/opencubicchunks/cubicchunks/core/server/chunkio/async/forge/TestAsyncTaskExecution.java'
+        java.include 'io/github/opencubicchunks/cubicchunks/core/server/chunkio/async/forge/TestAsyncTaskQuiescence.java'
+        java.include 'io/github/opencubicchunks/cubicchunks/core/server/chunkio/async/forge/TestAsyncCompletionQueue.java'
+        java.include 'io/github/opencubicchunks/cubicchunks/core/server/TestGenerationBudget.java'
+        java.include 'io/github/opencubicchunks/cubicchunks/core/server/TestGenerationQueue.java'
+        java.include 'io/github/opencubicchunks/cubicchunks/core/server/TestLeadingFace.java'
+        java.include 'io/github/opencubicchunks/cubicchunks/core/server/TestLoadingColumnContext.java'
+        java.include 'io/github/opencubicchunks/cubicchunks/core/server/chunkio/TestRegionCubeStorage.java'
+        java.include 'io/github/opencubicchunks/cubicchunks/core/visibility/TestCuboidalCubeSelector.java'
+        java.include 'io/github/opencubicchunks/cubicchunks/core/util/TestSpatialWatchersSortingList.java'
+        java.include 'io/github/opencubicchunks/cubicchunks/api/util/TestXYZMap.java'
+        java.include 'io/github/opencubicchunks/cubicchunks/api/worldgen/TestCubePrimerBiomes.java'
+        java.include 'io/github/opencubicchunks/cubicchunks/core/compat/TestCubicDistantMaterials.java'
+        java.include 'io/github/opencubicchunks/cubicchunks/core/compat/celeritas/TestEmptyCubeSection.java'
+        java.include 'io/github/opencubicchunks/cubicchunks/core/compat/demonica/TestDemonicaCompat.java'
+    }
+}
+repositories {
+    mavenCentral()
+    maven {
+        url = 'https://curse.cleanroommc.com'
+        content { includeGroup 'curse.maven' }
+    }
+    maven {
+        url = 'https://maven.daporkchop.net/'
+        content { includeGroup 'io.github.opencubicchunks' }
+    }
+    maven {
+        url = 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/'
+        content { includeGroup 'org.spigotmc' }
+    }
+}
+configurations {
+    embeddedLibraries
+    implementation.extendsFrom(embeddedLibraries)
+    modImplementation
+    modCompileOnly
+    compileOnly.extendsFrom(modCompileOnly)
+}
+// Distant Horizons and Demonica are compile-only inputs, never bundled. Inside Riven's workspace they come from its
+// dev/pins; elsewhere tools/fetch_build_inputs.py downloads and verifies them into cleanroom/build-inputs.
+def buildInputs = file(providers.gradleProperty('cubicBuildInputs')
+        .getOrElse(file('../../pins').isDirectory() ? '../../pins' : 'build-inputs'))
+// Celeritas ships inside Demonica's release jar; the cubic-section integration compiles against those exact classes.
+def extractCeleritas = tasks.register('extractCeleritas', Copy) {
+    from(zipTree(new File(buildInputs, 'Demonica-0.9.0.jar'))) { include 'zz-demonica-bundled-celeritas-*.jar' }
+    into layout.buildDirectory.dir('celeritas')
+}
+dependencies {
+    // DH stays upstream on disk; Cubature supplies optional runtime transformations.
+    modCompileOnly files(new File(buildInputs, 'DistantHorizons-3.3.3-1.12.2-forge.jar'))
+    compileOnly fileTree(layout.buildDirectory.dir('celeritas')) { include '*.jar' }.builtBy(extractCeleritas)
+    buildSupportCompileOnly 'com.google.code.findbugs:jsr305:3.0.2'
+    compileOnly 'com.google.code.findbugs:jsr305:3.0.2'
+    compileOnly sourceSets.buildSupport.output
+    // The legacy flow-noise embed is unused by both the mod and its API.
+    embeddedLibraries('io.github.opencubicchunks:regionlib:0.78.0-20210527.114505-2') { transitive = false }
+    compileOnly('org.spigotmc:spigot-api:1.12.2-R0.1-20180712.012057-156') { transitive = false }
+    if (targetLoader == 'forge') {
+        modImplementation 'curse.maven:mixin-booter-419286:8800561'
+    }
+    testImplementation 'junit:junit:4.13.2'
+}
+unimined.minecraft {
+    version '1.12.2'
+    mappings { mcp('stable', '39-1.12') }
+    if (targetLoader == 'cleanroom') {
+        cleanroom { loader cleanroom_version }
+    } else {
+        minecraftForge { loader forge_version }
+    }
+    defaultRemapJar = false
+    mods { remap(configurations.modCompileOnly) }
+    remap(tasks.named('jar').get()) {
+        mixinRemap { enableBaseMixin() }
+    }
+    runs.all {
+        javaVersion = JavaVersion.toVersion(targetLoader == 'cleanroom' ? 25 : 8)
+        workingDir = file("run/${targetLoader}/${name}")
+        jvmArgs += ['-Xms1G', '-Xmx4G', '-Dfml.coreMods.load=io.github.opencubicchunks.cubicchunks.core.asm.coremod.CubicChunksCoreMod']
+        doFirst { workingDir.mkdirs() }
+    }
+}
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    if (targetLoader == 'forge') options.release = 8
+}
+tasks.register('verifyEmbeddedLibraries') {
+    inputs.files(configurations.embeddedLibraries)
+    doLast {
+        def regionlib = configurations.embeddedLibraries.singleFile
+        def digest = java.security.MessageDigest.getInstance('SHA-256').digest(regionlib.bytes).encodeHex().toString()
+        assert digest == '9b4d0f3c6dcb26694f7d347e2ddd4166d76db98f2c9df0dd500add2fd8aa71cd': 'RegionLib artifact differs from the verified maintainer publication'
+    }
+}
+tasks.named('compileJava') { dependsOn tasks.named('verifyEmbeddedLibraries') }
+processResources {
+    inputs.property('version', project.version)
+    filesMatching('mcmod.info') { filter { it.replace('%%VERSION%%', project.version.toString()) } }
+    exclude 'log4j2.xml', 'assets/cubicchunks/logo.png'
+}
+jar {
+    archiveClassifier = "${targetLoader}-dev"
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    exclude 'assets/cubicchunks/logo.png'
+    from({ configurations.embeddedLibraries.collect { zipTree(it) } }) {
+        exclude 'META-INF/MANIFEST.MF', 'META-INF/*.SF', 'META-INF/*.RSA', 'META-INF/*.DSA'
+    }
+    manifest {
+        attributes('Implementation-Title': 'Cubature',
+                   'Implementation-Version': project.version,
+                   'Implementation-Vendor': 'OpenCubicChunks contributors and Orthrus Research',
+                   'FMLCorePlugin': 'io.github.opencubicchunks.cubicchunks.core.asm.coremod.CubicChunksCoreMod',
+                   'FMLCorePluginContainsFMLMod': 'true',
+                   'ForceLoadAsMod': 'true')
+        if (targetLoader == 'cleanroom') attributes('ModType': 'CRL')
+    }
+    finalizedBy tasks.named('remapJar')
+}
+tasks.named('remapJar') { archiveClassifier = targetLoader }
+
+// Source recipients need the same component terms and modification notices as binary recipients.
+['jar', 'sourcesJar'].each { taskName ->
+    tasks.named(taskName, Jar) {
+        from('../license.txt') { into 'META-INF/licenses/cubicchunks' }
+        from('licenses') { into 'META-INF/licenses' }
+        from('../NOTICE.md')
+        from('../MODIFICATIONS.md')
+    }
+}
+tasks.named('test') {
+    useJUnit()
+    // Storage regressions exercise the actual named Minecraft Tuple class without booting a world.
+    classpath += sourceSets.main.compileClasspath
+    javaLauncher = javaToolchains.launcherFor {
+        languageVersion = JavaLanguageVersion.of(testJavaVersion)
+    }
+    doFirst { logger.lifecycle("Focused regressions use Java ${javaLauncher.get().metadata.languageVersion}") }
+}
+
+// The focused lighting/config tests compile against the same named Minecraft and Mixin APIs as the mod.
+sourceSets.test.compileClasspath += sourceSets.main.compileClasspath
+tasks.register('queuedCubeHashDiagnostic', JavaExec) {
+    description = 'Export synthetic queue-key hash distributions; this is not a runtime benchmark.'
+    group = 'verification'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'io.github.opencubicchunks.cubicchunks.core.server.chunkio.async.forge.QueuedCubeHashDiagnostic'
+    javaLauncher = tasks.named('test').get().javaLauncher
+}
+
+tasks.register('heightMapAllocationDiagnostic', JavaExec) {
+    description = 'Compare heightmap serialization allocations with the previous buffer sizing.'
+    group = 'verification'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'io.github.opencubicchunks.cubicchunks.core.world.TestServerHeightMapSerialization'
+    javaLauncher = tasks.named('test').get().javaLauncher
+}
+
+tasks.register('verifyRemappedJar') {
+    description = 'Check distributable class versions, embedded libraries, API names and Mixin resources.'
+    group = 'verification'
+    dependsOn tasks.named('remapJar')
+    inputs.file(tasks.named('remapJar').flatMap { it.archiveFile })
+    doLast {
+        def artifact = tasks.named('remapJar').get().archiveFile.get().asFile
+        new java.util.zip.ZipFile(artifact).withCloseable { archive ->
+            def entries = archive.entries().toList()
+            def names = entries.collect { it.name } as Set
+            assert names.contains('cubicchunks/regionlib/impl/save/SaveSection3D.class'): 'Missing RegionLib'
+            assert names.contains('META-INF/licenses/regionlib/LICENSE.txt'): 'Missing RegionLib license'
+            assert !names.any { it.startsWith('org/spongepowered/asm/') }: 'Do not bundle Mixin'
+            assert !names.any { it.startsWith('mcp/') }: 'Compile support must not ship'
+            def ownClasses = entries.findAll {
+                it.name.startsWith('io/github/opencubicchunks/') && it.name.endsWith('.class')
+            }
+            def expectedMajor = targetLoader == 'cleanroom' ? 69 : 52
+            ownClasses.each { entry ->
+                archive.getInputStream(entry).withCloseable { raw ->
+                    def data = new DataInputStream(raw)
+                    data.readInt()
+                    data.readUnsignedShort()
+                    assert data.readUnsignedShort() == expectedMajor: "Wrong bytecode target: ${entry.name}"
+                }
+            }
+            def json = new groovy.json.JsonSlurper()
+            def externalBridge = 'io.github.opencubicchunks.cubicchunks.core.asm.mixin.fixes.common.MixinItemMap'
+            def configs = entries.findAll { it.name.startsWith('cubicchunks.mixins.') && it.name.endsWith('.json') && !it.name.contains('refmap') }
+            assert configs.size() == 6: 'Expected all six upstream Mixin configurations'
+            configs.each { entry ->
+                def config = json.parse(archive.getInputStream(entry))
+                assert names.contains(config.refmap): "Missing refmap ${config.refmap}"
+                ['mixins', 'client', 'server'].each { side ->
+                    (config[side] ?: []).each { name ->
+                        def mixinClass = "${config.package}.${name}"
+                        // This existing integration is supplied by Riven; it is not part of CubicChunks.
+                        assert mixinClass == externalBridge || names.contains(mixinClass.replace('.', '/') + '.class'): "Missing Mixin ${mixinClass}"
+                    }
+                }
+            }
+            def refmap = json.parse(archive.getInputStream(archive.getEntry('cubicchunks.mixins.refmap.json')))
+            assert refmap.mappings && refmap.mappings.size() > 50: 'Empty or incomplete Mixin refmap'
+            def api = new org.objectweb.asm.tree.ClassNode()
+            new org.objectweb.asm.ClassReader(archive.getInputStream(archive.getEntry('io/github/opencubicchunks/cubicchunks/api/world/IColumn.class'))).accept(api, 0)
+            assert api.methods.any { it.name == 'getHeightValue' && it.desc == '(II)I' }: 'Remapping changed the public IColumn API'
+            assert !api.methods.any { it.name == 'func_76611_b' }: 'Vanilla name leaked into IColumn API'
+            logger.lifecycle("Verified ${artifact.name}: ${ownClasses.size()} mod/API classes, Java ${expectedMajor - 44}, six Mixin configs, ${refmap.mappings.size()} refmap classes; Riven supplies the external map bridge.")
+        }
+    }
+}
+tasks.named('check') { dependsOn tasks.named('verifyRemappedJar') }

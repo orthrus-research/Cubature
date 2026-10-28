@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "id": "storage-tail-control",
+  "description": "Ordinary uninstrumented land control with a completed full view and 3000 whole server ticks. One run verifies capture quality, not representative all-terrain performance or an accepted optimization.",
+  "tags": ["land", "storage", "tail-control"],
+  "seed": 8675309,
+  "camera": [-111.5, 102, -2044.5, 135, 22],
+  "warmupTicks": 40,
+  "idleTicks": 3000,
+  "timeoutSeconds": 840,
+  "fixture": {"originColumn": [-64, -128], "sizeColumns": [1, 1], "cohortOffset": [8, 0], "batchSize": 4, "asyncConcurrency": 4, "requirement": "LIGHT"},
+  "scenarios": {"write": ["full-view", "idle", "generate", "save"], "read": ["load-sync", "load-async", "full-view"]}
+}

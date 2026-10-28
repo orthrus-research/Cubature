@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "id": "land-view",
+  "description": "Low-relief land control from retained Riven native evidence. Fresh view/visual qualification is required; spawn dependencies may be warm. Not a demanding mountain or cave workload.",
+  "tags": ["land", "spawn-control"],
+  "seed": 8675309,
+  "camera": [-111.5, 102, -2044.5, 135, 22],
+  "warmupTicks": 40,
+  "idleTicks": 240,
+  "timeoutSeconds": 840,
+  "scenarios": {"write": ["full-view", "idle"], "read": ["full-view", "idle"]}
+}

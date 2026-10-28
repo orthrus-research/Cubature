@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "purpose": "Optional client-only compatibility inputs. CubicChunks retains storage and world-light responsibilities; the installed render/shader mods retain their own responsibilities and remain unmodified.",
+  "mods": {
+    "celeritas": {
+      "filename": "celeritas-forge-mc12.2-2.5.0-autobuild.9b661b70.jar",
+      "version": "2.5.0-autobuild.9b661b70",
+      "source": "https://git.taumc.org/embeddedt/celeritas",
+      "sourceCommit": "9b661b70ecaf84c39052e8fbc51c875ba37e739d",
+      "url": "https://maven.outlands.top/releases/org/embeddedt/celeritas-forge-mc12.2/2.5.0-autobuild.9b661b70/celeritas-forge-mc12.2-2.5.0-autobuild.9b661b70.jar",
+      "sha256": "5bf123a6da6190f6e061cd3fd069a2bddcbf6ebf57894381b6c888c06a94f982",
+      "sha1": "e66b1f3d0fbf2327d435e45d14b672e3d13af148",
+      "reason": "Requested external terrain-renderer compatibility input; this exact unmodified upstream build is accepted by Demonica's runtime hash guard.",
+      "binaryProvenance": "Third-party upstream auto-build republished on Maven, explicitly pinned by Demonica. Celeritas upstream distributes source rather than official mod binaries.",
+      "license": "LGPL-3.0"
+    },
+    "demonica": {
+      "filename": "Demonica-0.7.3.jar",
+      "version": "0.7.3",
+      "source": "https://github.com/ndellagrotte/Demonica",
+      "sourceCommit": "705f596e7800d3dca20a61dd74753d7586beabc1",
+      "release": "https://github.com/ndellagrotte/Demonica/releases/tag/v0.7.3",
+      "url": "https://github.com/ndellagrotte/Demonica/releases/download/v0.7.3/Demonica-0.7.3.jar",
+      "sha256": "0b13f26d02d2b6081b8d6b7c913d207485052f3b39a182f9069e978e581c4b1d",
+      "sha1": "76ec01f88a70ef97c7522776930b04751133526a",
+      "reason": "Requested external Iris/GLSM/shader compatibility input, alongside its accepted Celeritas build; no renderer/shader implementation is imported into CubicChunks.",
+      "requires": ["celeritas"],
+      "license": "AGPL-3.0 with upstream bundled notices"
+    }
+  },
+  "profiles": {
+    "baseline": [],
+    "celeritas": ["celeritas"],
+    "celeritas-demonica": ["celeritas", "demonica"]
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "id": "cave-view",
+  "description": "Underground morphology proposal near the retained scalloped-pressure-tube column. Full-view visual qualification is pending; a model/native column does not prove a good camera or traversal route.",
+  "tags": ["caves", "site-proposal", "underground"],
+  "seed": 8675309,
+  "camera": [-1193.5, -66, 96.5, 90, 12],
+  "timeoutSeconds": 840,
+  "scenarios": {"write": ["full-view", "idle"], "read": ["full-view", "idle"]}
+}

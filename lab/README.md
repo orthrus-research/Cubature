@@ -1,0 +1,38 @@
+# Cubature lab
+
+An optional measurement mod and native test harness for Cubature. It runs a real Minecraft 1.12.2
+dedicated server and client on Cubature, drives fixed workloads (generation, save and reload,
+storage, full-view delivery) and records tick, frame and delivery timings, optionally with JFR.
+The lab is a development tool: it is never installed with Cubature or shipped in a pack.
+
+## Building
+
+Build Cubature first (`../cleanroom`), then the lab against that artifact, from this directory:
+
+```sh
+../cleanroom/gradlew -PcubicLoader=cleanroom build
+```
+
+`tools/build_cubature.py` builds both and runs the tests in one step.
+
+## Running
+
+`tools/cubic_standalone.py` prepares isolated client and server instances, and `tools/cubic_lab.py`
+runs scenarios and bulk pregeneration in them. Riven prepares instances with its
+`tools/runtime.py prepare` and drives captures through its `tools/riven_observe.py` (see Riven's
+[observability guide](https://github.com/orthrus-research/Riven/blob/main/docs/OBSERVABILITY.md)).
+The Python tools and their tests need the packages in `tools/requirements.txt`:
+
+```sh
+python -m pip install -r tools/requirements.txt
+python -B -m unittest discover -s tools -p "test_*.py"
+```
+
+| Path | Contents |
+| --- | --- |
+| `src/` | The lab mod: scenarios, probes and their Mixins |
+| `benchmarks/` | Workload definitions and an example campaign |
+| `jfr/` | JFR settings for generation, reload and tail-latency recordings |
+| `profiles/`, `runtime.properties` | Client renderer profiles and the pinned runtime the lab launches |
+
+Results describe the measured machine and runtime; they are diagnostics, not performance claims.

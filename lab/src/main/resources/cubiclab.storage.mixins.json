@@ -1,0 +1,8 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "io.github.opencubicchunks.cubicchunks.lab.mixin",
+  "compatibilityLevel": "JAVA_8",
+  "mixins": ["MixinStorageRegionForces", "MixinStorageWriter", "MixinStorageBackend", "MixinStorageSnapshot", "MixinStorageCache", "MixinStorageWorldSave", "MixinStorageRegionBuilder", "MixinStorageWrites", "MixinStorageOverflow", "MixinStorageServer", "MixinStorageCubePurge"],
+  "injectors": {"defaultRequire": 1}
+}

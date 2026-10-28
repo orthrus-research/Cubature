@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "id": "stack-smoke",
+  "description": "Infrastructure smoke workload: land view, idle, interpolated spectator movement and separate 64-cube full-height LIGHT/save/reload cohorts. This verifies tooling, not a speedup or representative terrain coverage.",
+  "tags": ["land", "route", "storage", "infrastructure"],
+  "seed": 8675309,
+  "camera": [-111.5, 102, -2044.5, 135, 22],
+  "warmupTicks": 40,
+  "idleTicks": 100,
+  "residentTicks": 100,
+  "timeoutSeconds": 840,
+  "fixture": {"originColumn": [-64, -128], "sizeColumns": [1, 1], "cohortOffset": [8, 0], "batchSize": 4, "asyncConcurrency": 4, "requirement": "LIGHT"},
+  "route": {
+    "interpolation": "linear",
+    "waypoints": [
+      {"pose": [-111.5, 102, -2044.5, 135, 22], "ticks": 80},
+      {"pose": [-47.5, 118, -2044.5, 90, 28], "ticks": 80},
+      {"pose": [-47.5, 118, -1980.5, 45, 28], "ticks": 80}
+    ]
+  },
+  "scenarios": {"write": ["full-view", "idle", "route", "generate", "lighting-snapshot", "resident", "save"], "read": ["load-sync", "load-async", "resident", "full-view"]}
+}

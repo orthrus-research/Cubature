@@ -1,0 +1,127 @@
+# Build #
+#########
+MANIFEST.MF
+dependency-reduced-pom.xml
+.checkstyle
+build.py
+
+# Compiled #
+############
+bin
+build
+dist
+lib
+out
+run
+run/**
+.mixin.out
+.mixin.out/**
+target
+*.com
+*.class
+__pycache__/
+*.py[cod]
+*.dll
+*.exe
+*.o
+*.so
+classes/
+
+# Databases #
+#############
+*.db
+*.sql
+*.sqlite
+
+# Packages #
+############
+*.7z
+*.dmg
+*.gz
+*.iso
+*.rar
+*.tar
+*.zip
+
+# Repository #
+##############
+.git
+
+# Logging #
+###########
+/logs
+*.log
+
+# Misc #
+########
+*.bak
+*.hprof
+*~
+
+# Libraries #
+#############
+/libs
+
+# System #
+##########
+.DS_Store
+ehthumbs.db
+Thumbs.db
+
+# Project #
+###########
+.classpath
+.externalToolBuilders
+.gradle
+.nb-gradle
+.project
+.settings
+eclipse
+nbproject
+atlassian-ide-plugin.xml
+build.xml
+nb-configuration.xml
+*.iml
+*.ipr
+*.iws
+
+# eclipse
+bin
+*.launch
+.settings
+.metadata
+.classpath
+.project
+
+# idea
+out
+*.ipr
+*.iws
+*.iml
+.idea/*
+!.idea/codeStyles/
+
+# gradle
+build
+.gradle
+
+# other
+eclipse
+run
+
+.nb-gradle-properties
+VERSION
+
+# Compile-only inputs fetched by tools/fetch_build_inputs.py
+cleanroom/build-inputs/
+
+# Agent tooling: local only, never committed
+AGENTS.md
+CLAUDE.md
+CLAUDE.local.md
+GEMINI.md
+.mcp.json
+.claude/
+.codex/
+.cursor/
+.agents/

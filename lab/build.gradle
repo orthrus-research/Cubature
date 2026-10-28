@@ -1,0 +1,64 @@
+plugins {
+    id 'java'
+    id 'xyz.wagyourtail.unimined' version '1.4.43-kappa'
+}
+group = 'io.github.opencubicchunks'
+version = '0.1.0'
+def targetLoader = providers.gradleProperty('cubicLoader').getOrElse('cleanroom')
+if (!(targetLoader in ['cleanroom', 'forge'])) throw new GradleException('Unsupported cubicLoader')
+def cubicProperties = new Properties()
+file('../cleanroom/gradle.properties').withInputStream { cubicProperties.load(it) }
+def cubicJar = file(providers.gradleProperty('cubicArtifact').getOrElse(
+        "../cleanroom/build/${targetLoader}/libs/Cubature-${cubicProperties.cubic_version}-${targetLoader}.jar"))
+if (!cubicJar.isFile()) throw new GradleException('Build the matching Cubature artifact under cleanroom/ first, or select -PcubicArtifact=<frozen.jar>')
+// A content-addressed module keeps Unimined remapping fresh as the local fork changes.
+def inputVersion = targetLoader + '-' + java.security.MessageDigest.getInstance('SHA-256').digest(cubicJar.bytes).encodeHex().toString()
+def inputRepository = file('.gradle/lab-mod-inputs')
+def inputJar = new File(inputRepository, "local/cubicchunks/CubicChunks/${inputVersion}/CubicChunks-${inputVersion}.jar")
+if (!inputJar.exists()) { inputJar.parentFile.mkdirs(); java.nio.file.Files.copy(cubicJar.toPath(), inputJar.toPath()) }
+base { archivesName = 'cubicchunks-lab' }
+layout.buildDirectory = layout.projectDirectory.dir("build/${targetLoader}")
+java { toolchain { languageVersion = JavaLanguageVersion.of(25) }; withSourcesJar() }
+if (targetLoader == 'cleanroom') sourceSets.main.java.srcDir('src/cleanroom070/java')
+repositories {
+    maven { url = inputRepository; content { includeGroup 'local.cubicchunks' }; metadataSources { artifact() } }
+    mavenCentral(); maven { url = 'https://curse.cleanroommc.com' }; maven { url = 'https://maven.cleanroommc.com' }
+}
+configurations { modCompileOnly; compileOnly.extendsFrom(modCompileOnly); modImplementation }
+dependencies {
+    modCompileOnly "local.cubicchunks:CubicChunks:${inputVersion}"
+    if (targetLoader == 'cleanroom') {
+        compileOnly 'zone.rong:imaginebreaker:3.2'
+        testRuntimeOnly 'zone.rong:imaginebreaker:3.2'
+    }
+    if (targetLoader == 'forge') modCompileOnly 'curse.maven:mixin-booter-419286:8800561'
+    testImplementation 'junit:junit:4.13.2'
+}
+unimined.minecraft {
+    version '1.12.2'
+    mappings { mcp('stable', '39-1.12') }
+    if (targetLoader == 'cleanroom') cleanroom { loader cleanroom_version }
+    else minecraftForge { loader forge_version }
+    mods { remap(configurations.modCompileOnly) }
+    defaultRemapJar = false
+    remap(tasks.named('jar').get()) { mixinRemap { enableBaseMixin(); enableMixinExtra() } }
+}
+tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8'; if (targetLoader == 'forge') options.release = 8 }
+jar {
+    archiveClassifier = "${targetLoader}-dev"
+    manifest {
+        attributes('FMLCorePlugin': 'io.github.opencubicchunks.cubicchunks.lab.LabCorePlugin',
+            'FMLCorePluginContainsFMLMod': 'true', 'Implementation-Version': project.version)
+        if (targetLoader == 'cleanroom') attributes('ModType': 'CRL')
+    }
+    from('../license.txt') { into 'META-INF/licenses/cubicchunks-lab' }
+    finalizedBy tasks.named('remapJar')
+}
+tasks.named('remapJar') { archiveClassifier = targetLoader }
+tasks.named('test') {
+    useJUnit()
+    classpath += sourceSets.main.compileClasspath
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(targetLoader == 'cleanroom' ? 26 : 8) }
+}
+sourceSets.test.compileClasspath += sourceSets.main.compileClasspath
+if (targetLoader == 'forge') sourceSets.test.java.exclude('**/TestLegacyFieldBridge.java')

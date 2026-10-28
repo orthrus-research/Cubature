@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "id": "storage-lighting-control",
+  "description": "Storage qualification with explicit emissive blocks and skylight at every allocated cube height. Forced first-light geometry is a persistence fixture, not pristine terrain or ordinary streaming performance.",
+  "tags": ["storage", "lighting", "infrastructure", "land"],
+  "seed": 8675309,
+  "camera": [-111.5, 102, -2044.5, 135, 22],
+  "warmupTicks": 40,
+  "timeoutSeconds": 840,
+  "fixture": {"originColumn": [-64, -128], "sizeColumns": [1, 1], "cohortOffset": [8, 0], "batchSize": 4, "asyncConcurrency": 4, "requirement": "GENERATE"},
+  "scenarios": {"write": ["generate", "first-light", "save", "save-command"], "read": ["load-sync", "load-async"]}
+}
