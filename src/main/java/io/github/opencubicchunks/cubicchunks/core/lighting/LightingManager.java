@@ -33,7 +33,6 @@ import io.github.opencubicchunks.cubicchunks.core.CubicChunksConfig;
 import io.github.opencubicchunks.cubicchunks.core.asm.mixin.ICubicWorldInternal;
 import io.github.opencubicchunks.cubicchunks.core.lighting.phosphor.LightingHooks;
 import io.github.opencubicchunks.cubicchunks.core.lighting.phosphor.PhosphorLightEngine;
-import io.github.opencubicchunks.cubicchunks.core.server.PlayerCubeMap;
 import io.github.opencubicchunks.cubicchunks.core.world.IColumnInternal;
 import io.github.opencubicchunks.cubicchunks.core.world.cube.Cube;
 import mcp.MethodsReturnNonnullByDefault;
@@ -163,16 +162,20 @@ public class LightingManager implements ILightingManager {
 
     @Override public void onHeightUpdate(BlockPos pos) {
         if (!world.isRemote) {
-            ((PlayerCubeMap) ((WorldServer) world).getPlayerChunkMap()).heightUpdated(pos.getX(), pos.getZ());
+            heightListener().heightUpdated(pos.getX(), pos.getZ());
         }
     }
 
     @Override public void onTrackCubeSurface(ICube cube) {
         if (!world.isRemote) {
-            PlayerCubeMap playerMap = (PlayerCubeMap) ((WorldServer) world).getPlayerChunkMap();
-            SurfaceHeightUpdates.forCube(cube.getCoords(), playerMap::heightUpdated);
+            SurfaceHeightUpdates.forCube(cube.getCoords(), heightListener());
             tryScheduleOnLoadHeightChangeRelight(cube);
         }
+    }
+
+    /** The server's player chunk map, told when lighting changes a column's surface height. */
+    private SurfaceHeightListener heightListener() {
+        return (SurfaceHeightListener) ((WorldServer) world).getPlayerChunkMap();
     }
 
     @Override public void doFirstLight(ICube cube) {

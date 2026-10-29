@@ -48,6 +48,7 @@ import io.github.opencubicchunks.cubicchunks.core.CubicChunksConfig;
 import io.github.opencubicchunks.cubicchunks.core.CubicChunksConfig.DeliveryMode;
 import io.github.opencubicchunks.cubicchunks.core.asm.mixin.ICubicWorldInternal;
 import io.github.opencubicchunks.cubicchunks.core.entity.ICubicEntityTracker;
+import io.github.opencubicchunks.cubicchunks.core.lighting.SurfaceHeightListener;
 import io.github.opencubicchunks.cubicchunks.core.network.PacketCubes;
 import io.github.opencubicchunks.cubicchunks.core.network.CubeSendDiagnostics;
 import io.github.opencubicchunks.cubicchunks.core.network.PacketDispatcher;
@@ -98,7 +99,7 @@ import javax.annotation.ParametersAreNonnullByDefault;
  */
 @ParametersAreNonnullByDefault
 @MethodsReturnNonnullByDefault
-public class PlayerCubeMap extends PlayerChunkMap {
+public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, SurfaceHeightListener {
     private final GenerationBudget generationBudget = new GenerationBudget();
 
     /** Teleports waiting for generation workers to prepare their destination column (deferArrival). */
@@ -692,6 +693,7 @@ public class PlayerCubeMap extends PlayerChunkMap {
         }
     }
 
+    @Override
     public void heightUpdated(int blockX, int blockZ) {
         ColumnWatcher columnWatcher = this.columnWatchers.get(blockToCube(blockX), blockToCube(blockZ));
         if (columnWatcher != null) {
@@ -876,7 +878,9 @@ public class PlayerCubeMap extends PlayerChunkMap {
         if (!deliveryMode.incremental()) this.chunkGc.tick();
     }
 
-    boolean deliveryViewContains(int x, int y, int z) {
+    @Override
+    public boolean holdsCube(int x, int y, int z) {
+        if (cubeWatchers.get(x, y, z) != null) return true;
         for (PlayerWrapper player : players.valueCollection())
             if (withinDeliveryView(player.playerEntity, x, y, z)) return true;
         for (EntityPlayerMP player : pendingPlayerAddToCubeMap)
@@ -1161,6 +1165,7 @@ public class PlayerCubeMap extends PlayerChunkMap {
         return this.cubeWatchers.randomWrappedIterator(seed);
     }
     
+    @Override
     public Iterator<Cube> getCubeIterator() {
         WorldServer world = this.getWorldServer();
         final Iterator<CubeWatcher> iterator = this.tickableCubeTracker.iterator();

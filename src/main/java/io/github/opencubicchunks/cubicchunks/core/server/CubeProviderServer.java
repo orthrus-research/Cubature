@@ -375,8 +375,7 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
         tickAutosave();
         long i = System.currentTimeMillis();
         Random rand = this.world.rand;
-        PlayerCubeMap playerCubeMap = ((PlayerCubeMap) this.world.getPlayerChunkMap());
-        Iterator<Cube> watchersIterator = playerCubeMap.getCubeIterator();
+        Iterator<Cube> watchersIterator = demand().getCubeIterator();
         BooleanSupplier tickFaster = () -> System.currentTimeMillis() - i > 40;
         while (watchersIterator.hasNext()) {
             watchersIterator.next().tickCubeServer(tickFaster, rand);
@@ -911,10 +910,9 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
 
     boolean tryUnloadCube(Cube cube) {
         if (deliveryMode.incremental()) {
-            PlayerCubeMap watchers = (PlayerCubeMap) world.getPlayerChunkMap();
-            // A watcher can still be waiting for its load callback and thus have no ticket yet.
-            // Also protect actual player positions if a callback moved one since reconciliation.
-            if (watchers.contains(cube.getCoords()) || watchers.deliveryViewContains(cube.getX(), cube.getY(), cube.getZ())
+            // Delivery may still hold a cube with no ticket yet (a pending load callback, or a player
+            // a callback moved since reconciliation).
+            if (demand().holdsCube(cube.getX(), cube.getY(), cube.getZ())
                     || !AsyncWorldIOExecutor.canDropColumn(worldServer, cube.getX(), cube.getZ())) return false;
         }
         if (ForgeChunkManager.getPersistentChunksFor(world).containsKey(cube.getColumn().getPos())) {
@@ -935,6 +933,11 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
             throw new RuntimeException();
         }
         return true;
+    }
+
+    /** What delivery asks of this provider, from the world's player chunk map. */
+    private CubeDemand demand() {
+        return (CubeDemand) world.getPlayerChunkMap();
     }
 
     boolean tryUnloadColumn(Chunk column) {

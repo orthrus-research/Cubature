@@ -23,7 +23,10 @@ starts and shared by every dimension, the `incrementalMaintenance` option and th
 a named provider call reached only from vanilla's periodic save, so `saveChunks` always saves at
 once; only watcher and ahead-preparation requests schedule generation on the workers, and other
 requests never see work in flight as absent; and `PacketCubes` sorts a copy of its batch and is
-told by its sender whether to compute an exact size.
+told by its sender whether to compute an exact size. The provider and lighting no longer name
+`PlayerCubeMap`: they read the world's player chunk map as `CubeDemand` (the cubes to tick, and
+whether delivery still holds a cube) and `SurfaceHeightListener` (column heights changed), which the
+map implements; `TestLayerBoundary` keeps it so.
 The Cubature name and license packaging were adopted on October 19, 2026;
 that change added no terrain or scheduling algorithm.
 

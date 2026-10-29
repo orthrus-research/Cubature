@@ -35,4 +35,10 @@ python -B -m unittest discover -s tools -p "test_*.py"
 | `jfr/` | JFR settings for generation, reload and tail-latency recordings |
 | `profiles/`, `runtime.properties` | Client renderer profiles and the pinned runtime the lab launches |
 
+Some probes live in Cubature's own packages (`core.server`, `core.server.chunkio`) so they can call
+package-private members such as `CubeProviderServer.tryUnloadCube` and `cubesIterator`, as unit tests
+in the same package do. They are tests: Cubature keeps those members package-private rather than
+publishing them for the lab, and a change to them must keep the lab building
+(`tools/build_cubature.py` builds both).
+
 Results describe the measured machine and runtime; they are diagnostics, not performance claims.
