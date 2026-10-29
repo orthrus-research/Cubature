@@ -24,4 +24,7 @@ final class CubeSendBudget {
     }
 
     long bytes() { return bytes; }
+
+    /** Whether a byte limit applies this tick, so packets must report their exact size. */
+    boolean limitsBytes() { return byteLimit > 0; }
 }

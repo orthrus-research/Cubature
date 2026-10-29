@@ -550,6 +550,8 @@ public class PlayerCubeMap extends PlayerChunkMap {
         int packetCubes = Math.max(1, Math.min(1024, CubicChunksConfig.maxCubePacketCubes));
         long started = observer != null || timeMillis > 0 ? System.nanoTime() : 0;
         cubeSendBudget.reset(started, TimeUnit.MILLISECONDS.toNanos(timeMillis), CubicChunksConfig.maxCubeSendBytesPerTick);
+        // The byte budget and the send diagnostics count bytes, so packets must know their size up front.
+        boolean exactBytes = observer != null || cubeSendBudget.limitsBytes();
         long lightingNanos = 0;
         int sent = 0;
         ArrayList<Cube> batch = new ArrayList<>(packetTarget > 0 ? Math.min(32, packetCubes) : packetCubes);
@@ -588,10 +590,9 @@ public class PlayerCubeMap extends PlayerChunkMap {
                 long bodyBytes = 0;
                 PacketCubes packet = null;
                 if (vanillaNetworkHandler.hasCubicChunks(player)) {
-                    packet = new PacketCubes(batch);
-                    bodyBytes = Math.max(0, packet.getSerializedSize()); // Unknown only when exact byte accounting is disabled.
+                    packet = new PacketCubes(batch, exactBytes);
+                    bodyBytes = Math.max(0, packet.getSerializedSize()); // Unknown (-1) only without exactBytes.
                 }
-                // PacketCubes sorts batch in place. Capture matching original watchers only after that sort/snapshot.
                 batchWatchers.clear();
                 for (int i = 0; i < batch.size(); i++) batchWatchers.add(getCubeWatcher(batch.get(i).getCoords()));
                 if (packet != null) {

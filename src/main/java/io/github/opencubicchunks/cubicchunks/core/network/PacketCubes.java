@@ -26,7 +26,6 @@ package io.github.opencubicchunks.cubicchunks.core.network;
 
 import io.github.opencubicchunks.cubicchunks.api.util.CubePos;
 import io.github.opencubicchunks.cubicchunks.core.CubicChunks;
-import io.github.opencubicchunks.cubicchunks.core.CubicChunksConfig;
 import io.github.opencubicchunks.cubicchunks.core.client.CubeProviderClient;
 import io.github.opencubicchunks.cubicchunks.core.util.PacketUtils;
 import io.github.opencubicchunks.cubicchunks.core.world.cube.Cube;
@@ -67,9 +66,16 @@ public class PacketCubes implements IMessage {
     public PacketCubes() {
     }
 
-    public PacketCubes(List<Cube> cubes) {
+    /**
+     * Snapshots the cubes, sorted into wire order without reordering the caller's list. With
+     * {@code exactSize}, tile-entity tags are encoded now on the calling thread so that
+     * {@link #getSerializedSize()} is exact at once; otherwise a packet with tile entities defers
+     * that work to encoding and reports -1 until then.
+     */
+    public PacketCubes(List<Cube> batch, boolean exactSize) {
         CubeSendDiagnostics.Observer observer = CubeSendDiagnostics.getObserver();
         long started = observer == null ? 0 : System.nanoTime();
+        List<Cube> cubes = new ArrayList<>(batch);
         cubes.sort(Comparator.<Cube>comparingInt(c -> c.getCoords().getY())
                 .thenComparingInt(c -> c.getCoords().getX())
                 .thenComparingInt(c -> c.getCoords().getZ()));
@@ -92,8 +98,8 @@ public class PacketCubes implements IMessage {
         for (Cube cube : cubes) if (!cube.getTileEntityMap().isEmpty()) { hasTiles = true; break; }
         if (!hasTiles) {
             encodedTileEntityTags = new byte[cubes.size() * 4]; // One zero count per cube, without a temporary buffer/list.
-        } else if (observer != null || CubicChunksConfig.maxCubeSendBytesPerTick > 0) {
-            // Exact byte budgeting snapshots and encodes once on the owner, without re-running TE hooks.
+        } else if (exactSize) {
+            // Exact byte accounting snapshots and encodes once on the owner, without re-running TE hooks.
             ByteBuf tags = Unpooled.buffer();
             try {
                 for (Cube cube : cubes) {
@@ -187,7 +193,7 @@ public class PacketCubes implements IMessage {
         while (remaining != 0) { remaining >>>= 7; bytes++; }
         return bytes;
     }
-    /** Uncompressed body including TE NBT; -1 until encoding for ordinary unbudgeted TE packets. Not wire framing/compression. */
+    /** Uncompressed body including TE NBT; -1 until encoding for a TE packet built without exactSize. Not wire framing/compression. */
     public int getSerializedSize() { return serializedSize; }
 
     /** Coordinate-only correlation across JVMs; this is not a content digest or a unique packet ID. */
