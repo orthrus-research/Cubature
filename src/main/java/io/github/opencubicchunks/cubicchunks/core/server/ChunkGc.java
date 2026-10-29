@@ -82,7 +82,7 @@ public class ChunkGc {
     private void tickIncrementalGc() {
         if (maintenance == null) return;
         long start = System.nanoTime();
-        long budget = Math.max(1, CubicChunksConfig.maintenanceTimeMillis) * 1_000_000L;
+        long budget = CubicChunksConfig.maintenanceTimeMillis * 1_000_000L;
         int unloaded = 0;
         for (int inspected = 0; inspected < CubicChunksConfig.maintenanceInspectionsPerTick
                 && (maintenance.gcCubes > 0 || maintenance.gcColumns > 0) && unloaded < CubicChunksConfig.maintenanceUnloadsPerTick

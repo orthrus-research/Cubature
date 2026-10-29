@@ -84,7 +84,7 @@ final class CubeSender {
         CubeSendDiagnostics.Observer observer = CubeSendDiagnostics.getObserver();
         int timeMillis = CubicChunksConfig.maxCubeSendTimeMillis;
         int packetTarget = CubicChunksConfig.maxCubePacketBytes;
-        int packetCubes = Math.max(1, Math.min(1024, CubicChunksConfig.maxCubePacketCubes));
+        int packetCubes = CubicChunksConfig.maxCubePacketCubes;
         long started = observer != null || timeMillis > 0 ? System.nanoTime() : 0;
         budget.reset(started, TimeUnit.MILLISECONDS.toNanos(timeMillis), CubicChunksConfig.maxCubeSendBytesPerTick);
         // The byte budget and the send diagnostics count bytes, so packets must know their size up front.

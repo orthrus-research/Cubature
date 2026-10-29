@@ -55,8 +55,8 @@ final class PeriodicAutosave {
         lastAutosaveProcessed = 0;
         if (provider.world.disableLevelSaving) return;
         long start = System.nanoTime();
-        long budget = Math.max(1, CubicChunksConfig.autosaveTimeMillis) * 1_000_000L;
-        int limit = Math.max(1, CubicChunksConfig.autosaveSnapshotsPerTick);
+        long budget = CubicChunksConfig.autosaveTimeMillis * 1_000_000L;
+        int limit = CubicChunksConfig.autosaveSnapshotsPerTick;
         if (maintenance != null && maintenance.continuousDiscovery
                 && maintenance.discoverCubes == 0 && maintenance.discoverColumns == 0) {
             // The existing two independent bounded cursors discover dirty state continuously.

@@ -71,8 +71,8 @@ public class AsyncBatchingCubeIO implements ICubeIO {
     public AsyncBatchingCubeIO(World world, ICubicStorage storage) throws IOException {
         this.world = Objects.requireNonNull(world, "world");
         this.storage = Objects.requireNonNull(storage, "storage");
-        this.writes = new PendingCubeWrites(storage, Math.max(1, CubicChunksConfig.storageBatchColumns),
-                Math.max(1, CubicChunksConfig.storageBatchCubes), error ->
+        this.writes = new PendingCubeWrites(storage, CubicChunksConfig.storageBatchColumns,
+                CubicChunksConfig.storageBatchCubes, error ->
                 CubicChunks.LOGGER.error("Cube storage write failed; snapshots retained. Explicit flush will retry.", error));
         this.pendingColumns = writes.columns;
         this.pendingCubes = writes.cubes;
@@ -272,7 +272,7 @@ public class AsyncBatchingCubeIO implements ICubeIO {
     public boolean canAutoSave() {
         return this.open && this.closeState.state() == StorageCloseState.State.OPEN && !this.writes.hasFailure()
                 && this.pendingColumns.size() + this.pendingCubes.size()
-                < Math.max(1, CubicChunksConfig.autosavePendingThreshold);
+                < CubicChunksConfig.autosavePendingThreshold;
     }
 
     @Override

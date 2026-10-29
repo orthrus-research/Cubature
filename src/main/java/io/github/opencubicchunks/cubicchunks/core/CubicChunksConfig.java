@@ -131,6 +131,7 @@ public class CubicChunksConfig {
     @Config.Comment("Maximum column entries in one storage write batch.")
     public static int storageBatchColumns = 16;
 
+    @Config.RangeInt(min = 0, max = 1000000)
     @Config.Comment("Chunk garbage collector update interval. Lower value will increase CPU usage, but can reduce memory usage.")
     @Config.LangKey("cubicchunks.config.chunk_gc_interval")
     public static int chunkGCInterval = 20 * 10;
@@ -162,10 +163,12 @@ public class CubicChunksConfig {
         + "ALWAYS - load everything as cubic chunks. Overrides forceDimensionExcludes")
     public static ForceCCMode forceLoadCubicChunks = ForceCCMode.NONE;
 
+    @Config.RangeInt(min = 1, max = 1048576)
     @Config.LangKey("cubicchunks.config.cubegen_per_tick")
     @Config.Comment("The maximum number of cubic chunks to generate per tick.")
     public static int maxGeneratedCubesPerTick = 49 * 16;
 
+    @Config.RangeInt(min = 1, max = 10000)
     @Config.LangKey("cubicchunks.config.max_cube_generation_time_millis")
     @Config.Comment("Maximum amount of time spent on generating chunks per dimension.")
     public static int maxCubeGenerationTimeMillis = 50;
@@ -177,6 +180,7 @@ public class CubicChunksConfig {
             + "generated. Use at your own risk.")
     public static boolean useVanillaChunkWorldGenerators = false;
 
+    @Config.RangeInt(min = 2, max = 64)
     @Config.LangKey("cubicchunks.config.vert_view_distance")
     @Config.Comment("Similar to Minecraft's view distance, only for vertical chunks. Automatically adjusted by vertical view distance slider on the"
             + " client. Does not affect rendering, only what chunks are sent to client.")
@@ -201,6 +205,7 @@ public class CubicChunksConfig {
             + "existing dimension switching between cubic chunks and vanilla, the contents of that dimension won't be converted.")
     public static boolean forceDimensionExcludes = false;
 
+    @Config.RangeInt(min = 0, max = 65536)
     @Config.LangKey("cubicchunks.config.relight_checks_per_tick_per_column")
     @Config.Comment("In an attempt to fix lighting glitches over time, cubic chunks will keep updating light in specified amount of blocks per "
             + "column (chunk) per tick. This option shouldn't be necessary but may be useful for old worlds where lighting is broken or when "
@@ -212,14 +217,17 @@ public class CubicChunksConfig {
             + "fix lighting on the clientside.")
     public static boolean doClientLightFixes = false;
 
+    @Config.RangeInt(min = CubicChunks.MIN_SUPPORTED_BLOCK_Y, max = CubicChunks.MAX_SUPPORTED_BLOCK_Y)
     @Config.LangKey("cubicchunks.config.biome_temperature_center_y")
     @Config.Comment("Heights below this value will have normal, unmodified biome temperature")
     public static int biomeTemperatureCenterY = 64;
 
+    @Config.RangeDouble(min = -1, max = 1)
     @Config.LangKey("cubicchunks.config.biome_temperature_y_factor")
     @Config.Comment("How much should biome temperature increase with height (negative values decrease temperature)")
     public static float biomeTemperatureHeightFactor = -0.05F / 30.0F;
 
+    @Config.RangeInt(min = CubicChunks.MIN_SUPPORTED_BLOCK_Y, max = CubicChunks.MAX_SUPPORTED_BLOCK_Y)
     @Config.LangKey("cubicchunks.config.biome_temperature_scale_max_y")
     @Config.Comment("Above this height, biome temperature will no longer change")
     public static int biomeTemperatureScaleMaxY = 256;
@@ -233,18 +241,22 @@ public class CubicChunksConfig {
                     + "If empty, the storage format for new worlds will be determined automatically.")
     public static String storageFormat = "";
 
+    @Config.RangeInt(min = 0, max = 256)
     @Config.LangKey("cubicchunks.config.spawn_generate_distance_horizontal")
     @Config.Comment("Horizontal distance for initially generated spawn area")
     public static int spawnGenerateDistanceXZ = 12;
 
+    @Config.RangeInt(min = 0, max = 256)
     @Config.LangKey("cubicchunks.config.spawn_generate_distance_vertical")
     @Config.Comment("Vertical distance for initially generated spawn area")
     public static int spawnGenerateDistanceY = 8;
 
+    @Config.RangeInt(min = 0, max = 256)
     @Config.LangKey("cubicchunks.config.spawn_forceload_distance_horizontal")
     @Config.Comment("Horizontal distance for spawn chunks kept loaded in memory")
     public static int spawnLoadDistanceXZ = 8;
 
+    @Config.RangeInt(min = 0, max = 256)
     @Config.LangKey("cubicchunks.config.spawn_forceload_distance_vertical")
     @Config.Comment("Vertical distance for spawn chunks kept loaded in memory")
     public static int spawnLoadDistanceY = 8;
@@ -259,6 +271,7 @@ public class CubicChunksConfig {
     @Config.RangeInt(min = 16, max = CubicChunks.MAX_SUPPORTED_BLOCK_Y)
     public static int defaultMaxHeight = 1 << 30;
 
+    @Config.RangeInt(min = 1, max = 3600000)
     @Config.LangKey("cubicchunks.config.worldgen_watchdog_time_limit")
     @Config.Comment("Time (milliseconds) in vanilla compatibility generation before logging one diagnostic report. "
             + "The watchdog does not stop or interrupt world generation.")
@@ -270,6 +283,7 @@ public class CubicChunksConfig {
             + "This is VERY likely to break when used with other mods")
     public static boolean allowVanillaClients = false;
 
+    @Config.RangeInt(min = 1, max = 1048576)
     @Config.LangKey("cubicchunks.config.cubes_to_send_per_tick")
     @Config.Comment("Max amount of cubes sent to client per tick to players")
     public static int cubesToSendPerTick = 81 * 8 + 1;
@@ -323,10 +337,12 @@ public class CubicChunksConfig {
         @Config.Comment("If horizontal slices is enabled, restricts horizontal slices to Bedrock edition clients.\n"
                         + "Note that Bedrock clients are not supported directly, but only when connecting through a proxy such as Geyser.")
         public boolean horizontalSlicesBedrockOnly = true;
+        @Config.RangeInt(min = 16, max = 30000000)
         @Config.LangKey("cubicchunks.config.vanilla_clients.horizontal_slice_size")
         @Config.Comment("The size (radius) of a horizontal slice.")
         public int horizontalSliceSize = 65536;
     }
+    @Config.RangeInt(min = 0, max = 1048576)
     public static int defaultMaxCubesPerChunkloadingTicket = 25 * 16;
     public static Map<String, Integer> modMaxCubesPerChunkloadingTicket = new HashMap<>();
 
@@ -344,6 +360,11 @@ public class CubicChunksConfig {
     }
 
     private static void validateConfigValues() {
+        try {
+            clampToDeclaredRanges(null, CubicChunksConfig.class.getFields(), "");
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException(e);
+        }
         if (!VanillaCompatibilityGeneratorProviderBase.REGISTRY.containsKey(new ResourceLocation(compatibilityGeneratorType))) {
             CubicChunks.LOGGER.error("CubicChunksConfig: Compatibility generator type {} doesn't exist, resetting config to default", compatibilityGeneratorType);
             compatibilityGeneratorType = VanillaCompatibilityGeneratorProviderBase.DEFAULT.toString();
@@ -359,6 +380,45 @@ public class CubicChunksConfig {
         if ((defaultMaxHeight & 0xF) != 0) {
             CubicChunks.LOGGER.error("CubicChunksConfig: defaultMaxHeight not a multiple of 16, got {}, setting to {}", defaultMaxHeight, defaultMaxHeight & ~0xF);
             defaultMaxHeight &= ~0xF;
+        }
+    }
+
+    /**
+     * Brings every number outside its declared range to the nearest bound, as Forge's ranged getters do, walking the
+     * same options as the set command.
+     */
+    private static void clampToDeclaredRanges(@Nullable Object object, Field[] fields, String prefix) throws ReflectiveOperationException {
+        for (Field field : fields) {
+            if (field.getAnnotationsByType(Config.Ignore.class).length != 0) {
+                continue;
+            }
+            Class<?> type = field.getType();
+            Config.RangeInt ints = field.getAnnotation(Config.RangeInt.class);
+            Config.RangeDouble doubles = field.getAnnotation(Config.RangeDouble.class);
+            if (ints != null && type == int.class) {
+                int value = field.getInt(object);
+                int clamped = Math.max(ints.min(), Math.min(ints.max(), value));
+                if (clamped != value) {
+                    CubicChunks.LOGGER.error("CubicChunksConfig: {} is {}, outside [{}, {}], setting to {}", prefix + field.getName(), value,
+                            ints.min(), ints.max(), clamped);
+                    field.setInt(object, clamped);
+                }
+            } else if (doubles != null && (type == double.class || type == float.class)) {
+                double value = field.getDouble(object);
+                double clamped = Math.max(doubles.min(), Math.min(doubles.max(), value));
+                if (clamped != value) {
+                    CubicChunks.LOGGER.error("CubicChunksConfig: {} is {}, outside [{}, {}], setting to {}", prefix + field.getName(), value,
+                            doubles.min(), doubles.max(), clamped);
+                    if (type == float.class) {
+                        field.setFloat(object, (float) clamped);
+                    } else {
+                        field.setDouble(object, clamped);
+                    }
+                }
+            } else if (!type.isPrimitive() && type != String.class && !type.isEnum() && !type.isArray()
+                    && !Map.class.isAssignableFrom(type) && !List.class.isAssignableFrom(type)) {
+                clampToDeclaredRanges(field.get(object), type.getFields(), prefix + field.getName() + ".");
+            }
         }
     }
 
