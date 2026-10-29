@@ -257,46 +257,11 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
 
     boolean usesIncrementalMaintenance() { return maintenance != null; }
 
-    void beginIncrementalGc() {
-        if (maintenance != null && maintenance.gcCubes == 0 && maintenance.gcColumns == 0) {
-            maintenance.gcCubes = maintenance.cubes.size();
-            maintenance.gcColumns = maintenance.columns.size();
-        }
-    }
+    /** The incremental maintenance state, whose GC cursors ChunkGc drives, or null without it. */
+    @Nullable MaintenanceState maintenance() { return maintenance; }
 
-    void tickIncrementalGc() {
-        if (maintenance == null) return;
-        long start = System.nanoTime();
-        long budget = Math.max(1, CubicChunksConfig.maintenanceTimeMillis) * 1_000_000L;
-        int unloaded = 0;
-        for (int inspected = 0; inspected < CubicChunksConfig.maintenanceInspectionsPerTick
-                && (maintenance.gcCubes > 0 || maintenance.gcColumns > 0) && unloaded < CubicChunksConfig.maintenanceUnloadsPerTick
-                && (inspected == 0 || System.nanoTime() - start < budget); inspected++) {
-            maintenance.gcColumnFirst = !maintenance.gcColumnFirst;
-            if (maintenance.gcColumns > 0 && (maintenance.gcColumnFirst || maintenance.gcCubes == 0)) {
-                maintenance.gcColumns--;
-                Chunk column = maintenance.columns.next(false);
-                if (column == null) maintenance.gcColumns = 0;
-                else if (loadedChunks.get(ChunkPos.asLong(column.x, column.z)) != column) maintenance.columns.remove(column);
-                else if (tryUnloadColumn(column)) {
-                    if (loadedChunks.get(ChunkPos.asLong(column.x, column.z)) == column)
-                        loadedChunks.remove(ChunkPos.asLong(column.x, column.z));
-                    maintenance.columns.remove(column);
-                    unloaded++;
-                }
-            } else {
-                maintenance.gcCubes--;
-                Cube cube = maintenance.cubes.next(false);
-                if (cube == null) maintenance.gcCubes = 0;
-                else if (getLoadedCube(cube.getX(), cube.getY(), cube.getZ()) != cube) maintenance.cubes.remove(cube);
-                else if (tryUnloadCube(cube)) {
-                    if (getLoadedCube(cube.getX(), cube.getY(), cube.getZ()) == cube) cubeMap.remove(cube);
-                    maintenance.cubes.remove(cube);
-                    unloaded++;
-                }
-            }
-        }
-    }
+    /** Forgets a cube ChunkGc has just unloaded. */
+    void forgetCube(Cube cube) { cubeMap.remove(cube); }
 
     @Override
     public boolean tick() {

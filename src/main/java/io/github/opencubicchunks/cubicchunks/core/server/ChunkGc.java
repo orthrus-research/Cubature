@@ -29,8 +29,10 @@ import io.github.opencubicchunks.cubicchunks.core.CubicChunks;
 import io.github.opencubicchunks.cubicchunks.core.CubicChunksConfig;
 import io.github.opencubicchunks.cubicchunks.core.world.cube.Cube;
 import mcp.MethodsReturnNonnullByDefault;
+import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.chunk.Chunk;
 
+import javax.annotation.Nullable;
 import javax.annotation.ParametersAreNonnullByDefault;
 import java.util.Collection;
 import java.util.Iterator;
@@ -43,11 +45,14 @@ import java.util.Iterator;
 public class ChunkGc {
 
     private final CubeProviderServer cubeCache;
+    /** The provider's incremental maintenance, or null when each interval sweeps everything. */
+    @Nullable private final MaintenanceState maintenance;
 
     private int tick = 0;
 
     public ChunkGc(CubeProviderServer cubeCache) {
         this.cubeCache = cubeCache;
+        this.maintenance = cubeCache.maintenance();
     }
 
     public void tick() {
@@ -55,14 +60,57 @@ public class ChunkGc {
         tick++;
         if (tick > CubicChunksConfig.chunkGCInterval) {
             tick = 0;
-            if (cubeCache.usesIncrementalMaintenance()) cubeCache.beginIncrementalGc();
+            if (maintenance != null) beginIncrementalGc();
             else chunkGc();
         }
-        if (cubeCache.usesIncrementalMaintenance()) cubeCache.tickIncrementalGc();
+        if (maintenance != null) tickIncrementalGc();
         if (CubicChunks.DEBUG_ENABLED) {
             verifyColumnConsistency();
         }
         cubeCache.world.profiler.endSection();
+    }
+
+    /** Incremental maintenance: start a GC pass over every loaded cube and column, once per interval. */
+    private void beginIncrementalGc() {
+        if (maintenance != null && maintenance.gcCubes == 0 && maintenance.gcColumns == 0) {
+            maintenance.gcCubes = maintenance.cubes.size();
+            maintenance.gcColumns = maintenance.columns.size();
+        }
+    }
+
+    /** Incremental maintenance: inspect and unload within this tick's maintenance budget. */
+    private void tickIncrementalGc() {
+        if (maintenance == null) return;
+        long start = System.nanoTime();
+        long budget = Math.max(1, CubicChunksConfig.maintenanceTimeMillis) * 1_000_000L;
+        int unloaded = 0;
+        for (int inspected = 0; inspected < CubicChunksConfig.maintenanceInspectionsPerTick
+                && (maintenance.gcCubes > 0 || maintenance.gcColumns > 0) && unloaded < CubicChunksConfig.maintenanceUnloadsPerTick
+                && (inspected == 0 || System.nanoTime() - start < budget); inspected++) {
+            maintenance.gcColumnFirst = !maintenance.gcColumnFirst;
+            if (maintenance.gcColumns > 0 && (maintenance.gcColumnFirst || maintenance.gcCubes == 0)) {
+                maintenance.gcColumns--;
+                Chunk column = maintenance.columns.next(false);
+                if (column == null) maintenance.gcColumns = 0;
+                else if (cubeCache.loadedChunks.get(ChunkPos.asLong(column.x, column.z)) != column) maintenance.columns.remove(column);
+                else if (cubeCache.tryUnloadColumn(column)) {
+                    if (cubeCache.loadedChunks.get(ChunkPos.asLong(column.x, column.z)) == column)
+                        cubeCache.loadedChunks.remove(ChunkPos.asLong(column.x, column.z));
+                    maintenance.columns.remove(column);
+                    unloaded++;
+                }
+            } else {
+                maintenance.gcCubes--;
+                Cube cube = maintenance.cubes.next(false);
+                if (cube == null) maintenance.gcCubes = 0;
+                else if (cubeCache.getLoadedCube(cube.getX(), cube.getY(), cube.getZ()) != cube) maintenance.cubes.remove(cube);
+                else if (cubeCache.tryUnloadCube(cube)) {
+                    if (cubeCache.getLoadedCube(cube.getX(), cube.getY(), cube.getZ()) == cube) cubeCache.forgetCube(cube);
+                    maintenance.cubes.remove(cube);
+                    unloaded++;
+                }
+            }
+        }
     }
 
     private void verifyColumnConsistency() {
