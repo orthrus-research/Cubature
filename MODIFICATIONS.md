@@ -26,7 +26,9 @@ requests never see work in flight as absent; and `PacketCubes` sorts a copy of i
 told by its sender whether to compute an exact size. The provider and lighting no longer name
 `PlayerCubeMap`: they read the world's player chunk map as `CubeDemand` (the cubes to tick, and
 whether delivery still holds a cube) and `SurfaceHeightListener` (column heights changed), which the
-map implements; `TestLayerBoundary` keeps it so.
+map implements; `TestLayerBoundary` keeps it so. A teleport that leaves the player where they are
+(vanilla re-sending an unconfirmed teleport, or correcting a rejected move) no longer cancels a held
+teleport; before, one arriving during a hold dropped it and left the player where they stood.
 The Cubature name and license packaging were adopted on October 19, 2026;
 that change added no terrain or scheduling algorithm.
 

@@ -63,6 +63,7 @@ sourceSets {
         java.include 'io/github/opencubicchunks/cubicchunks/core/server/TestLeadingFace.java'
         java.include 'io/github/opencubicchunks/cubicchunks/core/server/TestLoadingColumnContext.java'
         java.include 'io/github/opencubicchunks/cubicchunks/core/server/TestLayerBoundary.java'
+        java.include 'io/github/opencubicchunks/cubicchunks/core/server/TestDeferredArrivals.java'
         java.include 'io/github/opencubicchunks/cubicchunks/core/server/chunkio/TestRegionCubeStorage.java'
         java.include 'io/github/opencubicchunks/cubicchunks/core/visibility/TestCuboidalCubeSelector.java'
         java.include 'io/github/opencubicchunks/cubicchunks/core/util/TestSpatialWatchersSortingList.java'

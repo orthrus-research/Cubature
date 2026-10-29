@@ -19,12 +19,14 @@ import java.util.UUID;
  * (NetHandlerPlayServer.setPlayerLocation) into a column that is neither loaded nor saved is held, so
  * the server thread does not generate it on the spot and every player keeps ticking. The player stays
  * where they are until tick completes the teleport, with its target and rotation made absolute when
- * it was held; a later teleport replaces a held one, and a held teleport completes after
- * TIMEOUT_TICKS even if its column is not prepared.
+ * it was held; a later teleport that moves the player replaces a held one, and a held teleport
+ * completes after TIMEOUT_TICKS even if its column is not prepared. A teleport that leaves the player
+ * where they are does not replace a held one: vanilla calls setPlayerLocation with the player's own
+ * position to re-send a teleport the client has not confirmed and to correct a move it rejects.
  */
 public final class DeferredArrivals {
     /** A held teleport completes this long after it was held even if its column is not prepared. */
-    static final long TIMEOUT_TICKS = 600;
+    public static final long TIMEOUT_TICKS = 600;
 
     /**
      * Whether a player may arrive in a column now. Asking may hand the column to the generation
@@ -46,6 +48,11 @@ public final class DeferredArrivals {
             columnX = blockToCube(MathHelper.floor(x));
             columnZ = blockToCube(MathHelper.floor(z));
         }
+
+        /** Whether this arrival leaves a player at (px, py, pz) where they are. */
+        boolean at(double px, double py, double pz) {
+            return Math.abs(x - px) < 1.0E-3 && Math.abs(y - py) < 1.0E-3 && Math.abs(z - pz) < 1.0E-3;
+        }
     }
 
     private final WorldServer world;
@@ -63,19 +70,31 @@ public final class DeferredArrivals {
     public boolean defer(EntityPlayerMP player, double x, double y, double z, float yaw, float pitch,
             Set<SPacketPlayerPosLook.EnumFlags> relative) {
         if (completing) return false;
+        return defer(player.getUniqueID(), player.posX, player.posY, player.posZ, player.rotationYaw, player.rotationPitch,
+                x, y, z, yaw, pitch, relative, world.getTotalWorldTime());
+    }
+
+    /** The hold for a player at (posX, posY, posZ), apart from the player and world objects. */
+    boolean defer(UUID player, double posX, double posY, double posZ, float rotationYaw, float rotationPitch,
+            double x, double y, double z, float yaw, float pitch, Set<SPacketPlayerPosLook.EnumFlags> relative, long now) {
         Arrival arrival = new Arrival(
-                x + (relative.contains(SPacketPlayerPosLook.EnumFlags.X) ? player.posX : 0),
-                y + (relative.contains(SPacketPlayerPosLook.EnumFlags.Y) ? player.posY : 0),
-                z + (relative.contains(SPacketPlayerPosLook.EnumFlags.Z) ? player.posZ : 0),
-                yaw + (relative.contains(SPacketPlayerPosLook.EnumFlags.Y_ROT) ? player.rotationYaw : 0),
-                pitch + (relative.contains(SPacketPlayerPosLook.EnumFlags.X_ROT) ? player.rotationPitch : 0),
-                world.getTotalWorldTime());
+                x + (relative.contains(SPacketPlayerPosLook.EnumFlags.X) ? posX : 0),
+                y + (relative.contains(SPacketPlayerPosLook.EnumFlags.Y) ? posY : 0),
+                z + (relative.contains(SPacketPlayerPosLook.EnumFlags.Z) ? posZ : 0),
+                yaw + (relative.contains(SPacketPlayerPosLook.EnumFlags.Y_ROT) ? rotationYaw : 0),
+                pitch + (relative.contains(SPacketPlayerPosLook.EnumFlags.X_ROT) ? rotationPitch : 0),
+                now);
         if (readiness.ready(arrival.columnX, arrival.columnZ)) {
-            arrivals.remove(player.getUniqueID());
+            if (!arrival.at(posX, posY, posZ)) arrivals.remove(player);
             return false;
         }
-        arrivals.put(player.getUniqueID(), arrival);
+        arrivals.put(player, arrival);
         return true;
+    }
+
+    /** Whether a teleport of the player is held. */
+    boolean holds(UUID player) {
+        return arrivals.containsKey(player);
     }
 
     /** Teleports at once, generating the destination column on this thread if it must (scripted moves). */
