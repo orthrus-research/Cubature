@@ -89,7 +89,7 @@ public final class LabLightingSaveProbe implements AutoCloseable {
             if (mode == Mode.AUTOSAVE) {
                 pendingByTick.clear();
                 discoveryByTick.clear();
-                AutosaveScope.run(() -> provider.saveChunks(true));
+                provider.beginPeriodicAutosave();
                 require(first.needsSaving(), "Autosave entry did not complete pending " + light);
                 require(provider.getPendingAutosaveCount() + provider.getPendingAutosaveDiscoveryCount() > 0,
                         "Autosave did not schedule light-only work");

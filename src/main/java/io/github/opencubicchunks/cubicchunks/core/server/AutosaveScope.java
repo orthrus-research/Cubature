@@ -1,6 +1,10 @@
 package io.github.opencubicchunks.cubicchunks.core.server;
 
-/** Marks only the periodic server save. Explicit commands and shutdown keep full-save semantics. */
+/**
+ * Marks only the periodic server save (MixinMinecraftServer). Its one reader is
+ * MixinWorldServer_PeriodicAutosave, which turns that save's saveChunks call into
+ * {@link CubeProviderServer#beginPeriodicAutosave()}; everything else keeps full-save semantics.
+ */
 public final class AutosaveScope {
     private static final ThreadLocal<Boolean> ACTIVE = ThreadLocal.withInitial(() -> false);
     private AutosaveScope() { }

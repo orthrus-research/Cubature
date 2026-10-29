@@ -150,7 +150,7 @@ public final class LabMaintenanceProbe implements AutoCloseable {
             evictionCompletedAt = steps;
             ticketed.setBlockState(marker(ticketed.getCoords()), Blocks.DIAMOND_BLOCK.getDefaultState());
             ticketed.markDirty();
-            AutosaveScope.run(() -> provider.saveChunks(true));
+            provider.beginPeriodicAutosave();
             phase = 1;
         } else if (phase == 1) {
             if (added < ADDED_CUBES) {
@@ -158,7 +158,7 @@ public final class LabMaintenanceProbe implements AutoCloseable {
                 retain(cube);
                 // New dirty retained entries arrive while the older ticketed cube's discovery
                 // lane is already in flight. The fixture stops adding after sixteen entries.
-                AutosaveScope.run(() -> provider.saveChunks(true));
+                provider.beginPeriodicAutosave();
             }
             // Cube NBT uses the state palette encoding; Block.getStateId uses a different legacy encoding.
             if (oldestSavedAt < 0 && savedMarkerPaletteId(read(ticketed.getCoords())) == Block.BLOCK_STATE_IDS.get(Blocks.DIAMOND_BLOCK.getDefaultState()))

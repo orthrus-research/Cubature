@@ -220,22 +220,12 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
         return (Chunk) provideColumn(cubeX, cubeZ);
     }
 
+    /** Saves every dirty cube and column now. The periodic autosave uses {@link #beginPeriodicAutosave()}. */
     @Override
     public boolean saveChunks(boolean alwaysTrue) {
         // Lighting can dirty cubes that the scan would otherwise skip, including cubes before
         // the first dirty entry. Complete queued updates before selecting any save candidates.
         ((ICubicWorldInternal) worldServer).getLightingManager().processUpdates();
-        if (AutosaveScope.isActive()) {
-            if (maintenance != null) {
-                maintenance.discoverCubes = Math.max(maintenance.discoverCubes, maintenance.cubes.size());
-                maintenance.discoverColumns = Math.max(maintenance.discoverColumns, maintenance.columns.size());
-                return true;
-            }
-            for (Cube cube : cubeMap) if (cube.needsSaving()) autosaveCubes.add(cube.getCoords());
-            for (Chunk chunk : loadedChunks.values()) if (chunk.needsSaving(alwaysTrue)) autosaveColumns.add(chunk.getPos());
-            // Continuations run in provider ticks. The initial scan does not serialize dirty cubes.
-            return true;
-        }
         for (Cube cube : cubeMap) { // save cubes
             if (cube.needsSaving()) {
                 this.cubeIO.saveCube(cube);
@@ -251,6 +241,22 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
         autosaveColumns.clear();
         if (maintenance != null) maintenance.discoverCubes = maintenance.discoverColumns = 0;
         return true;
+    }
+
+    /**
+     * The periodic autosave: selects what is dirty now, and provider ticks snapshot it within the
+     * autosave budget. Only the server's periodic save calls this; {@link #saveChunks} saves at once.
+     */
+    public void beginPeriodicAutosave() {
+        ((ICubicWorldInternal) worldServer).getLightingManager().processUpdates();
+        if (maintenance != null) {
+            maintenance.discoverCubes = Math.max(maintenance.discoverCubes, maintenance.cubes.size());
+            maintenance.discoverColumns = Math.max(maintenance.discoverColumns, maintenance.columns.size());
+            return;
+        }
+        for (Cube cube : cubeMap) if (cube.needsSaving()) autosaveCubes.add(cube.getCoords());
+        for (Chunk chunk : loadedChunks.values()) if (chunk.needsSaving(true)) autosaveColumns.add(chunk.getPos());
+        // Continuations run in provider ticks. The initial scan does not serialize dirty cubes.
     }
 
     private void tickAutosave() {

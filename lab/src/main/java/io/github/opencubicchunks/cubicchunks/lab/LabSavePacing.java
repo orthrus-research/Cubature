@@ -2,7 +2,6 @@ package io.github.opencubicchunks.cubicchunks.lab;
 
 import io.github.opencubicchunks.cubicchunks.api.util.CubePos;
 import io.github.opencubicchunks.cubicchunks.core.CubicChunksConfig;
-import io.github.opencubicchunks.cubicchunks.core.server.AutosaveScope;
 import io.github.opencubicchunks.cubicchunks.core.world.cube.Cube;
 import net.minecraft.init.Blocks;
 import net.minecraft.util.math.BlockPos;
@@ -32,7 +31,7 @@ final class LabSavePacing {
     boolean tick(LabJob job) throws IOException {
         if (!issued) {
             long start = System.nanoTime();
-            if (job.scenario.equals("autosave")) AutosaveScope.run(() -> job.provider.saveChunks(true));
+            if (job.scenario.equals("autosave")) job.provider.beginPeriodicAutosave();
             else job.provider.saveChunks(true);
             job.submissionNanos = System.nanoTime() - start;
             job.stages.record("pacedSaveSubmission",start);

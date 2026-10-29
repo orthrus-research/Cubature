@@ -38,6 +38,7 @@
         "common.MixinWorldInfo",
         "common.MixinWorldProvider",
         "common.MixinWorldServer",
+        "common.MixinWorldServer_PeriodicAutosave",
         "common.MixinWorldSettings",
         "common.vanillaclient.ICPacketPlayer",
         "common.vanillaclient.ICPacketPlayerDigging",
