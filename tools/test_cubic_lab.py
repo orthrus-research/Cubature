@@ -1,5 +1,6 @@
 """Control-plane regressions; these do not simulate Minecraft performance."""
 import queue
+import re
 import argparse
 import json
 from pathlib import Path
@@ -100,6 +101,11 @@ class LabControlTest(unittest.TestCase):
                                load=load,prime_lab=prime_lab,record=record,retain=retain_survey)
                 self.assertEqual(calls,['prime','load','record'])
             self.assertFalse(process.alive)
+
+    def test_delivery_modes_match_cubatures_enum(self):
+        source = (Path(__file__).resolve().parents[1] / 'src/main/java/io/github/opencubicchunks/cubicchunks/core/CubicChunksConfig.java').read_text(encoding='utf-8')
+        constants = re.search(r'public enum DeliveryMode \{\s*([A-Z_,\s]+);', source)[1]
+        self.assertEqual(tuple(name.strip() for name in constants.split(',')), profiles.DELIVERY_MODES)
 
     def test_measurement_lease_rejects_overlap_and_releases_after_failure(self):
         with tempfile.TemporaryDirectory() as temporary:
