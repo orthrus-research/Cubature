@@ -19,12 +19,15 @@ final class LabPreparationView {
     private final LabViewGeometry geometry;
     private final CubePos[] positions = new CubePos[LabViewGeometry.EXPECTED];
     private final long start = System.nanoTime();
+    /** The lab tick of the preparation teleport. */
+    private final int teleportTick;
     private final Set<UUID> arrived = new HashSet<>();
     private long arrivedNanos, readyNanos, deliveredNanos,renderReadyNanos,previousDataIncompleteNanos;
     private long previousIncompleteNanos;
     private int serverReady, serverSent;
     LabPreparationView(LabJob job) {
         geometry=job.fullView;
+        teleportTick=job.elapsedTicks;
         int index=0;
         for(int x=geometry.minX;x<=geometry.maxX;x++)for(int y=geometry.minY;y<=geometry.maxY;y++)for(int z=geometry.minZ;z<=geometry.maxZ;z++)
             positions[index++]=new CubePos(x,y,z);
@@ -61,6 +64,10 @@ final class LabPreparationView {
             else waiting=true;
         }
         if(waiting){
+            // Cubature completes a held teleport within TIMEOUT_TICKS: a participant still away 200 ticks
+            // later lost its teleport, so fail now, naming that, instead of at the full-view timeout.
+            long waited=job.elapsedTicks-teleportTick, limit=io.github.opencubicchunks.cubicchunks.core.server.DeferredArrivals.TIMEOUT_TICKS+200;
+            if(waited>limit)throw new IllegalStateException("Full-view participant did not arrive within "+limit+" ticks of its teleport; Cubature completes a held teleport within "+(limit-200)+" ticks, so the teleport was lost");
             if(System.nanoTime()-start>job.fullViewTimeoutSeconds*1000000000L)throw new IllegalStateException("Full-view participant did not arrive within " + job.fullViewTimeoutSeconds + " seconds");
             return false;
         }
