@@ -199,7 +199,7 @@ public class CubeWatcher implements ITicket, ICubeWatcher, BucketSorterEntry {
 
         playerCubeMap.getWorldServer().profiler.startSection("getCube");
         if (canGenerate) {
-            this.cube = this.cubeCache.getCube(cubeX, cubeY, cubeZ, ICubeProviderServer.Requirement.LIGHT);
+            this.cube = this.cubeCache.getCubeForDelivery(cubeX, cubeY, cubeZ, ICubeProviderServer.Requirement.LIGHT);
             assert this.cube != null;
             if (this.cube instanceof BlankCube) {
                 this.cube = null;

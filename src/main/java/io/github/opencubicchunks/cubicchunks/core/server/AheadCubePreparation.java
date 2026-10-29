@@ -41,7 +41,7 @@ final class AheadCubePreparation implements ITicket {
         while(!queue.isEmpty()&&used<quota
                 &&mandatory.canGenerateCube(System.nanoTime())) {
             CubePos pos=queue.removeFirst();
-            Cube cube=provider.getCube(pos.getX(),pos.getY(),pos.getZ(),ICubeProviderServer.Requirement.LIGHT);
+            Cube cube=provider.getCubeForDelivery(pos.getX(),pos.getY(),pos.getZ(),ICubeProviderServer.Requirement.LIGHT);
             used++;mandatory.generatedCube();
             if(cube!=null&&!(cube instanceof BlankCube)){cube.getTickets().add(this);held.put(pos,cube);}
         }

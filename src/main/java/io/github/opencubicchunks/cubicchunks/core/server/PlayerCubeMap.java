@@ -395,8 +395,7 @@ public class PlayerCubeMap extends PlayerChunkMap {
         generationBudget.reset(System.nanoTime(), TimeUnit.MILLISECONDS.toNanos(concurrent
                         ? CubicChunksConfig.concurrentGenerationTickMillis : CubicChunksConfig.maxCubeGenerationTimeMillis),
                 CubicChunksConfig.maxGeneratedCubesPerTick);
-        // Requests from this pass are scheduled on generation workers and installed when ready.
-        cubeCache.beginScheduledGeneration();
+        // Watchers make delivery requests: generation goes to the workers and is installed when ready.
         if (!this.columnsToGenerate.isEmpty()) {
             getWorldServer().profiler.startSection("columns");
             Iterator<ColumnWatcher> iter = this.columnsToGenerate.iterator();
@@ -461,7 +460,6 @@ public class PlayerCubeMap extends PlayerChunkMap {
 
             getWorldServer().profiler.endSection(); // chunks
         }
-        cubeCache.endScheduledGeneration();
         getWorldServer().profiler.endStartSection("send");
         if (!this.columnsToSendToClients.isEmpty()) {
             getWorldServer().profiler.startSection("columns");
@@ -530,12 +528,7 @@ public class PlayerCubeMap extends PlayerChunkMap {
                 PlayerWrapper player=candidates[(i+(int)Math.floorMod(currentTime,(long)candidates.length))%candidates.length];
                 if(!canGenerateChunkPredicate.apply(player.playerEntity)){player.ahead.close();continue;}
                 player.ahead.update(player.playerEntity,horizontalViewDistance,verticalViewDistance,currentTime);
-                cubeCache.beginScheduledGeneration();
-                try {
-                    player.ahead.service(cubeCache,generationBudget,64);
-                } finally {
-                    cubeCache.endScheduledGeneration();
-                }
+                player.ahead.service(cubeCache,generationBudget,64);
             }
         }
         if (deliveryMode.incremental()) {
@@ -622,6 +615,8 @@ public class PlayerCubeMap extends PlayerChunkMap {
     }
 
     public int getPendingCubeSendCount() { return cubesToSend.size(); }
+
+    CubeProviderServer cubeCache() { return cubeCache; }
 
     // CHECKED: 1.10.2-12.18.1.2092
     @Override

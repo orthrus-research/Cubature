@@ -3,7 +3,10 @@ package io.github.opencubicchunks.cubicchunks.core.server;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -11,22 +14,23 @@ import java.util.function.Function;
 import javax.annotation.Nullable;
 
 /**
- * Bounded, keyed off-thread work for pure generation. Inside a scheduled scope the first poll of a
- * key submits it and reports WAITING; later polls report WAITING until its result is retained,
- * then READY. Outside the scope a key with no entry is READY at once, so the caller generates
- * synchronously as before. Results are pure functions of their key: eviction, failure or a
- * synchronous generation racing a worker only costs time, never changes content.
+ * Bounded, keyed off-thread work for pure generation. A poll that schedules submits an unknown key
+ * and reports WAITING until its result is retained, then READY. A poll that does not schedule is
+ * READY at once: an unknown key leaves the caller to generate synchronously as before, and a key in
+ * flight is run on the caller's thread if no worker has started it, or awaited if one has. Results
+ * are pure functions of their key, so eviction, failure or duplicated work only costs time; no
+ * caller is ever told that work in flight is absent.
  */
 final class GenerationQueue<K, V> {
     enum State { READY, WAITING }
 
-    private static final Object RUNNING = new Object(), FAILED = new Object();
+    private static final Object FAILED = new Object();
 
     private final Executor executor;
     private final Function<K, V> work;
     private final Consumer<Throwable> failures;
     private final int capacity;
-    // Insertion order is submission order; guarded by this.
+    // Insertion order is submission order; guarded by this. In-flight keys map to their FutureTask.
     private final Map<K, Object> entries = new LinkedHashMap<>();
     private int running;
     private boolean closed;
@@ -39,21 +43,41 @@ final class GenerationQueue<K, V> {
         this.capacity = capacity;
     }
 
+    @SuppressWarnings("unchecked")
     State poll(K key, boolean schedule) {
+        FutureTask<Void> task;
         synchronized (this) {
             Object entry = entries.get(key);
-            if (entry == RUNNING) return State.WAITING;
-            if (entry != null || !schedule || closed) return State.READY;
-            if (running >= capacity) return State.WAITING;
-            entries.put(key, RUNNING);
-            running++;
+            if (entry instanceof FutureTask) {
+                if (schedule) return State.WAITING;
+                task = (FutureTask<Void>) entry;
+            } else {
+                if (entry != null || !schedule || closed) return State.READY;
+                if (running >= capacity) return State.WAITING;
+                task = new FutureTask<>(() -> run(key), null);
+                entries.put(key, task);
+                running++;
+            }
         }
+        if (schedule) {
+            try {
+                executor.execute(task);
+            } catch (RejectedExecutionException rejected) {
+                task.cancel(false);
+                finish(key, FAILED);
+            }
+            return State.WAITING;
+        }
+        // Not started by a worker: run it here. Started: wait for the worker. Done: return at once.
+        task.run();
         try {
-            executor.execute(() -> run(key));
-        } catch (RejectedExecutionException rejected) {
-            finish(key, FAILED);
+            task.get();
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        } catch (ExecutionException | CancellationException ignored) {
+            // run() reported the failure; the caller finds no result and generates now.
         }
-        return State.WAITING;
+        return State.READY;
     }
 
     /** Removes and returns the retained result; null when there is none and the caller generates now. */
@@ -61,7 +85,7 @@ final class GenerationQueue<K, V> {
     @SuppressWarnings("unchecked")
     synchronized V take(K key) {
         Object entry = entries.get(key);
-        if (entry == null || entry == RUNNING) return null;
+        if (entry == null || entry instanceof FutureTask) return null;
         entries.remove(key);
         return entry == FAILED ? null : (V) entry;
     }
@@ -97,7 +121,7 @@ final class GenerationQueue<K, V> {
         // Retain at most capacity finished results, dropping the oldest unclaimed ones.
         int finished = entries.size() - running;
         for (Iterator<Object> it = entries.values().iterator(); finished > capacity && it.hasNext(); ) {
-            if (it.next() != RUNNING) {
+            if (!(it.next() instanceof FutureTask)) {
                 it.remove();
                 finished--;
             }

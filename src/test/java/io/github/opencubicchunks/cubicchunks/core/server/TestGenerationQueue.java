@@ -5,8 +5,11 @@ import org.junit.Test;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.Assert.*;
 
@@ -25,12 +28,54 @@ public class TestGenerationQueue {
         }, failures::add, capacity);
     }
 
-    @Test public void outsideTheScheduledScopeAnUnknownKeyIsReadyAndNothingIsSubmitted() {
+    @Test public void aPollThatDoesNotScheduleLeavesAnUnknownKeyToTheCallerAndSubmitsNothing() {
         ManualExecutor executor = new ManualExecutor();
         GenerationQueue<Integer, String> q = queue(executor, 4, new ArrayList<>());
         assertEquals(GenerationQueue.State.READY, q.poll(1, false));
         assertTrue(executor.pending.isEmpty());
         assertNull(q.take(1));
+    }
+
+    @Test public void aPollThatDoesNotScheduleRunsQueuedWorkHereOnce() {
+        ManualExecutor executor = new ManualExecutor();
+        AtomicInteger calls = new AtomicInteger();
+        GenerationQueue<Integer, String> q = new GenerationQueue<>(executor, key -> "v" + key + "#" + calls.incrementAndGet(),
+                failure -> fail("no failure expected"), 4);
+        assertEquals(GenerationQueue.State.WAITING, q.poll(7, true));
+        assertEquals(1, executor.pending.size());
+        // Queued but not started: the caller runs it rather than being told it is absent.
+        assertEquals(GenerationQueue.State.READY, q.poll(7, false));
+        assertEquals("v7#1", q.take(7));
+        executor.runAll();
+        assertEquals(1, calls.get());
+        assertEquals(0, q.running());
+        assertEquals(0, q.retained());
+    }
+
+    @Test public void aPollThatDoesNotScheduleWaitsForAWorkerAlreadyRunningTheKey() throws InterruptedException {
+        CountDownLatch started = new CountDownLatch(1), release = new CountDownLatch(1);
+        AtomicInteger calls = new AtomicInteger();
+        GenerationQueue<Integer, String> q = new GenerationQueue<>(command -> new Thread(command).start(), key -> {
+            calls.incrementAndGet();
+            started.countDown();
+            try {
+                release.await();
+            } catch (InterruptedException e) {
+                throw new IllegalStateException(e);
+            }
+            return "v" + key;
+        }, failure -> fail("no failure expected"), 4);
+        assertEquals(GenerationQueue.State.WAITING, q.poll(3, true));
+        assertTrue(started.await(10, TimeUnit.SECONDS));
+        Thread releaser = new Thread(() -> {
+            try { Thread.sleep(50); } catch (InterruptedException ignored) { }
+            release.countDown();
+        });
+        releaser.start();
+        assertEquals(GenerationQueue.State.READY, q.poll(3, false));
+        assertEquals("v3", q.take(3));
+        assertEquals(1, calls.get());
+        releaser.join();
     }
 
     @Test public void scheduledKeysWaitUntilTheirResultIsRetainedAndAreTakenOnce() {

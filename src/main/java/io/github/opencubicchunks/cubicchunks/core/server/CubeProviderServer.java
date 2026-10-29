@@ -474,27 +474,43 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
                     assert !col.isEmpty();
                     onCubeLoaded(loaded, col);
                     // TODO: async loading in asyncGetCube?
-                    loaded = postCubeLoadAttempt(cubeX, cubeY, cubeZ, loaded, col, req, false);
+                    loaded = postCubeLoadAttempt(cubeX, cubeY, cubeZ, loaded, col, req, Timing.POLL);
                 }
                 callback.accept(loaded);
             }));
         } else {
-            callback.accept(postCubeLoadAttempt(cubeX, cubeY, cubeZ, cube, cube.getColumn(), req, false));
+            callback.accept(postCubeLoadAttempt(cubeX, cubeY, cubeZ, cube, cube.getColumn(), req, Timing.POLL));
         }
+    }
+
+    /** When a request that needs generation gets it. */
+    private enum Timing {
+        /** On this thread once the generator is ready; with workers, a result they already hold is used. */
+        POLL,
+        /** Delivery: handed to the generation workers; the empty cube or column is returned until they finish. */
+        SCHEDULE,
+        /** On this thread now, even when the generator reports it is not ready. */
+        NOW
     }
 
     @Nullable @Override
     public Cube getCube(int cubeX, int cubeY, int cubeZ, Requirement req) {
-        return getCube(cubeX, cubeY, cubeZ, req, false);
+        return getCube(cubeX, cubeY, cubeZ, req, Timing.POLL);
     }
 
     @Nullable @Override
     public Cube getCubeNow(int cubeX, int cubeY, int cubeZ, Requirement req) {
-        return getCube(cubeX, cubeY, cubeZ, req, true);
+        return getCube(cubeX, cubeY, cubeZ, req, Timing.NOW);
+    }
+
+    /** A delivery request: generation it needs, population included, goes to the workers instead of this thread. */
+    @Nullable
+    Cube getCubeForDelivery(int cubeX, int cubeY, int cubeZ, Requirement req) {
+        return getCube(cubeX, cubeY, cubeZ, req, Timing.SCHEDULE);
     }
 
     @Nullable
-    private Cube getCube(int cubeX, int cubeY, int cubeZ, Requirement req, boolean forceNow) {
+    private Cube getCube(int cubeX, int cubeY, int cubeZ, Requirement req, Timing timing) {
         Cube cube = getLoadedCube(cubeX, cubeY, cubeZ);
         if (req == Requirement.GET_CACHED ||
                 (cube != null && req.compareTo(Requirement.GENERATE) <= 0)) {
@@ -502,7 +518,7 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
         }
 
         // try to get the Column
-        Chunk column = getColumn(cubeX, cubeZ, req, forceNow);
+        Chunk column = getColumn(cubeX, cubeZ, req, timing);
         if (column == null) {
             return cube; // Column did not reach req, so Cube also does not
         }
@@ -522,7 +538,7 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
             onCubeLoaded(cube, column);
         }
 
-        return postCubeLoadAttempt(cubeX, cubeY, cubeZ, cube, column, req, forceNow);
+        return postCubeLoadAttempt(cubeX, cubeY, cubeZ, cube, column, req, timing);
     }
 
     @Override public boolean isCubeGenerated(int cubeX, int cubeY, int cubeZ) {
@@ -566,7 +582,7 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
      * @return The processed cube, or <code>null</code> if the effort level is not sufficient to provide a cube
      */
     @Nullable
-    private Cube postCubeLoadAttempt(int cubeX, int cubeY, int cubeZ, @Nullable Cube cube, Chunk column, Requirement req, boolean forceNow) {
+    private Cube postCubeLoadAttempt(int cubeX, int cubeY, int cubeZ, @Nullable Cube cube, Chunk column, Requirement req, Timing timing) {
         // when async load+generate request is immediately followed by sync request,  the async one will generate the cube in callback, but it won't
         // change the async load request result, so the cube here will still be null. Just to make sure, get the cube here
         // otherwise we may end up generating the same cube twice
@@ -581,11 +597,11 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
             return cube;
         }
         if (cube == null) {
-            if (!forceNow && pollCube(cubeX, cubeY, cubeZ) != ICubeGenerator.GeneratorReadyState.READY) {
+            if (timing != Timing.NOW && pollCube(cubeX, cubeY, cubeZ, timing) != ICubeGenerator.GeneratorReadyState.READY) {
                 return emptyCube;
             }
             // generate the Cube
-            cube = generateCube(cubeX, cubeY, cubeZ, column, forceNow).orElse(null);
+            cube = generateCube(cubeX, cubeY, cubeZ, column, timing == Timing.NOW).orElse(null);
             if (cube == null) {
                 return emptyCube;
             }
@@ -595,11 +611,11 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
         }
 
         if (!cube.isFullyPopulated()) {
-            if (!forceNow && cubeGen.pollAsyncCubePopulator(cubeX, cubeY, cubeZ) != ICubeGenerator.GeneratorReadyState.READY) {
+            if (timing != Timing.NOW && cubeGen.pollAsyncCubePopulator(cubeX, cubeY, cubeZ) != ICubeGenerator.GeneratorReadyState.READY) {
                 return emptyCube;
             }
             // forced full population of this cube
-            if (!populateCube(cube, forceNow)) {
+            if (!populateCube(cube, timing)) {
                 return cube;
             }
             if (req == Requirement.POPULATE) {
@@ -649,10 +665,12 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
      *
      * @param cube The cube to populate
      */
-    private boolean populateCube(Cube cube, boolean forceNow) {
+    private boolean populateCube(Cube cube, Timing timing) {
         int cubeX = cube.getX();
         int cubeY = cube.getY();
         int cubeZ = cube.getZ();
+        // A delivery request schedules its neighbours too; a forced one forces only the pregeneration box.
+        Timing neighbours = timing == Timing.SCHEDULE ? Timing.SCHEDULE : Timing.POLL;
 
         // for all cubes needed for full population - generate their population requirements
         Box fullPopulation = cubeGen.getFullPopulationRequirements(cube);
@@ -668,7 +686,7 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
         Set<Cube> newlyPopulatedCubes = new HashSet<>();
         boolean success = fullPopulation.allMatch((x, y, z) -> {
             // this also generates the cube
-            Cube fullPopulationCube = getCube(x + cubeX, y + cubeY, z + cubeZ);
+            Cube fullPopulationCube = getCube(x + cubeX, y + cubeY, z + cubeZ, Requirement.GENERATE, neighbours);
             Box newBox = cubeGen.getPopulationPregenerationRequirements(fullPopulationCube);
             if (useVanillaGenerators) {
                 newBox = new Box(
@@ -680,7 +698,7 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
                 int genX = cubeX + x + nx;
                 int genY = cubeY + y + ny;
                 int genZ = cubeZ + z + nz;
-                return !(getCube(genX, genY, genZ, Requirement.GENERATE, forceNow) instanceof BlankCube);
+                return !(getCube(genX, genY, genZ, Requirement.GENERATE, timing) instanceof BlankCube);
             });
             if (!generated) {
                 return false;
@@ -703,7 +721,7 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
             box.setY1(0);
             box.setY2(0);
             box.forEachPoint((x, y, z) -> {
-                Cube columnCube = getCube(cubeX + x, 0, cubeZ + z);
+                Cube columnCube = getCube(cubeX + x, 0, cubeZ + z, Requirement.GENERATE, neighbours);
                 if (!columnCube.isPopulated()) {
                     GameRegistry.generateWorld(cubeX + x, cubeZ + z, world, chunkGenerator, world.getChunkProvider());
                     columnCube.setFullyPopulated(true);
@@ -753,26 +771,31 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
 
         AsyncWorldIOExecutor.queueColumnLoad(worldServer, cubeIO, columnX, columnZ,
                 AsyncWorldIOExecutor.withCallbackIdentity(callbackIdentity, col -> {
-            col = postProcessColumn(columnX, columnZ, col, req, false);
+            col = postProcessColumn(columnX, columnZ, col, req, Timing.POLL);
             callback.accept(col);
         }), loadingColumns);
     }
 
     @Nullable @Override
     public Chunk getColumn(int columnX, int columnZ, Requirement req) {
-        return getColumn(columnX, columnZ, req, false);
+        return getColumn(columnX, columnZ, req, Timing.POLL);
     }
 
+    /** A delivery request for a column; see {@link #getCubeForDelivery}. */
+    @Nullable
+    Chunk getColumnForDelivery(int columnX, int columnZ, Requirement req) {
+        return getColumn(columnX, columnZ, req, Timing.SCHEDULE);
+    }
 
     @Nullable
-    private Chunk getColumn(int columnX, int columnZ, Requirement req, boolean forceNow) {
+    private Chunk getColumn(int columnX, int columnZ, Requirement req, Timing timing) {
         Chunk column = getLoadedColumn(columnX, columnZ);
         if (column != null || req == Requirement.GET_CACHED) {
             return column;
         }
 
         column = AsyncWorldIOExecutor.syncColumnLoad(worldServer, cubeIO, columnX, columnZ, loadingColumns);
-        column = postProcessColumn(columnX, columnZ, column, req, forceNow);
+        column = postProcessColumn(columnX, columnZ, column, req, timing);
 
         return column;
     }
@@ -788,7 +811,7 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
      * @return The postprocessed column, or <code>null</code>
      */
     @Nullable
-    private Chunk postProcessColumn(int columnX, int columnZ, @Nullable Chunk column, Requirement req, boolean force) {
+    private Chunk postProcessColumn(int columnX, int columnZ, @Nullable Chunk column, Requirement req, Timing timing) {
         Chunk loaded = getLoadedColumn(columnX, columnZ);
         if (loaded != null) {
             if (column != null && loaded != column) {
@@ -806,10 +829,10 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
             return null;
         }
 
-        if (!force && pollColumn(columnX, columnZ) != ICubeGenerator.GeneratorReadyState.READY) {
+        if (timing != Timing.NOW && pollColumn(columnX, columnZ, timing) != ICubeGenerator.GeneratorReadyState.READY) {
             return emptyColumn;
         }
-        column = cubeGen.tryGenerateColumn(world, columnX, columnZ, new ChunkPrimer(), force).orElse(null);
+        column = cubeGen.tryGenerateColumn(world, columnX, columnZ, new ChunkPrimer(), timing == Timing.NOW).orElse(null);
         if (column == null) {
             return emptyColumn;
         }
@@ -821,11 +844,6 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
         return column;
     }
 
-    /** Owner-thread scope in which generation requests are scheduled off-thread instead of generated now. */
-    void beginScheduledGeneration() { if (concurrentGeneration != null) concurrentGeneration.begin(); }
-
-    void endScheduledGeneration() { if (concurrentGeneration != null) concurrentGeneration.end(); }
-
     boolean concurrentGenerationActive() { return concurrentGeneration != null; }
 
     /**
@@ -836,21 +854,21 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
     public boolean arrivalReady(int columnX, int columnZ) {
         if (concurrentGeneration == null || getLoadedColumn(columnX, columnZ) != null
                 || cubeIO.columnExists(columnX, columnZ)) return true;
-        return concurrentGeneration.requestColumn(columnX, columnZ) == ICubeGenerator.GeneratorReadyState.READY;
+        return concurrentGeneration.pollColumn(columnX, columnZ, true) == ICubeGenerator.GeneratorReadyState.READY;
     }
 
     boolean concurrentGenerationSaturated() { return concurrentGeneration != null && concurrentGeneration.saturated(); }
 
     public void closeConcurrentGeneration() { if (concurrentGeneration != null) concurrentGeneration.close(); }
 
-    private ICubeGenerator.GeneratorReadyState pollCube(int cubeX, int cubeY, int cubeZ) {
+    private ICubeGenerator.GeneratorReadyState pollCube(int cubeX, int cubeY, int cubeZ, Timing timing) {
         return concurrentGeneration == null ? cubeGen.pollAsyncCubeGenerator(cubeX, cubeY, cubeZ)
-                : concurrentGeneration.pollCube(cubeX, cubeY, cubeZ);
+                : concurrentGeneration.pollCube(cubeX, cubeY, cubeZ, timing == Timing.SCHEDULE);
     }
 
-    private ICubeGenerator.GeneratorReadyState pollColumn(int columnX, int columnZ) {
+    private ICubeGenerator.GeneratorReadyState pollColumn(int columnX, int columnZ, Timing timing) {
         return concurrentGeneration == null ? cubeGen.pollAsyncColumnGenerator(columnX, columnZ)
-                : concurrentGeneration.pollColumn(columnX, columnZ);
+                : concurrentGeneration.pollColumn(columnX, columnZ, timing == Timing.SCHEDULE);
     }
 
     public String dumpLoadedCubes() {

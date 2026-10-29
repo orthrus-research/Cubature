@@ -26,6 +26,7 @@ package io.github.opencubicchunks.cubicchunks.core.server;
 
 import io.github.opencubicchunks.cubicchunks.api.util.CubePos;
 import io.github.opencubicchunks.cubicchunks.api.util.XZAddressable;
+import io.github.opencubicchunks.cubicchunks.api.world.ICubeProviderServer;
 import io.github.opencubicchunks.cubicchunks.core.CubicChunks;
 import io.github.opencubicchunks.cubicchunks.core.asm.mixin.core.common.IPlayerChunkMapEntry;
 import io.github.opencubicchunks.cubicchunks.core.network.PacketColumn;
@@ -74,8 +75,9 @@ public class ColumnWatcher extends PlayerChunkMapEntry implements XZAddressable,
             return true;
         }
         if (canGenerate) {
-            Chunk chunk = this.playerCubeMap.getWorldServer().getChunkProvider().provideChunk(self().getPos().x, self().getPos().z);
-            if (chunk.isEmpty()) {
+            Chunk chunk = this.playerCubeMap.cubeCache().getColumnForDelivery(self().getPos().x, self().getPos().z,
+                    ICubeProviderServer.Requirement.GENERATE);
+            if (chunk == null || chunk.isEmpty()) {
                 return false;
             }
             self().setChunk(chunk);
