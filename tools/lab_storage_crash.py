@@ -32,25 +32,26 @@ def inspect_crash_files(fixture,boundary):
 
 
 def run(args):
-    import cubic_lab as lab
     import lab_files
+    import lab_input_snapshot
+    import lab_instance
     import lab_process
     if not args.crash_id or not re.fullmatch('[a-z0-9-]{1,48}',args.crash_id) or not args.crash_boundary:
         raise ValueError('storage-crash requires --crash-id and --crash-boundary')
-    lab.prime(args);target,manifest=lab.load_lab(args)
+    lab_instance.prime(args);target,manifest=lab_instance.load_lab(args)
     if manifest.get('labProperties',{}).get('cubiclab.storageDiagnostics')!='true':raise ValueError('Prepare with --storage-diagnostics')
     server_dir=Path(manifest['server']);fixture=server_dir/'cubiclab-crashes'/args.crash_id
     if fixture.exists():raise ValueError('Crash fixture already exists; use a new identity')
     evidence=target/'runs'/('crash-'+args.crash_id);evidence.mkdir(parents=True,exist_ok=False)
-    result={'passed':False,'boundary':args.crash_boundary,'inputHashesBeforeLaunch':lab.record_inputs(manifest),'phases':[],
+    result={'passed':False,'boundary':args.crash_boundary,'inputHashesBeforeLaunch':lab_instance.record_inputs(manifest),'phases':[],
             'scope':'Controller kills only its freshly spawned native server, paused inside isolated region files. No client/performance claim; OS and storage cache stay alive.'}
-    result['preLaunchInputSnapshots']=lab.retain_prelaunch_inputs(manifest,result['inputHashesBeforeLaunch'],evidence)
+    result['preLaunchInputSnapshots']=lab_input_snapshot.retain_prelaunch_inputs(manifest,result['inputHashesBeforeLaunch'],evidence)
     try:
         for mode in ('crash','recover'):
             phase=evidence/mode;phase.mkdir();messages=queue.Queue();server=None
             row={'mode':mode,'passed':False};result['phases'].append(row)
             try:
-                _,manifest=lab.load_lab(args)
+                _,manifest=lab_instance.load_lab(args)
                 server=lab_process.spawn(lab_process.argv(manifest,False),server_dir,phase/'server.log',messages,lifecycle_role='server')
                 lab_process.write_process_receipt(phase,server);lab_process.await_line(messages,'Done (',[server],300)
                 lab_process.send(server,f'cubiclab storage-{mode} {args.crash_id} {args.crash_boundary} isolated-files')

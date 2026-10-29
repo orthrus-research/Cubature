@@ -5,7 +5,8 @@ import tempfile
 import struct
 import unittest
 from unittest.mock import patch
-import cubic_lab
+import lab_input_snapshot
+import lab_instance
 import lab_process
 from lab_storage_crash import run,inspect_crash_files
 
@@ -45,15 +46,15 @@ class CrashControllerTest(unittest.TestCase):
         def endpoint(evidence,process,name):
             # Keep the real lifecycle API's supported endpoints; do not hide an integration mismatch.
             self.assertIn(name,('ready','endBeforeQuit'))
-        patches={'prime':lambda a:None,'load_lab':lambda a:(target,manifest),'record_inputs':lambda m:{},
-                 'retain_prelaunch_inputs':lambda *a:{}}
+        patches={'prime':lambda a:None,'load_lab':lambda a:(target,manifest),'record_inputs':lambda m:{}}
         process_patches={'argv':lambda *a:['owned-java'],
                  'spawn':spawn,'write_process_receipt':lambda *a:None,'await_line':lambda *a:'CUBICLAB_CRASH_RECOVERED id=fixture PASS',
                  'send':send,'capture_process_endpoint':endpoint,'retain_process_lifecycles':lambda *a:None}
         from contextlib import ExitStack
         with ExitStack() as stack:
             stack.enter_context(patch('lab_storage_crash.inspect_crash_files',return_value={'passed':True}))
-            for name,value in patches.items():stack.enter_context(patch.object(cubic_lab,name,value))
+            for name,value in patches.items():stack.enter_context(patch.object(lab_instance,name,value))
+            stack.enter_context(patch.object(lab_input_snapshot,'retain_prelaunch_inputs',lambda *a:{}))
             for name,value in process_patches.items():stack.enter_context(patch.object(lab_process,name,value))
             if wrong_boundary:
                 with self.assertRaisesRegex(RuntimeError,'Wrong storage boundary'):run(args)

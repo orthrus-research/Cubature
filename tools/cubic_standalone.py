@@ -13,6 +13,7 @@ import uuid
 
 import cubic_lab as lab
 import lab_files
+import lab_instance
 import lab_process
 import lab_profiles
 
@@ -23,17 +24,17 @@ def prepare(args):
     if target.exists():
         raise RuntimeError('Instance already exists; choose a fresh name')
     donor = json.loads(args.runtime_lab.read_text())
-    pins = dict(line.split('=', 1) for line in (lab.FORK / 'lab/runtime.properties').read_text().splitlines()
+    pins = dict(line.split('=', 1) for line in (lab_instance.FORK / 'lab/runtime.properties').read_text().splitlines()
                 if line.strip() and not line.startswith('#'))
     if donor['runtimeVersion'] != pins['runtime_version']:
         raise RuntimeError('Runtime donor is not the reviewed pinned version')
-    lab.validate_java26_inputs(donor)
-    assets = lab.runtime_assets(donor['release'], pins['runtime_version'],
+    lab_instance.validate_java26_inputs(donor)
+    assets = lab_instance.runtime_assets(donor['release'], pins['runtime_version'],
         {kind: pins[kind + '_sha256'] for kind in ['installer', 'universal', 'prism']})
     files = {}
     for kind in ['installer', 'prism']:
         asset = assets[kind]
-        files[kind] = lab.fetch(asset['browser_download_url'], root / '.local/downloads' / asset['name'],
+        files[kind] = lab_instance.fetch(asset['browser_download_url'], root / '.local/downloads' / asset['name'],
                                 pins[kind + '_sha256'], 'sha256')
     if not args.cubic_jar.is_file():
         raise RuntimeError('Missing selected CC artifact')
@@ -67,7 +68,7 @@ def prepare(args):
     lab_files.write_json(server / 'ops.json', [{'uuid': player_uuid, 'name': lab_process.PLAYER, 'level': 4,
                                          'bypassesPlayerLimit': False}])
     lab_profiles.configure_jvm(server)
-    runtime = lab.prepare_client(server, client, files['prism'], root, donor['java'], donor['release'])
+    runtime = lab_instance.prepare_client(server, client, files['prism'], root, donor['java'], donor['release'])
     # Freeze installer output and client libraries; no Riven configs, scripts or lab mod are copied.
     server_files = {str(p.relative_to(server)): lab_files.sha(p) for p in (server / 'libraries').rglob('*') if p.is_file()}
     universal = server / 'libraries/com/cleanroommc/cleanroom' / pins['runtime_version'] / ('cleanroom-' + pins['runtime_version'] + '-universal.jar')
@@ -86,7 +87,7 @@ def prepare(args):
 def load(args):
     target = args.workspace.resolve() / '.local/cubic-standalone' / args.name
     manifest = json.loads((target / 'standalone.json').read_text())
-    lab.validate_java26_inputs(manifest)
+    lab_instance.validate_java26_inputs(manifest)
     lab_profiles.validate_view_distance_inputs(manifest)
     lab_profiles.validate_jvm_inputs(manifest)
     for side in ['server', 'client']:
@@ -140,7 +141,7 @@ def play(args):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('command', choices=['prepare', 'play', 'command'])
-    parser.add_argument('--workspace', type=Path, default=lab.FORK.parents[1])
+    parser.add_argument('--workspace', type=Path, default=lab_instance.FORK.parents[1])
     parser.add_argument('--name', required=True)
     parser.add_argument('--runtime-lab', type=Path)
     parser.add_argument('--cubic-jar', type=Path)
