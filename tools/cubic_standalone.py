@@ -49,7 +49,6 @@ def prepare(args):
     I:defaultMinHeight=-128
     I:defaultMaxHeight=384
     I:verticalCubeLoadDistance=12
-    B:incrementalMaintenance=false
     I:maxCubeSendTimeMillis=0
     I:maxCubeSendBytesPerTick=0
     I:maxCubePacketBytes=0

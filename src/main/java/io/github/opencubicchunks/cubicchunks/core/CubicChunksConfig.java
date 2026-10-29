@@ -114,11 +114,11 @@ public class CubicChunksConfig {
             + "generation is active; maxCubeGenerationTimeMillis applies otherwise.")
     public static int concurrentGenerationTickMillis = 20;
 
-    @Config.RequiresMcRestart
-    @Config.Comment("Cube delivery mode. BASELINE: periodic unload and autosave. MAINTENANCE: incremental unload "
-            + "inspection. SAVE: also continuous autosave discovery, so explicit flushes find a small backlog. "
-            + "PREFETCH: also prepares cubes ahead of moving players. The cubature.deliveryExperiment system "
-            + "property overrides it.")
+    @Config.RequiresWorldRestart
+    @Config.Comment("Cube delivery mode, read when the server starts and shared by all its dimensions. BASELINE: "
+            + "periodic unload and autosave. MAINTENANCE: incremental unload inspection every tick. SAVE: also "
+            + "continuous autosave discovery, so explicit flushes find a small backlog. PREFETCH: also prepares "
+            + "cubes ahead of moving players.")
     public static DeliveryMode deliveryMode = DeliveryMode.BASELINE;
 
     @Config.RangeInt(min = 1, max = 4096)
@@ -135,17 +135,14 @@ public class CubicChunksConfig {
     @Config.LangKey("cubicchunks.config.chunk_gc_interval")
     public static int chunkGCInterval = 20 * 10;
 
-    @Config.RequiresWorldRestart
-    @Config.Comment("Experimental incremental unload inspection and periodic autosave discovery. Explicit saves/unload requests remain complete.")
-    public static boolean incrementalMaintenance = false;
-
     @Config.RangeInt(min = 1, max = 65536)
     @Config.Comment("Maximum entries inspected per incremental maintenance tick and per autosave discovery tick.")
     public static int maintenanceInspectionsPerTick = 256;
 
     @Config.RangeInt(min = 1, max = 4096)
-    @Config.Comment("Maximum successful routine cube/column unloads per tick.")
-    public static int maintenanceUnloadsPerTick = 8;
+    @Config.Comment("Maximum successful routine cube/column unloads per tick under incremental maintenance "
+            + "(deliveryMode MAINTENANCE and later).")
+    public static int maintenanceUnloadsPerTick = 64;
 
     @Config.RangeInt(min = 1, max = 50)
     @Config.Comment("Soft incremental GC budget in milliseconds. One unload may exceed it.")
@@ -464,11 +461,21 @@ public class CubicChunksConfig {
         return excludedDimensionsRanges.contains(dimension);
     }
 
+    /** Ordered stages: each adds to the one before it. */
     public enum DeliveryMode {
         BASELINE,
         MAINTENANCE,
         SAVE,
-        PREFETCH
+        PREFETCH;
+
+        /** Incremental unload inspection every tick, and autosave discovery over the maintenance index. */
+        public boolean incremental() { return this != BASELINE; }
+
+        /** Autosave discovery restarts as soon as it finishes. */
+        public boolean continuousSave() { return compareTo(SAVE) >= 0; }
+
+        /** Cubes ahead of moving players are prepared. */
+        public boolean prefetch() { return this == PREFETCH; }
     }
 
     public enum DistantHorizonsNativeFeed {

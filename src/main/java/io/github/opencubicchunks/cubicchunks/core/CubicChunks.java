@@ -33,6 +33,7 @@ import io.github.opencubicchunks.cubicchunks.core.asm.mixin.ICubicWorldSettings;
 import io.github.opencubicchunks.cubicchunks.core.asm.mixin.core.common.IIntegratedServer;
 import io.github.opencubicchunks.cubicchunks.core.client.ClientEventHandler;
 import io.github.opencubicchunks.cubicchunks.core.network.PacketDispatcher;
+import io.github.opencubicchunks.cubicchunks.core.server.ServerDeliveryMode;
 import io.github.opencubicchunks.cubicchunks.core.server.chunkio.RegionCubeStorage;
 import io.github.opencubicchunks.cubicchunks.core.util.CompatHandler;
 import io.github.opencubicchunks.cubicchunks.core.util.SideUtils;
@@ -55,6 +56,7 @@ import net.minecraftforge.fml.common.event.FMLPostInitializationEvent;
 import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
 import net.minecraftforge.fml.common.event.FMLServerAboutToStartEvent;
 import net.minecraftforge.fml.common.event.FMLServerStartingEvent;
+import net.minecraftforge.fml.common.event.FMLServerStoppedEvent;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.network.NetworkCheckHandler;
 import net.minecraftforge.fml.common.network.NetworkRegistry;
@@ -171,6 +173,8 @@ public class CubicChunks {
 
     @EventHandler
     public void onServerAboutToStart(FMLServerAboutToStartEvent event) {
+        // Before any world is built: every dimension of this server shares the mode.
+        ServerDeliveryMode.resolve();
         SideUtils.runForSide(
                 () -> () -> {
                     IIntegratedServer integratedServer = cast(event.getServer());
@@ -183,6 +187,11 @@ public class CubicChunks {
                     // no-op, done by mixin
                 }
         );
+    }
+
+    @EventHandler
+    public void onServerStopped(FMLServerStoppedEvent event) {
+        ServerDeliveryMode.clear();
     }
 
     @SubscribeEvent

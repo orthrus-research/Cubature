@@ -78,12 +78,17 @@ class LabControlTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root=Path(temporary); (root/'config').mkdir()
             path=root/'config/cubicchunks.cfg'; path.write_text('general {\nI:defaultMinHeight=-128\n}\n')
-            args=argparse.Namespace(incremental_maintenance=True,cube_send_ms=8,cube_send_bytes=4194304,cube_packet_bytes=262144,cube_packet_cubes=16)
+            args=argparse.Namespace(delivery_mode='MAINTENANCE',cube_send_ms=8,cube_send_bytes=4194304,cube_packet_bytes=262144,cube_packet_cubes=16)
             values=lab.configure_cube_experiments(root,args)
             self.assertEqual(values['maxCubePacketCubes'], '16')
+            self.assertEqual(values['deliveryMode'], 'MAINTENANCE')
             lab.validate_cube_experiments({'server':str(root),'cubeExperiments':values})
-            path.write_text(path.read_text().replace('maxCubeSendTimeMillis=8','maxCubeSendTimeMillis=4'))
-            with self.assertRaisesRegex(RuntimeError,'experiment changed'): lab.validate_cube_experiments({'server':str(root),'cubeExperiments':values})
+            original=path.read_text()
+            for before,after in (('maxCubeSendTimeMillis=8','maxCubeSendTimeMillis=4'),('deliveryMode=MAINTENANCE','deliveryMode=PREFETCH')):
+                path.write_text(original.replace(before,after))
+                with self.assertRaisesRegex(RuntimeError,'experiment changed'): lab.validate_cube_experiments({'server':str(root),'cubeExperiments':values})
+            args.delivery_mode='prefetch'
+            with self.assertRaisesRegex(ValueError,'Delivery mode'): lab.configure_cube_experiments(root,args)
 
     def test_installer_argfile_cannot_override_heap_and_collector(self):
         with tempfile.TemporaryDirectory() as temporary:

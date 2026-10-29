@@ -45,6 +45,7 @@ import io.github.opencubicchunks.cubicchunks.api.world.IColumn;
 import io.github.opencubicchunks.cubicchunks.api.world.ICube;
 import io.github.opencubicchunks.cubicchunks.core.CubicChunks;
 import io.github.opencubicchunks.cubicchunks.core.CubicChunksConfig;
+import io.github.opencubicchunks.cubicchunks.core.CubicChunksConfig.DeliveryMode;
 import io.github.opencubicchunks.cubicchunks.core.asm.mixin.ICubicWorldInternal;
 import io.github.opencubicchunks.cubicchunks.core.entity.ICubicEntityTracker;
 import io.github.opencubicchunks.cubicchunks.core.network.PacketCubes;
@@ -212,6 +213,8 @@ public class PlayerCubeMap extends PlayerChunkMap {
     private long previousWorldTime = 0;
 
     private final CubeProviderServer cubeCache;
+    /** The provider's mode, so this map and the provider always run the same delivery stage. */
+    private final DeliveryMode deliveryMode;
 
     private final PendingCubeSends<EntityPlayerMP, Cube> cubesToSend = new PendingCubeSends<>();
     private final CubeSendBudget cubeSendBudget = new CubeSendBudget();
@@ -255,6 +258,7 @@ public class PlayerCubeMap extends PlayerChunkMap {
     public PlayerCubeMap(WorldServer worldServer) {
         super(worldServer);
         this.cubeCache = ((ICubicWorldInternal.Server) worldServer).getCubeCache();
+        this.deliveryMode = cubeCache.getDeliveryMode();
         this.setPlayerViewDistance(worldServer.getMinecraftServer().getPlayerList().getViewDistance(),
                 ((ICubicPlayerList) worldServer.getMinecraftServer().getPlayerList()).getVerticalViewDistance());
         this.chunkGc = new ChunkGc(((ICubicWorldInternal.Server) worldServer).getCubeCache());
@@ -520,7 +524,7 @@ public class PlayerCubeMap extends PlayerChunkMap {
         }
         getWorldServer().profiler.endStartSection("sendCubes");//unload
         sendPendingCubes();
-        if (DeliveryExperiment.prefetch()) {
+        if (deliveryMode.prefetch()) {
             PlayerWrapper[] candidates=players.valueCollection().toArray(new PlayerWrapper[0]);
             for(int i=0;i<candidates.length;i++) {
                 PlayerWrapper player=candidates[(i+(int)Math.floorMod(currentTime,(long)candidates.length))%candidates.length];
@@ -534,7 +538,7 @@ public class PlayerCubeMap extends PlayerChunkMap {
                 }
             }
         }
-        if (DeliveryExperiment.maintenance()) {
+        if (deliveryMode.incremental()) {
             // Collection follows demand reconciliation on the world owner. It is serviced once
             // per world tick, independent of player speed and whether players are moving at all.
             for (PlayerWrapper player : players.valueCollection().toArray(new PlayerWrapper[0]))
@@ -873,7 +877,7 @@ public class PlayerCubeMap extends PlayerChunkMap {
         // for problem #0.
         // So we put ChunkGc here so that we can be sure it has consistent data about player location, and that no chunks are
         // loaded while we aren't looking.
-        if (!DeliveryExperiment.maintenance()) this.chunkGc.tick();
+        if (!deliveryMode.incremental()) this.chunkGc.tick();
     }
 
     boolean deliveryViewContains(int x, int y, int z) {

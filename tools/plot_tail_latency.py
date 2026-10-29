@@ -51,7 +51,11 @@ CLEANROOM_LOADING_OWNERS = (CLEANROOM_LOADING_OWNER,
 TREATMENTS = ("cc-source", "cc-pacing", "cc-maintenance", "jvm", "riven-source", "render-upload")
 PROPERTY_TREATMENTS = {"render-upload": ("cubiclab.uploadStrategy", ("original", "orphan"))}
 PACING_KEYS = ("general.I:maxCubeSendTimeMillis", "general.I:maxCubeSendBytesPerTick", "general.I:maxCubePacketBytes")
-MAINTENANCE_KEYS = {"general.B:incrementalMaintenance": None,
+DELIVERY_MODE_KEY = "general.S:deliveryMode"
+LEGACY_MAINTENANCE_KEY = "general.B:incrementalMaintenance"
+# Cubature's CubicChunksConfig.DeliveryMode, in stage order.
+DELIVERY_MODES = ("BASELINE", "MAINTENANCE", "SAVE", "PREFETCH")
+MAINTENANCE_KEYS = {DELIVERY_MODE_KEY: None,
                     "general.I:maintenanceInspectionsPerTick": (1, 65536),
                     "general.I:maintenanceUnloadsPerTick": (1, 4096),
                     "general.I:maintenanceTimeMillis": (1, 50)}
@@ -476,28 +480,35 @@ def canonical_prepared_input(name, data, manifest, treatment):
     text = data.decode("utf-8-sig").replace("\r\n", "\n")
     if name == "config/cubicchunks.cfg":
         settings = parse_cube_config(data)
-        # Old main lacks only these reviewed defaults for its disabled maintenance experiment.
-        if settings.get("general.B:incrementalMaintenance") is False:
-            for key, value in (("maintenanceInspectionsPerTick", 256), ("maintenanceTimeMillis", 1), ("maintenanceUnloadsPerTick", 8)):
+        # Builds before delivery stages ran BASELINE unless their legacy incrementalMaintenance flag was
+        # set. A false flag means the same as its absence, so it is not compared.
+        legacy_off = settings.get(LEGACY_MAINTENANCE_KEY) is False
+        if (legacy_off or LEGACY_MAINTENANCE_KEY not in settings) and not any(
+                key.rsplit(":", 1)[1] == "deliveryMode" for key in settings):
+            settings[DELIVERY_MODE_KEY] = "BASELINE"
+        # BASELINE never reads the maintenance limits, so missing ones take the current defaults.
+        if settings.get(DELIVERY_MODE_KEY) == "BASELINE":
+            for key, value in (("maintenanceInspectionsPerTick", 256), ("maintenanceTimeMillis", 1), ("maintenanceUnloadsPerTick", 64)):
                 settings.setdefault("general.I:" + key, value)
+        compared = {key: value for key, value in settings.items() if not (legacy_off and key == LEGACY_MAINTENANCE_KEY)}
         values = {key: settings[key] for key in PACING_KEYS if key in settings}
         maintenance = {key: settings[key] for key in MAINTENANCE_KEYS if key in settings}
         if treatment == "cc-pacing":
             if len(values) != len(PACING_KEYS) or any(type(v) is not int or not 0 <= v <= 2147483647 for v in values.values()):
                 raise ChartDataError("Pacing treatment requires exactly the reviewed nonnegative integer keys")
-            controls = {key: value for key, value in settings.items() if key not in PACING_KEYS}
+            controls = {key: value for key, value in compared.items() if key not in PACING_KEYS}
         elif treatment == "cc-maintenance":
             if (len(maintenance) != len(MAINTENANCE_KEYS) or
-                    type(maintenance["general.B:incrementalMaintenance"]) is not bool or
+                    maintenance[DELIVERY_MODE_KEY] not in DELIVERY_MODES or
                     any(type(maintenance[key]) is not int or not limits[0] <= maintenance[key] <= limits[1]
                         for key, limits in MAINTENANCE_KEYS.items() if limits is not None)):
-                raise ChartDataError("Maintenance treatment requires its reviewed boolean and in-range integer limits")
-            controls = {key: value for key, value in settings.items() if key not in MAINTENANCE_KEYS}
+                raise ChartDataError("Maintenance treatment requires a known delivery mode and in-range integer limits")
+            controls = {key: value for key, value in compared.items() if key not in MAINTENANCE_KEYS}
         else:
-            controls = settings
+            controls = compared
         return "cube-config-v1:", controls, {"parsedSettings": settings, "pacingValues": values,
             "maintenanceValues": maintenance,
-            "rule": "All parsed cube config fields retained; only declared pacing/maintenance keys vary in their own treatment; disabled missing maintenance fields use reviewed defaults"}
+            "rule": "All parsed cube config fields retained except a legacy incrementalMaintenance=false; configs without deliveryMode ran BASELINE; only declared pacing/maintenance keys vary in their own treatment; BASELINE's missing maintenance limits use current defaults"}
     if name == "server.properties":
         properties = {}
         for line in text.splitlines():
@@ -702,7 +713,8 @@ def controls_for(manifest, row, result, scenario_index, result_path, input_hashe
     server_cube = prepared.get(("server", "config/cubicchunks.cfg"), {}).get("parsedSettings", {})
     experiments = manifest.get("cubeExperiments") or {}
     for name, value in experiments.items():
-        key = "general." + ("B:" if name == "incrementalMaintenance" else "I:") + name
+        # Manifests from builds before delivery stages declare the legacy flag.
+        key = "general." + {"deliveryMode": "S:", "incrementalMaintenance": "B:"}.get(name, "I:") + name
         actual = server_cube.get(key)
         actual_text = str(actual).lower() if type(actual) is bool else str(actual)
         if actual is None or str(value) != actual_text:

@@ -60,20 +60,14 @@ public final class LabMaintenanceProbe implements AutoCloseable {
     }
 
     private int effectiveUnloadQuota() {
-        try {
-            return ((Number)provider.getClass().getMethod("getMaintenanceUnloadLimit").invoke(provider)).intValue();
-        } catch (NoSuchMethodException historicalArtifact) {
-            return CubicChunksConfig.maintenanceUnloadsPerTick;
-        } catch (ReflectiveOperationException error) {
-            throw new IllegalStateException("Cannot read effective maintenance quota", error);
-        }
+        return CubicChunksConfig.maintenanceUnloadsPerTick;
     }
 
     public void prepare() throws IOException {
         owner = Thread.currentThread();
         long start = System.nanoTime();
         try {
-            require(provider.usesIncrementalMaintenance(), "maintenance-contracts requires incrementalMaintenance enabled at world construction");
+            require(provider.usesIncrementalMaintenance(), "maintenance-contracts requires deliveryMode MAINTENANCE or later when the server starts");
             require(CubicChunksConfig.maintenanceUnloadsPerTick > 0 && CubicChunksConfig.maintenanceInspectionsPerTick > 0,
                     "maintenance allowances must make progress");
             require(CubicChunksConfig.chunkGCInterval >= 0 && CubicChunksConfig.chunkGCInterval <= 2000,

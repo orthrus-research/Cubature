@@ -16,6 +16,10 @@ prepare columns off the server thread for generators that declare concurrent gen
 (`concurrentGenerationThreads`, `concurrentGenerationQueue`, `concurrentGenerationTickMillis`),
 a `deliveryMode` option selects the opt-in delivery stages, the storage writer lock is fair,
 and `distantHorizonsNativeFeed` can limit DH rebuilds to edited columns.
+On October 29, 2026, `deliveryMode` became the only delivery input: it is read when the server
+starts and shared by every dimension, the `incrementalMaintenance` option and the
+`cubature.deliveryExperiment` system property were removed, and `maintenanceUnloadsPerTick`
+(now 64 by default) applies in every incremental stage.
 The Cubature name and license packaging were adopted on October 19, 2026;
 that change added no terrain or scheduling algorithm.
 

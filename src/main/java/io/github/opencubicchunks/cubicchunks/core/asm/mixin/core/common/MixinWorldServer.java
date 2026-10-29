@@ -44,6 +44,7 @@ import io.github.opencubicchunks.cubicchunks.core.lighting.LightingManager;
 import io.github.opencubicchunks.cubicchunks.core.server.ChunkGc;
 import io.github.opencubicchunks.cubicchunks.core.server.CubeProviderServer;
 import io.github.opencubicchunks.cubicchunks.core.server.PlayerCubeMap;
+import io.github.opencubicchunks.cubicchunks.core.server.ServerDeliveryMode;
 import io.github.opencubicchunks.cubicchunks.core.server.SpawnCubes;
 import io.github.opencubicchunks.cubicchunks.core.server.VanillaNetworkHandler;
 import io.github.opencubicchunks.cubicchunks.core.util.CompatHandler;
@@ -134,7 +135,7 @@ public abstract class MixinWorldServer extends MixinWorld implements ICubicWorld
         spawnHandler.setEntitySpawner(spawner);
 
         this.chunkProvider = new CubeProviderServer((WorldServer) (Object) this,
-                ((ICubicWorldProvider) this.provider).createCubeGenerator());
+                ((ICubicWorldProvider) this.provider).createCubeGenerator(), ServerDeliveryMode.get());
 
         this.vanillaNetworkHandler = new VanillaNetworkHandler((WorldServer) (Object) this);
         this.playerChunkMap = new PlayerCubeMap((WorldServer) (Object) this);

@@ -40,7 +40,7 @@ class NativeFixture:
             "riven": {"sha256": "same-riven", "generatorSettings": {"sha256": "same-settings"}},
             "sharedScriptHashes": {"content.groovy": "same-script"},
             "cubeExperiments": {"maxCubeSendTimeMillis": "0", "maxCubeSendBytesPerTick": "0",
-                                "maxCubePacketBytes": "0", "incrementalMaintenance": "false"},
+                                "maxCubePacketBytes": "0", "deliveryMode": "BASELINE"},
             "server": str(self.root / "server"), "client": str(self.root / "client"), "port": 25620}
         common = {"runId": self.id, "scenario": "full-view", "runtime": runtime, "elapsedNanos": 3_000_000_000,
                   "measurementMode": "ordinary-profile-with-bounded-lab-counters"}
@@ -60,7 +60,7 @@ class NativeFixture:
                        "fullView": {"geometry": self.geometry, "resident": 15625, "meshUploadDrawCompletionMeasured": False}}}
         self.result = {"schema": 1, "phase": "write", "passed": True, "jfr": True, "scenarios": [self.row]}
         self.result["inputHashesBeforeLaunch"] = {"server": {}, "client": {}}
-        self.cube_config = ("general {\n B:incrementalMaintenance=false\n B:disableLighting=false\n"
+        self.cube_config = ("general {\n S:deliveryMode=BASELINE\n B:disableLighting=false\n"
                             " I:maxCubeSendTimeMillis=0\n I:maxCubeSendBytesPerTick=0\n"
                             " I:maxCubePacketBytes=0\n I:verticalCubeLoadDistance=12\n"
                             " S:excludedDimensions <\n  -1\n >\n}\n").encode()
@@ -115,13 +115,13 @@ class NativeFixture:
             self.manifest[field].pop(old)
             self.manifest[field][self.manifest["cubicJar"]["filename"]] = self.manifest["cubicJar"]["sha256"]
 
-    def configure_maintenance(self, enabled=True, inspections=256, unloads=8, millis=1):
-        config = self.cube_config.replace(b"incrementalMaintenance=false", ("incrementalMaintenance=" + str(enabled).lower()).encode())
+    def configure_maintenance(self, mode="MAINTENANCE", inspections=256, unloads=64, millis=1):
+        config = self.cube_config.replace(b"deliveryMode=BASELINE", ("deliveryMode=" + mode).encode())
         for name, value in (("maintenanceInspectionsPerTick", inspections), ("maintenanceUnloadsPerTick", unloads),
                             ("maintenanceTimeMillis", millis)):
             config = config.replace(b"general {", ("general {\n I:" + name + "=" + str(value)).encode())
             self.manifest["cubeExperiments"][name] = str(value)
-        self.manifest["cubeExperiments"]["incrementalMaintenance"] = str(enabled).lower()
+        self.manifest["cubeExperiments"]["deliveryMode"] = mode
         self.set_input("server", "config/cubicchunks.cfg", config)
 
     def configure_property(self, key, value):
@@ -340,13 +340,13 @@ class TailLatencyContractTest(unittest.TestCase):
         base = NativeFixture(self.root, "a")
         group = base.load(treatment="cc-pacing")["captures"][0]["controlGroup"]
         for index, (before, after) in enumerate(((b"disableLighting=false", b"disableLighting=true"),
-                (b"incrementalMaintenance=false", b"incrementalMaintenance=true"),
+                (b"deliveryMode=BASELINE", b"deliveryMode=MAINTENANCE"),
                 (b"verticalCubeLoadDistance=12", b"verticalCubeLoadDistance=13"),
                 (b"  -1", b"  -2"), (b" B:disableLighting=false", b" I:maintenanceTimeMillis=2\n B:disableLighting=false"))):
             candidate = NativeFixture(self.root, "b" + str(index)); candidate.same_binary(base)
             candidate.set_input("server", "config/cubicchunks.cfg", candidate.cube_config.replace(before, after))
-            if before == b"incrementalMaintenance=false":
-                candidate.manifest["cubeExperiments"]["incrementalMaintenance"] = "true"
+            if before == b"deliveryMode=BASELINE":
+                candidate.manifest["cubeExperiments"]["deliveryMode"] = "MAINTENANCE"
             self.assertNotEqual(group, candidate.load(treatment="cc-pacing")["captures"][0]["controlGroup"])
 
     def test_pacing_mode_requires_same_binary_and_non_numeric_or_unknown_syntax_fails_closed(self):
@@ -376,7 +376,7 @@ class TailLatencyContractTest(unittest.TestCase):
         self.assertTrue(b["captures"][0]["eligibleComparator"], b["captures"][0]["issues"])
         self.assertEqual(a["captures"][0]["controlGroup"], b["captures"][0]["controlGroup"])
         values = b["captures"][0]["declaredTreatmentValues"]["maintenance"]["server"]
-        self.assertEqual(values, {"general.B:incrementalMaintenance": True,
+        self.assertEqual(values, {"general.S:deliveryMode": "MAINTENANCE",
             "general.I:maintenanceInspectionsPerTick": 128, "general.I:maintenanceUnloadsPerTick": 4,
             "general.I:maintenanceTimeMillis": 2})
         self.assertNotEqual(a["rawInputHashesBeforeLaunch"], b["rawInputHashesBeforeLaunch"])
@@ -397,15 +397,27 @@ class TailLatencyContractTest(unittest.TestCase):
         other = NativeFixture(self.root, "other")
         self.assertNotEqual(group, other.load(treatment="cc-maintenance")["captures"][0]["controlGroup"])
 
-    def test_maintenance_limits_require_reviewed_ranges_and_boolean_kind(self):
+    def test_maintenance_limits_require_reviewed_ranges_and_a_known_delivery_mode(self):
         fixture = NativeFixture(self.root)
         for values in ((0, 8, 1), (65537, 8, 1), (256, 0, 1), (256, 4097, 1), (256, 8, 0), (256, 8, 51)):
             fixture.configure_maintenance(inspections=values[0], unloads=values[1], millis=values[2])
             self.assertFalse(fixture.load(treatment="cc-maintenance")["captures"][0]["eligibleComparator"])
-        fixture.configure_maintenance()
-        path = Path(fixture.manifest["server"]) / "config/cubicchunks.cfg"
-        fixture.set_input("server", "config/cubicchunks.cfg", path.read_bytes().replace(b"B:incrementalMaintenance=true", b"I:incrementalMaintenance=1"))
-        self.assertFalse(fixture.load(treatment="cc-maintenance")["captures"][0]["eligibleComparator"])
+        for replacement in (b"I:deliveryMode=1", b"S:deliveryMode=FAST"):
+            fixture.configure_maintenance()
+            path = Path(fixture.manifest["server"]) / "config/cubicchunks.cfg"
+            fixture.set_input("server", "config/cubicchunks.cfg", path.read_bytes().replace(b"S:deliveryMode=MAINTENANCE", replacement))
+            self.assertFalse(fixture.load(treatment="cc-maintenance")["captures"][0]["eligibleComparator"])
+
+    def test_legacy_disabled_maintenance_flag_reads_as_baseline_and_an_enabled_one_stays_distinct(self):
+        def controls(body):
+            data = ("general {\n" + body + " I:maxCubeSendTimeMillis=0\n}\n").encode()
+            return chart.canonical_prepared_input("config/cubicchunks.cfg", data, {}, "cc-source")[1]
+        current = controls(" S:deliveryMode=BASELINE\n")
+        self.assertEqual(current, controls(" B:incrementalMaintenance=false\n"))
+        self.assertEqual(current, controls(""))
+        enabled = controls(" B:incrementalMaintenance=true\n")
+        self.assertNotEqual(current, enabled)
+        self.assertNotIn(chart.DELIVERY_MODE_KEY, enabled)
 
     def test_maintenance_configuration_needs_exact_prelaunch_byte_proof(self):
         fixture = NativeFixture(self.root)

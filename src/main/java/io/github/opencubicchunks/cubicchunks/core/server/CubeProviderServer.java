@@ -27,6 +27,7 @@ package io.github.opencubicchunks.cubicchunks.core.server;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
 import io.github.opencubicchunks.cubicchunks.api.world.storage.StorageFormatProviderBase;
 import io.github.opencubicchunks.cubicchunks.core.CubicChunksConfig;
+import io.github.opencubicchunks.cubicchunks.core.CubicChunksConfig.DeliveryMode;
 import io.github.opencubicchunks.cubicchunks.core.server.chunkio.AsyncBatchingCubeIO;
 import io.github.opencubicchunks.cubicchunks.core.server.chunkio.ICubeIO;
 import io.github.opencubicchunks.cubicchunks.core.server.chunkio.async.forge.AsyncWorldIOExecutor;
@@ -100,10 +101,9 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
     private final PacedAutosave<ChunkPos> autosaveColumns = new PacedAutosave<>();
     private int lastAutosaveProcessed;
     private boolean autosaveColumnsFirst;
-    private final MaintenanceIndex<Cube> maintenanceCubes = CubicChunksConfig.incrementalMaintenance || DeliveryExperiment.maintenance() ? new MaintenanceIndex<>() : null;
-    private final MaintenanceIndex<Chunk> maintenanceColumns = CubicChunksConfig.incrementalMaintenance || DeliveryExperiment.maintenance() ? new MaintenanceIndex<>() : null;
-    private int discoverCubes, discoverColumns, gcCubes, gcColumns;
-    private boolean discoveryColumnFirst, gcColumnFirst;
+    private final DeliveryMode deliveryMode;
+    /** Present exactly when the delivery mode inspects incrementally. */
+    @Nullable private final MaintenanceState maintenance;
 
     @Nonnull private final CubePrimer cubePrimer;
     @Nonnull private final ICubeGenerator cubeGen;
@@ -113,13 +113,15 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
     // this needs the column to be already known by the chunk provider so that it can load cubes without trying to load the column again
     private final LoadingColumnContext loadingColumns = new LoadingColumnContext();
 
-    public CubeProviderServer(WorldServer worldServer, ICubeGenerator cubeGen) {
+    public CubeProviderServer(WorldServer worldServer, ICubeGenerator cubeGen, DeliveryMode deliveryMode) {
         super(worldServer,
                 worldServer.getSaveHandler().getChunkLoader(worldServer.provider), // forge uses this in
                 worldServer.provider.createChunkGenerator()); // let's create the chunk generator, for now the vanilla one may be enough
 
         this.cubePrimer = new CubePrimer();
         this.cubeGen = cubeGen;
+        this.deliveryMode = deliveryMode;
+        this.maintenance = deliveryMode.incremental() ? new MaintenanceState(deliveryMode.continuousSave()) : null;
         this.concurrentGeneration = ConcurrentGeneration.create(cubeGen, "dimension " + worldServer.provider.getDimension());
         this.worldServer = worldServer;
         this.profiler = worldServer.profiler;
@@ -224,9 +226,9 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
         // the first dirty entry. Complete queued updates before selecting any save candidates.
         ((ICubicWorldInternal) worldServer).getLightingManager().processUpdates();
         if (AutosaveScope.isActive()) {
-            if (maintenanceCubes != null) {
-                discoverCubes = Math.max(discoverCubes, maintenanceCubes.size());
-                discoverColumns = Math.max(discoverColumns, maintenanceColumns.size());
+            if (maintenance != null) {
+                maintenance.discoverCubes = Math.max(maintenance.discoverCubes, maintenance.cubes.size());
+                maintenance.discoverColumns = Math.max(maintenance.discoverColumns, maintenance.columns.size());
                 return true;
             }
             for (Cube cube : cubeMap) if (cube.needsSaving()) autosaveCubes.add(cube.getCoords());
@@ -247,7 +249,7 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
         }
         autosaveCubes.clear();
         autosaveColumns.clear();
-        discoverCubes = discoverColumns = 0;
+        if (maintenance != null) maintenance.discoverCubes = maintenance.discoverColumns = 0;
         return true;
     }
 
@@ -257,11 +259,12 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
         long start = System.nanoTime();
         long budget = Math.max(1, CubicChunksConfig.autosaveTimeMillis) * 1_000_000L;
         int limit = Math.max(1, CubicChunksConfig.autosaveSnapshotsPerTick);
-        if (DeliveryExperiment.saving() && discoverCubes == 0 && discoverColumns == 0) {
+        if (maintenance != null && maintenance.continuousDiscovery
+                && maintenance.discoverCubes == 0 && maintenance.discoverColumns == 0) {
             // The existing two independent bounded cursors discover dirty state continuously.
             // Snapshot publication still runs on this owner thread and honors writer backpressure.
-            discoverCubes = maintenanceCubes.size();
-            discoverColumns = maintenanceColumns.size();
+            maintenance.discoverCubes = maintenance.cubes.size();
+            maintenance.discoverColumns = maintenance.columns.size();
         }
         discoverAutosave(start, budget / 2);
         // Alternate priority, including with a quota of one or an over-budget first snapshot.
@@ -289,66 +292,70 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
     public int getPendingAutosaveCount() { return autosaveCubes.size() + autosaveColumns.size(); }
     public int getLastAutosaveProcessedCount() { return lastAutosaveProcessed; }
 
-    public int getPendingAutosaveDiscoveryCount() { return discoverCubes + discoverColumns; }
-    /** Effective experimental limit is exposed for diagnostics and native contract checks. */
-    public int getMaintenanceUnloadLimit() { return DeliveryExperiment.maintenance() ? 64 : CubicChunksConfig.maintenanceUnloadsPerTick; }
+    public int getPendingAutosaveDiscoveryCount() {
+        return maintenance == null ? 0 : maintenance.discoverCubes + maintenance.discoverColumns;
+    }
 
     private void discoverAutosave(long start, long budget) {
+        if (maintenance == null) return;
         for (int inspected = 0; inspected < CubicChunksConfig.maintenanceInspectionsPerTick
-                && (discoverCubes > 0 || discoverColumns > 0)
+                && (maintenance.discoverCubes > 0 || maintenance.discoverColumns > 0)
                 && getPendingAutosaveCount() < CubicChunksConfig.autosavePendingThreshold
                 && (inspected == 0 || System.nanoTime() - start < budget); inspected++) {
-            discoveryColumnFirst = !discoveryColumnFirst;
-            if (discoverColumns > 0 && (discoveryColumnFirst || discoverCubes == 0)) {
-                discoverColumns--;
-                Chunk column = maintenanceColumns.next(true);
-                if (column == null) discoverColumns = 0;
+            maintenance.discoveryColumnFirst = !maintenance.discoveryColumnFirst;
+            if (maintenance.discoverColumns > 0 && (maintenance.discoveryColumnFirst || maintenance.discoverCubes == 0)) {
+                maintenance.discoverColumns--;
+                Chunk column = maintenance.columns.next(true);
+                if (column == null) maintenance.discoverColumns = 0;
                 else if (column.needsSaving(true)) autosaveColumns.add(column.getPos());
             } else {
-                discoverCubes--;
-                Cube cube = maintenanceCubes.next(true);
-                if (cube == null) discoverCubes = 0;
+                maintenance.discoverCubes--;
+                Cube cube = maintenance.cubes.next(true);
+                if (cube == null) maintenance.discoverCubes = 0;
                 else if (cube.needsSaving()) autosaveCubes.add(cube.getCoords());
             }
         }
     }
 
-    boolean usesIncrementalMaintenance() { return maintenanceCubes != null; }
+    DeliveryMode getDeliveryMode() { return deliveryMode; }
+
+    boolean usesIncrementalMaintenance() { return maintenance != null; }
 
     void beginIncrementalGc() {
-        if (gcCubes == 0 && gcColumns == 0) {
-            gcCubes = maintenanceCubes.size();
-            gcColumns = maintenanceColumns.size();
+        if (maintenance != null && maintenance.gcCubes == 0 && maintenance.gcColumns == 0) {
+            maintenance.gcCubes = maintenance.cubes.size();
+            maintenance.gcColumns = maintenance.columns.size();
         }
     }
 
     void tickIncrementalGc() {
+        if (maintenance == null) return;
         long start = System.nanoTime();
         long budget = Math.max(1, CubicChunksConfig.maintenanceTimeMillis) * 1_000_000L;
         int unloaded = 0;
         for (int inspected = 0; inspected < CubicChunksConfig.maintenanceInspectionsPerTick
-                && (gcCubes > 0 || gcColumns > 0) && unloaded < getMaintenanceUnloadLimit()
+                && (maintenance.gcCubes > 0 || maintenance.gcColumns > 0) && unloaded < CubicChunksConfig.maintenanceUnloadsPerTick
                 && (inspected == 0 || System.nanoTime() - start < budget); inspected++) {
-            gcColumnFirst = !gcColumnFirst;
-            if (gcColumns > 0 && (gcColumnFirst || gcCubes == 0)) {
-                gcColumns--;
-                Chunk column = maintenanceColumns.next(false);
-                if (column == null) gcColumns = 0;
-                else if (loadedChunks.get(ChunkPos.asLong(column.x, column.z)) != column) maintenanceColumns.remove(column);
+            maintenance.gcColumnFirst = !maintenance.gcColumnFirst;
+            if (maintenance.gcColumns > 0 && (maintenance.gcColumnFirst || maintenance.gcCubes == 0)) {
+                maintenance.gcColumns--;
+                Chunk column = maintenance.columns.next(false);
+                if (column == null) maintenance.gcColumns = 0;
+                else if (loadedChunks.get(ChunkPos.asLong(column.x, column.z)) != column) maintenance.columns.remove(column);
                 else if (tryUnloadColumn(column)) {
                     if (loadedChunks.get(ChunkPos.asLong(column.x, column.z)) == column)
                         loadedChunks.remove(ChunkPos.asLong(column.x, column.z));
-                    maintenanceColumns.remove(column);
+                    maintenance.columns.remove(column);
                     unloaded++;
                 }
             } else {
-                gcCubes--;
-                Cube cube = maintenanceCubes.next(false);
-                if (cube == null) gcCubes = 0;
-                else if (getLoadedCube(cube.getX(), cube.getY(), cube.getZ()) != cube) maintenanceCubes.remove(cube);
+                maintenance.gcCubes--;
+                Cube cube = maintenance.cubes.next(false);
+                if (cube == null) maintenance.gcCubes = 0;
+                else if (getLoadedCube(cube.getX(), cube.getY(), cube.getZ()) != cube) maintenance.cubes.remove(cube);
                 else if (tryUnloadCube(cube)) {
                     if (getLoadedCube(cube.getX(), cube.getY(), cube.getZ()) == cube) cubeMap.remove(cube);
-                    maintenanceCubes.remove(cube);
+                    maintenance.cubes.remove(cube);
                     unloaded++;
                 }
             }
@@ -525,9 +532,9 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
     private void onCubeLoaded(@Nullable Cube cube, Chunk column) {
         if (cube != null) {
             Cube previous = cubeMap.put(cube); // cache the Cube
-            if (maintenanceCubes != null) {
-                if (previous != cube) maintenanceCubes.remove(previous);
-                maintenanceCubes.add(cube);
+            if (maintenance != null) {
+                if (previous != cube) maintenance.cubes.remove(previous);
+                maintenance.cubes.add(cube);
             }
             //synchronous loading may cause it to be called twice when async loading has been already queued
             //because AsyncWorldIOExecutor only executes one task for one cube and because only saving a cube
@@ -785,7 +792,7 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
         }
         if (column != null) {
             loadedChunks.put(ChunkPos.asLong(columnX, columnZ), column);
-            if (maintenanceColumns != null) maintenanceColumns.add(column);
+            if (maintenance != null) maintenance.columns.add(column);
             column.setLastSaveTime(this.worldServer.getTotalWorldTime()); // the column was just loaded
             column.onLoad();
             return column;
@@ -802,7 +809,7 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
         }
 
         loadedChunks.put(ChunkPos.asLong(columnX, columnZ), column);
-        if (maintenanceColumns != null) maintenanceColumns.add(column);
+        if (maintenance != null) maintenance.columns.add(column);
         column.setLastSaveTime(this.worldServer.getTotalWorldTime()); // the column was just generated
         column.onLoad();
         return column;
@@ -870,16 +877,16 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
     }
 
     Iterator<Cube> cubesIterator() {
-        return maintenanceCubes == null ? cubeMap.iterator() : maintenanceCubes.track(cubeMap.iterator());
+        return maintenance == null ? cubeMap.iterator() : maintenance.cubes.track(cubeMap.iterator());
     }
 
     @SuppressWarnings("unchecked")
     Iterator<Chunk> columnsIterator() {
-        return maintenanceColumns == null ? loadedChunks.values().iterator() : maintenanceColumns.track(loadedChunks.values().iterator());
+        return maintenance == null ? loadedChunks.values().iterator() : maintenance.columns.track(loadedChunks.values().iterator());
     }
 
     boolean tryUnloadCube(Cube cube) {
-        if (DeliveryExperiment.maintenance()) {
+        if (deliveryMode.incremental()) {
             PlayerCubeMap watchers = (PlayerCubeMap) world.getPlayerChunkMap();
             // A watcher can still be waiting for its load callback and thus have no ticket yet.
             // Also protect actual player positions if a callback moved one since reconciliation.

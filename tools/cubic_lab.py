@@ -28,6 +28,8 @@ import lab_workload
 FORK = Path(__file__).resolve().parents[1]
 PLAYER = 'CubicLab'
 VIEW_DISTANCE = 12
+# Cubature's CubicChunksConfig.DeliveryMode, in stage order.
+DELIVERY_MODES = ('BASELINE', 'MAINTENANCE', 'SAVE', 'PREFETCH')
 JVM_ARGUMENTS = ['-Xms1G', '-Xmx8G', '-XX:+UseZGC']
 
 
@@ -104,7 +106,9 @@ def validate_jvm_capture(server, client, manifest=None):
 def configure_cube_experiments(server, args):
     if not 1 <= getattr(args, 'cube_packet_cubes', 1024) <= 1024:
         raise ValueError('Packet cube count must be 1..1024')
-    values = {'incrementalMaintenance': ('B', 'true' if args.incremental_maintenance else 'false'),
+    if args.delivery_mode not in DELIVERY_MODES:
+        raise ValueError('Delivery mode must be one of ' + ', '.join(DELIVERY_MODES))
+    values = {'deliveryMode': ('S', args.delivery_mode),
               'maxCubeSendTimeMillis': ('I', args.cube_send_ms),
               'maxCubeSendBytesPerTick': ('I', args.cube_send_bytes),
               'maxCubePacketBytes': ('I', args.cube_packet_bytes),
@@ -125,7 +129,7 @@ def configure_cube_experiments(server, args):
 def validate_cube_experiments(manifest):
     for name, expected in manifest.get('cubeExperiments', {}).items():
         path = Path(manifest['server']) / 'config/cubicchunks.cfg'
-        actual = re.findall(r'^\s*[BI]:' + re.escape(name) + r'=(.*?)\s*$', path.read_text(), flags=re.M)
+        actual = re.findall(r'^\s*[BIS]:' + re.escape(name) + r'=(.*?)\s*$', path.read_text(), flags=re.M)
         if actual != [expected]: raise RuntimeError('Prepared cube experiment changed: ' + name)
 
 

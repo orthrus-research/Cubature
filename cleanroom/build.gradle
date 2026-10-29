@@ -49,6 +49,7 @@ sourceSets {
         java.include 'io/github/opencubicchunks/cubicchunks/core/server/chunkio/TestStorageCloseState.java'
         java.include 'io/github/opencubicchunks/cubicchunks/core/server/TestPacedAutosave.java'
         java.include 'io/github/opencubicchunks/cubicchunks/core/server/TestMaintenanceIndex.java'
+        java.include 'io/github/opencubicchunks/cubicchunks/core/server/TestServerDeliveryMode.java'
         java.include 'io/github/opencubicchunks/cubicchunks/core/server/TestCubeSendBudget.java'
         java.include 'io/github/opencubicchunks/cubicchunks/core/server/TestPendingCubeSends.java'
         java.include 'io/github/opencubicchunks/cubicchunks/core/network/TestWorldEncoderMissingCubes.java'
