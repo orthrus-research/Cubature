@@ -60,12 +60,10 @@ import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import mcp.MethodsReturnNonnullByDefault;
 import net.minecraft.entity.player.EntityPlayerMP;
-import net.minecraft.network.play.server.SPacketPlayerPosLook;
 import net.minecraft.server.management.PlayerChunkMap;
 import net.minecraft.server.management.PlayerChunkMapEntry;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
-import net.minecraft.util.math.MathHelper;
 import net.minecraft.world.WorldProvider;
 import net.minecraft.world.WorldServer;
 import net.minecraft.world.chunk.Chunk;
@@ -77,14 +75,11 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.Iterator;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -101,26 +96,6 @@ import javax.annotation.ParametersAreNonnullByDefault;
 @MethodsReturnNonnullByDefault
 public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, SurfaceHeightListener {
     private final GenerationBudget generationBudget = new GenerationBudget();
-
-    /** Teleports waiting for generation workers to prepare their destination column (deferArrival). */
-    private final Map<UUID, Arrival> arrivals = new HashMap<>();
-    /** Set while a held teleport completes, so it is not held again. */
-    private boolean completingArrival;
-    /** A held teleport completes this long after it was held even if its column is not prepared. */
-    private static final long ARRIVAL_TIMEOUT_TICKS = 600;
-
-    private static final class Arrival {
-        final double x, y, z;
-        final float yaw, pitch;
-        final int columnX, columnZ;
-        final long since;
-
-        Arrival(double x, double y, double z, float yaw, float pitch, long since) {
-            this.x = x; this.y = y; this.z = z; this.yaw = yaw; this.pitch = pitch; this.since = since;
-            columnX = blockToCube(MathHelper.floor(x));
-            columnZ = blockToCube(MathHelper.floor(z));
-        }
-    }
 
     private static final Predicate<EntityPlayerMP> NOT_SPECTATOR = player -> player != null && !player.isSpectator();
 
@@ -254,6 +229,8 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
     // see comment in updateMovingPlayer() for explnation why it's in this class
     private final ChunkGc chunkGc;
 
+    private final DeferredArrivals arrivals;
+
     final VanillaNetworkHandler vanillaNetworkHandler;
 
     public PlayerCubeMap(WorldServer worldServer) {
@@ -263,6 +240,7 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
         this.setPlayerViewDistance(worldServer.getMinecraftServer().getPlayerList().getViewDistance(),
                 ((ICubicPlayerList) worldServer.getMinecraftServer().getPlayerList()).getVerticalViewDistance());
         this.chunkGc = new ChunkGc(((ICubicWorldInternal.Server) worldServer).getCubeCache());
+        this.arrivals = new DeferredArrivals(worldServer, cubeCache::arrivalReady);
         this.vanillaNetworkHandler = ((ICubicWorldInternal.Server) worldServer).getVanillaNetworkHandler();
     }
 
@@ -342,11 +320,7 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
 
         long currentTime = this.getWorldServer().getTotalWorldTime();
 
-        if (!arrivals.isEmpty()) {
-            getWorldServer().profiler.startSection("arrivals");
-            completeArrivals(currentTime);
-            getWorldServer().profiler.endSection();
-        }
+        arrivals.tick(currentTime);
 
         getWorldServer().profiler.startSection("addPendingPlayers");
         if (!pendingPlayerAddToCubeMap.isEmpty()) {
@@ -618,6 +592,9 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
 
     public int getPendingCubeSendCount() { return cubesToSend.size(); }
 
+    /** Teleports held while generation workers prepare their destination column. */
+    public DeferredArrivals arrivals() { return arrivals; }
+
     CubeProviderServer cubeCache() { return cubeCache; }
 
     // CHECKED: 1.10.2-12.18.1.2092
@@ -738,64 +715,6 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
             scheduleAddPlayerToWatcher(cubeWatcher, player);
         });
         this.players.put(player.getEntityId(), playerWrapper);
-    }
-
-    /**
-     * Holds a teleport (NetHandlerPlayServer.setPlayerLocation) whose destination column is neither
-     * loaded nor saved while generation workers prepare it, so the server thread does not generate
-     * it on the spot and every player keeps ticking. The player stays where they are until tick
-     * completes the teleport, with its target and rotation made absolute now; a later teleport
-     * replaces a held one. Returns whether the teleport was held.
-     */
-    public boolean deferArrival(EntityPlayerMP player, double x, double y, double z, float yaw, float pitch,
-            Set<SPacketPlayerPosLook.EnumFlags> relative) {
-        if (completingArrival) return false;
-        Arrival arrival = new Arrival(
-                x + (relative.contains(SPacketPlayerPosLook.EnumFlags.X) ? player.posX : 0),
-                y + (relative.contains(SPacketPlayerPosLook.EnumFlags.Y) ? player.posY : 0),
-                z + (relative.contains(SPacketPlayerPosLook.EnumFlags.Z) ? player.posZ : 0),
-                yaw + (relative.contains(SPacketPlayerPosLook.EnumFlags.Y_ROT) ? player.rotationYaw : 0),
-                pitch + (relative.contains(SPacketPlayerPosLook.EnumFlags.X_ROT) ? player.rotationPitch : 0),
-                getWorldServer().getTotalWorldTime());
-        if (cubeCache.arrivalReady(arrival.columnX, arrival.columnZ)) {
-            arrivals.remove(player.getUniqueID());
-            return false;
-        }
-        arrivals.put(player.getUniqueID(), arrival);
-        return true;
-    }
-
-    /** Teleports at once, generating the destination column on this thread if it must (scripted moves). */
-    public void teleportNow(EntityPlayerMP player, double x, double y, double z, float yaw, float pitch) {
-        arrivals.remove(player.getUniqueID());
-        completingArrival = true;
-        try {
-            player.connection.setPlayerLocation(x, y, z, yaw, pitch);
-        } finally {
-            completingArrival = false;
-        }
-    }
-
-    /** Completes each held teleport whose column is prepared or whose wait has run out. */
-    private void completeArrivals(long now) {
-        Iterator<Map.Entry<UUID, Arrival>> it = arrivals.entrySet().iterator();
-        while (it.hasNext()) {
-            Map.Entry<UUID, Arrival> entry = it.next();
-            Arrival a = entry.getValue();
-            EntityPlayerMP player = getWorldServer().getMinecraftServer().getPlayerList().getPlayerByUUID(entry.getKey());
-            if (player == null || player.world != getWorldServer() || player.connection == null) {
-                it.remove();
-                continue;
-            }
-            if (now - a.since < ARRIVAL_TIMEOUT_TICKS && !cubeCache.arrivalReady(a.columnX, a.columnZ)) continue;
-            it.remove();
-            completingArrival = true;
-            try {
-                player.connection.setPlayerLocation(a.x, a.y, a.z, a.yaw, a.pitch, Collections.emptySet());
-            } finally {
-                completingArrival = false;
-            }
-        }
     }
 
     // CHECKED: 1.10.2-12.18.1.2092

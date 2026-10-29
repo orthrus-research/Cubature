@@ -234,7 +234,7 @@ final class LabJob {
                     EntityPlayerMP player=server.getPlayerList().getPlayerByUUID(peer);
                     if(player==null)throw new IllegalStateException("Route participant disconnected");
                     if(benchmark.moveAt(routeTick)){player.setGameType(GameType.SPECTATOR);
-                        ((io.github.opencubicchunks.cubicchunks.core.server.PlayerCubeMap)world.getPlayerChunkMap()).teleportNow(player,routePose[0],routePose[1],routePose[2],(float)routePose[3],(float)routePose[4]);operationCount++;}
+                        ((io.github.opencubicchunks.cubicchunks.core.server.PlayerCubeMap)world.getPlayerChunkMap()).arrivals().teleportNow(player,routePose[0],routePose[1],routePose[2],(float)routePose[3],(float)routePose[4]);operationCount++;}
                     if(Math.abs(player.posX-routePose[0])>.3||Math.abs(player.posY-routePose[1])>.3||Math.abs(player.posZ-routePose[2])>.3
                             ||Math.abs(net.minecraft.util.math.MathHelper.wrapDegrees(player.rotationYaw-(float)routePose[3]))>2||Math.abs(player.rotationPitch-routePose[4])>2)
                         throw new IllegalStateException("Route participant moved outside the declared pose");
@@ -254,7 +254,7 @@ final class LabJob {
                         double x = scenario.equals("horizontal") ? 2048 + step * 256 : 2048;
                         double y = scenario.equals("vertical") ? LabRoute.height(minY, maxY, step) : 80;
                         // Scripted moves keep their synchronous arrival, as these streams were measured.
-                        ((io.github.opencubicchunks.cubicchunks.core.server.PlayerCubeMap) world.getPlayerChunkMap()).teleportNow(player, x + .5, y, 2048.5, 0, 15);
+                        ((io.github.opencubicchunks.cubicchunks.core.server.PlayerCubeMap) world.getPlayerChunkMap()).arrivals().teleportNow(player, x + .5, y, 2048.5, 0, 15);
                     }
                     progress++; operationCount++;
                 }

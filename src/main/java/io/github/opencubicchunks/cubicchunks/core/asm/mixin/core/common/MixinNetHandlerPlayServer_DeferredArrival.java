@@ -21,7 +21,7 @@ import java.util.Set;
 /**
  * A teleport into a column that is neither loaded nor saved makes the server thread generate that
  * column at once (Entity.setPositionAndRotation reads its chunk), stalling every player while the
- * generator works. In cubic worlds with generation workers, PlayerCubeMap.deferArrival holds the
+ * generator works. In cubic worlds with generation workers, PlayerCubeMap.arrivals() holds the
  * teleport until the workers have prepared the column, and completes it then.
  */
 @Mixin(NetHandlerPlayServer.class)
@@ -34,7 +34,7 @@ public abstract class MixinNetHandlerPlayServer_DeferredArrival {
             Set<SPacketPlayerPosLook.EnumFlags> relative, CallbackInfo ci) {
         if (!(player.world instanceof WorldServer)) return;
         PlayerChunkMap map = ((WorldServer) player.world).getPlayerChunkMap();
-        if (map instanceof PlayerCubeMap && ((PlayerCubeMap) map).deferArrival(player, x, y, z, yaw, pitch, relative)) {
+        if (map instanceof PlayerCubeMap && ((PlayerCubeMap) map).arrivals().defer(player, x, y, z, yaw, pitch, relative)) {
             ci.cancel();
         }
     }
