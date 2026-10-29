@@ -24,7 +24,7 @@ def sha(path):
 
 
 def validate(report):
-    from cubic_lab import validate_view_distance_capture
+    from lab_profiles import validate_view_distance_capture
     scenarios = [row for run in report['runs'] for row in run['result']['scenarios']
                  if row['scenario'] == 'storage-strategies']
     if len(scenarios) != 1:

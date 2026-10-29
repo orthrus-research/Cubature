@@ -12,6 +12,7 @@ import time
 import uuid
 
 import cubic_lab as lab
+import lab_profiles
 
 
 def prepare(args):
@@ -63,7 +64,7 @@ def prepare(args):
     player_uuid = str(uuid.UUID(bytes=hashlib.md5(('OfflinePlayer:' + lab.PLAYER).encode()).digest(), version=3))
     lab.write_json(server / 'ops.json', [{'uuid': player_uuid, 'name': lab.PLAYER, 'level': 4,
                                          'bypassesPlayerLimit': False}])
-    lab.configure_jvm(server)
+    lab_profiles.configure_jvm(server)
     runtime = lab.prepare_client(server, client, files['prism'], root, donor['java'], donor['release'])
     # Freeze installer output and client libraries; no Riven configs, scripts or lab mod are copied.
     server_files = {str(p.relative_to(server)): lab.sha(p) for p in (server / 'libraries').rglob('*') if p.is_file()}
@@ -72,7 +73,7 @@ def prepare(args):
         raise RuntimeError('Installer output differs from reviewed universal artifact')
     manifest = {key: donor[key] for key in ['release', 'runtimeVersion', 'java', 'javaRuntime']}
     manifest.update(name=args.name, server=str(server), client=str(client), port=args.port, seed=args.seed,
-        jvmProfile=lab.jvm_profile(), clientRuntime=runtime, viewDistance=lab.view_distance_profile(),
+        jvmProfile=lab_profiles.jvm_profile(), clientRuntime=runtime, viewDistance=lab_profiles.view_distance_profile(),
         serverRuntimeHashes=server_files, cubicJar={'source': str(args.cubic_jar.resolve()), 'sha256': lab.sha(args.cubic_jar)},
         purpose='Interactive CC-only: vanilla compatibility terrain, creative/peaceful, no instrumentation mod',
         height={'minY': -128, 'maxYExclusive': 384}, modFiles=['cubicchunks.jar'])
@@ -84,8 +85,8 @@ def load(args):
     target = args.workspace.resolve() / '.local/cubic-standalone' / args.name
     manifest = json.loads((target / 'standalone.json').read_text())
     lab.validate_java26_inputs(manifest)
-    lab.validate_view_distance_inputs(manifest)
-    lab.validate_jvm_inputs(manifest)
+    lab_profiles.validate_view_distance_inputs(manifest)
+    lab_profiles.validate_jvm_inputs(manifest)
     for side in ['server', 'client']:
         directory = Path(manifest[side])
         actual = {str(p.relative_to(directory / 'mods')): lab.sha(p) for p in (directory / 'mods').rglob('*') if p.is_file()}

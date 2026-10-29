@@ -8,6 +8,7 @@ import unittest
 from unittest import mock
 import zipfile
 import cubic_lab as lab
+import lab_profiles as profiles
 
 class LabControlTest(unittest.TestCase):
     def test_foreign_workload_preflight_retains_failure_without_launching(self):
@@ -104,14 +105,14 @@ class LabControlTest(unittest.TestCase):
             self.assertEqual(value['name'],'second')
 
     def test_reviewed_jvm_experiments_keep_equal_max_heap_and_verify_effective_collectors(self):
-        for variant in lab.JVM_VARIANTS:
-            profile = lab.jvm_profile(variant)
+        for variant in profiles.JVM_VARIANTS:
+            profile = profiles.jvm_profile(variant)
             with tempfile.TemporaryDirectory() as temporary:
-                root=Path(temporary); lab.configure_jvm(root, profile)
+                root=Path(temporary); profiles.configure_jvm(root, profile)
                 manifest={'server':str(root),'jvmProfile':profile}
-                lab.validate_jvm_inputs(manifest)
+                profiles.validate_jvm_inputs(manifest)
                 capture={'runtime':{'maxHeapBytes':8*1024**3,'garbageCollectors':[profile['collector']+' Young Generation']}}
-                lab.validate_jvm_capture(capture,capture,manifest)
+                profiles.validate_jvm_capture(capture,capture,manifest)
                 self.assertEqual(profile['initialHeapMiB'],1024 if '-' not in variant else 8192)
                 self.assertEqual('-XX:+AlwaysPreTouch' in profile['arguments'],variant.endswith('-pretouch'))
 
@@ -120,41 +121,41 @@ class LabControlTest(unittest.TestCase):
             root=Path(temporary); (root/'config').mkdir()
             path=root/'config/cubicchunks.cfg'; path.write_text('general {\nI:defaultMinHeight=-128\n}\n')
             args=argparse.Namespace(delivery_mode='MAINTENANCE',cube_send_ms=8,cube_send_bytes=4194304,cube_packet_bytes=262144,cube_packet_cubes=16)
-            values=lab.configure_cube_experiments(root,args)
+            values=profiles.configure_cube_experiments(root,args)
             self.assertEqual(values['maxCubePacketCubes'], '16')
             self.assertEqual(values['deliveryMode'], 'MAINTENANCE')
-            lab.validate_cube_experiments({'server':str(root),'cubeExperiments':values})
+            profiles.validate_cube_experiments({'server':str(root),'cubeExperiments':values})
             original=path.read_text()
             for before,after in (('maxCubeSendTimeMillis=8','maxCubeSendTimeMillis=4'),('deliveryMode=MAINTENANCE','deliveryMode=PREFETCH')):
                 path.write_text(original.replace(before,after))
-                with self.assertRaisesRegex(RuntimeError,'experiment changed'): lab.validate_cube_experiments({'server':str(root),'cubeExperiments':values})
+                with self.assertRaisesRegex(RuntimeError,'experiment changed'): profiles.validate_cube_experiments({'server':str(root),'cubeExperiments':values})
             args.delivery_mode='prefetch'
-            with self.assertRaisesRegex(ValueError,'Delivery mode'): lab.configure_cube_experiments(root,args)
+            with self.assertRaisesRegex(ValueError,'Delivery mode'): profiles.configure_cube_experiments(root,args)
 
     def test_installer_argfile_cannot_override_heap_and_collector(self):
         with tempfile.TemporaryDirectory() as temporary:
             server = Path(temporary)
             path = server / 'user_jvm_args.txt'
             path.write_text('-Xmx6G\n-XX:+UseG1GC\n')
-            lab.configure_jvm(server)
-            manifest = {'server': str(server), 'jvmProfile': lab.jvm_profile()}
-            lab.validate_jvm_inputs(manifest)
+            profiles.configure_jvm(server)
+            manifest = {'server': str(server), 'jvmProfile': profiles.jvm_profile()}
+            profiles.validate_jvm_inputs(manifest)
             path.write_text(path.read_text() + '-Xmx4G\n')
             with self.assertRaisesRegex(RuntimeError, 'arguments changed'):
-                lab.validate_jvm_inputs(manifest)
+                profiles.validate_jvm_inputs(manifest)
         with self.assertRaisesRegex(RuntimeError, 'fresh instance'):
-            lab.validate_jvm_inputs({})
+            profiles.validate_jvm_inputs({})
 
     def test_native_capture_requires_effective_heap_and_collector_on_both_sides(self):
         server = {'runtime': {'maxHeapBytes': 8 * 1024**3, 'garbageCollectors': ['ZGC Minor Cycles', 'ZGC Major Cycles']}}
         client = json.loads(json.dumps(server))
-        lab.validate_jvm_capture(server, client)
+        profiles.validate_jvm_capture(server, client)
         for record in [server, client]:
             record['runtime']['maxHeapBytes'] = 6 * 1024**3
-            with self.assertRaisesRegex(RuntimeError, 'heap'): lab.validate_jvm_capture(server, client)
+            with self.assertRaisesRegex(RuntimeError, 'heap'): profiles.validate_jvm_capture(server, client)
             record['runtime']['maxHeapBytes'] = 8 * 1024**3
             record['runtime']['garbageCollectors'] = ['G1 Young Generation']
-            with self.assertRaisesRegex(RuntimeError, 'collector'): lab.validate_jvm_capture(server, client)
+            with self.assertRaisesRegex(RuntimeError, 'collector'): profiles.validate_jvm_capture(server, client)
             record['runtime']['garbageCollectors'] = ['ZGC Minor Cycles', 'ZGC Major Cycles']
 
     def test_old_java_lab_is_not_java26_qualification(self):
@@ -178,36 +179,36 @@ class LabControlTest(unittest.TestCase):
             for directory in [server, client]: (directory / 'config').mkdir(parents=True)
             (server / 'server.properties').write_text('level-name=fresh-test\nview-distance=3\n', encoding='utf-8')
             (server / 'config/cubicchunks.cfg').write_text('general {\n    I:defaultMinHeight=-128\n    I:defaultMaxHeight=384\n}\n', encoding='utf-8')
-            lab.configure_view_distance(server)
+            profiles.configure_view_distance(server)
             (client / 'config/cubicchunks.cfg').write_bytes((server / 'config/cubicchunks.cfg').read_bytes())
-            (client / 'options.txt').write_text(lab.client_options(), encoding='utf-8')
-            manifest = {'server': str(server), 'client': str(client), 'viewDistance': lab.view_distance_profile()}
-            lab.validate_view_distance_inputs(manifest)
+            (client / 'options.txt').write_text(profiles.client_options(), encoding='utf-8')
+            manifest = {'server': str(server), 'client': str(client), 'viewDistance': profiles.view_distance_profile()}
+            profiles.validate_view_distance_inputs(manifest)
             self.assertIn('I:defaultMinHeight=-128', (server / 'config/cubicchunks.cfg').read_text())
             self.assertIn('I:defaultMaxHeight=384', (server / 'config/cubicchunks.cfg').read_text())
             # The manifest cannot conceal a drifted client preference.
             (client / 'options.txt').write_text('renderDistance:3\n', encoding='utf-8')
-            with self.assertRaises(RuntimeError): lab.validate_view_distance_inputs(manifest)
+            with self.assertRaises(RuntimeError): profiles.validate_view_distance_inputs(manifest)
 
     def test_old_distance_lab_cannot_be_launched_as_current_profile(self):
         with self.assertRaisesRegex(RuntimeError, 'prepare a new instance'):
-            lab.validate_view_distance_inputs({'viewDistance': {'horizontal': 3, 'vertical': 3, 'clientRender': 3}})
+            profiles.validate_view_distance_inputs({'viewDistance': {'horizontal': 3, 'vertical': 3, 'clientRender': 3}})
 
     def test_duplicate_view_settings_are_rejected(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary); (root / 'server.properties').write_text('view-distance=12\nview-distance=3\n', encoding='utf-8')
             with self.assertRaisesRegex(RuntimeError, 'ambiguous'):
-                lab.validate_view_distance_inputs({'server': str(root), 'client': str(root), 'viewDistance': lab.view_distance_profile()})
+                profiles.validate_view_distance_inputs({'server': str(root), 'client': str(root), 'viewDistance': profiles.view_distance_profile()})
 
     def test_native_capture_rejects_effective_distance_fallback(self):
-        manifest = {'viewDistance': lab.view_distance_profile()}
+        manifest = {'viewDistance': profiles.view_distance_profile()}
         server = {'horizontalViewDistance': 12, 'verticalViewDistance': 12}
         client = {'renderDistance': 12, 'verticalViewDistance': 12}
-        lab.validate_view_distance_capture(manifest, server, client)
+        profiles.validate_view_distance_capture(manifest, server, client)
         for record, field in [(server, 'horizontalViewDistance'), (server, 'verticalViewDistance'),
                               (client, 'renderDistance'), (client, 'verticalViewDistance')]:
             record[field] = 3
-            with self.assertRaises(RuntimeError): lab.validate_view_distance_capture(manifest, server, client)
+            with self.assertRaises(RuntimeError): profiles.validate_view_distance_capture(manifest, server, client)
             record[field] = 12
 
     def test_changed_prepared_runtime_is_rejected_before_launch(self):
