@@ -55,7 +55,6 @@ import java.lang.reflect.Field;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -684,33 +683,40 @@ public class CubicChunksConfig {
             }
         }
 
+        /** The value as the command reports it; reflection hands back primitives boxed. */
         private String stringify(@Nullable Object o) {
-            if (o == null) {
-                return "null";
-            }
-            if (o.getClass().isPrimitive() || o.getClass().isEnum() || o instanceof String || o instanceof Collection) {
-                return o.toString();
-            }
             if (o instanceof int[]) {
                 return Arrays.toString((int[]) o);
             }
-            if (o instanceof String[]) {
+            if (o instanceof Object[]) {
                 return Arrays.deepToString((Object[]) o);
             }
-            throw new IllegalArgumentException(o.toString());
+            return String.valueOf(o);
         }
 
+        /** Parses and checks the arguments for this option, before anything is set. */
         private Object parseConfigValue(String[] args) throws CommandException {
             Class<?> type = field.getType();
             if (type == String.class) {
                 return String.join(" ", args);
             }
-            if ((type.isPrimitive() || type.isEnum()) && args.length != 1) {
-                throw new WrongUsageException("cubicchunks.command.usage.config.set.primitive", name, type.getSimpleName());
-            }
-            Object o = tryParseSimpleType(type, args[0]);
-            if (o != null) {
-                return o;
+            if (type.isPrimitive() || type.isEnum()) {
+                if (args.length != 1) {
+                    throw new WrongUsageException("cubicchunks.command.usage.config.set.primitive", name, type.getSimpleName());
+                }
+                Config.RangeInt ints = field.getAnnotation(Config.RangeInt.class);
+                if (type == int.class && ints != null) {
+                    return parseInt(args[0], ints.min(), ints.max());
+                }
+                Config.RangeDouble doubles = field.getAnnotation(Config.RangeDouble.class);
+                if ((type == double.class || type == float.class) && doubles != null) {
+                    double value = parseDouble(args[0], doubles.min(), doubles.max());
+                    return type == float.class ? (Object) (float) value : value;
+                }
+                Object o = tryParseSimpleType(type, args[0]);
+                if (o != null) {
+                    return o;
+                }
             }
             if (type == int[].class) {
                 int[] value = new int[args.length];
@@ -741,6 +747,9 @@ public class CubicChunksConfig {
                 Map<Object, Object> map = new HashMap<>();
                 for (String arg : args) {
                     String[] split = arg.split("=");
+                    if (split.length != 2) {
+                        throw new CommandException("commands.generic.parameter.invalid", arg);
+                    }
                     Object k = tryParseSimpleType((Class<?>) key, split[0]);
                     Object v = tryParseSimpleType((Class<?>) value, split[1]);
                     map.put(k, v);
@@ -755,20 +764,24 @@ public class CubicChunksConfig {
             if (type == String.class) {
                 return value;
             }
-            if (type == int.class) {
+            if (type == int.class || type == Integer.class) {
                 return parseInt(value);
             }
-            if (type == boolean.class) {
+            if (type == boolean.class || type == Boolean.class) {
                 return parseBool(value);
             }
-            if (type == float.class) {
+            if (type == float.class || type == Float.class) {
                 return (float) parseDouble(value);
             }
-            if (type == double.class) {
+            if (type == double.class || type == Double.class) {
                 return parseDouble(value);
             }
             if (type.isEnum()) {
-                return Enum.valueOf((Class) type, value);
+                try {
+                    return Enum.valueOf((Class) type, value);
+                } catch (IllegalArgumentException e) {
+                    throw new CommandException("commands.generic.parameter.invalid", value);
+                }
             }
             return null;
         }
