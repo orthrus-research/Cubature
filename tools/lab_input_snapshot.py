@@ -1,4 +1,4 @@
-"""Small immutable input proofs for native chart controls, captured before launch."""
+"""Small immutable input proofs for comparing native captures, captured before launch."""
 import hashlib
 from pathlib import Path
 
