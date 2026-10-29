@@ -11,8 +11,8 @@ Examples (from the Cubature checkout or anywhere):
   python tools/build_cubature.py --forge --freeze candidate-01
 """
 
+from lab_files import sha
 import argparse
-import hashlib
 import json
 import os
 import shutil
@@ -35,14 +35,6 @@ def workspace_settings(workspace: Path) -> dict:
         if not Path(data.get(key, "")).is_file():
             sys.exit(f"Missing JDK executable in {path}: {key}")
     return data
-
-
-def sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for block in iter(lambda: stream.read(1 << 20), b""):
-            digest.update(block)
-    return digest.hexdigest()
 
 
 def git_state() -> dict:
@@ -140,7 +132,7 @@ def main():
         "seconds": round(time.monotonic() - started, 1),
         "git": git_state(),
         "artifacts": {
-            k: {"path": str(p), "bytes": p.stat().st_size, "sha256": sha256(p)}
+            k: {"path": str(p), "bytes": p.stat().st_size, "sha256": sha(p)}
             for k, p in artifacts.items()
         },
         "tests": tests,
@@ -150,7 +142,7 @@ def main():
         target.mkdir(parents=True, exist_ok=True)
         for name, entry in manifest["artifacts"].items():
             destination = target / f"{name}.jar"
-            if destination.exists() and sha256(destination) != entry["sha256"]:
+            if destination.exists() and sha(destination) != entry["sha256"]:
                 sys.exit(f"Refusing to overwrite a different frozen artifact: {destination}")
             shutil.copy2(entry["path"], destination)
             entry["frozen"] = str(destination)

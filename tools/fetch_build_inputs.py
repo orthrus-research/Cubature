@@ -4,8 +4,8 @@
 Inside Riven's workspace the build uses its dev/pins instead and this step is unnecessary.
 Neither JAR is bundled into Cubature; both remain their authors' unmodified releases.
 """
+from lab_files import sha
 import argparse
-import hashlib
 from pathlib import Path
 import urllib.request
 
@@ -20,14 +20,9 @@ INPUTS = [
 ]
 
 
-def sha256(path):
-    with path.open('rb') as stream:
-        return hashlib.file_digest(stream, 'sha256').hexdigest()
-
-
 def fetch(name, url, expected, target):
     path = target / name
-    if path.is_file() and sha256(path) == expected:
+    if path.is_file() and sha(path) == expected:
         print('present  ' + name)
         return
     partial = path.with_name(name + '.part')
@@ -35,7 +30,7 @@ def fetch(name, url, expected, target):
     with urllib.request.urlopen(request, timeout=120) as response, partial.open('wb') as out:
         while chunk := response.read(1 << 20):
             out.write(chunk)
-    actual = sha256(partial)
+    actual = sha(partial)
     if actual != expected:
         partial.unlink()
         raise SystemExit(f'{name}: SHA-256 {actual} does not match the pinned {expected}')

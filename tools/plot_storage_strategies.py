@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Validate/export native storage strategy trials; no game launch or build."""
+from lab_files import sha
 import argparse
 import csv
-import hashlib
 import json
 from pathlib import Path
 from statistics import mean, median
@@ -16,11 +16,6 @@ VARIANTS = [
 LABELS = ['1 cube / column order', '16 cubes / column order', '64 cubes / column order',
           '256 cubes / column order', '64 / region order / direct',
           '64 / region order / heap, GZIP 512', '64 / region order / heap, GZIP 8192']
-
-
-def sha(path):
-    with path.open('rb') as stream:
-        return hashlib.file_digest(stream, 'sha256').hexdigest()
 
 
 def validate(report):
