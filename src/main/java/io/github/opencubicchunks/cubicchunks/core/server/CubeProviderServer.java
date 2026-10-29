@@ -97,13 +97,10 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
 
     // TODO: Use a better hash map!
     @Nonnull private final XYZMap<Cube> cubeMap = new XYZMap<>(0.7f, 8000);
-    private final PacedAutosave<CubePos> autosaveCubes = new PacedAutosave<>();
-    private final PacedAutosave<ChunkPos> autosaveColumns = new PacedAutosave<>();
-    private int lastAutosaveProcessed;
-    private boolean autosaveColumnsFirst;
     private final DeliveryMode deliveryMode;
     /** Present exactly when the delivery mode inspects incrementally. */
     @Nullable private final MaintenanceState maintenance;
+    @Nonnull private final PeriodicAutosave autosave;
 
     @Nonnull private final CubePrimer cubePrimer;
     @Nonnull private final ICubeGenerator cubeGen;
@@ -122,6 +119,7 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
         this.cubeGen = cubeGen;
         this.deliveryMode = deliveryMode;
         this.maintenance = deliveryMode.incremental() ? new MaintenanceState(deliveryMode.continuousSave()) : null;
+        this.autosave = new PeriodicAutosave(this, maintenance);
         this.concurrentGeneration = ConcurrentGeneration.create(cubeGen, "dimension " + worldServer.provider.getDimension());
         this.worldServer = worldServer;
         this.profiler = worldServer.profiler;
@@ -237,9 +235,7 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
                 this.cubeIO.saveColumn(chunk);
             }
         }
-        autosaveCubes.clear();
-        autosaveColumns.clear();
-        if (maintenance != null) maintenance.discoverCubes = maintenance.discoverColumns = 0;
+        autosave.clear();
         return true;
     }
 
@@ -248,80 +244,14 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
      * autosave budget. Only the server's periodic save calls this; {@link #saveChunks} saves at once.
      */
     public void beginPeriodicAutosave() {
-        ((ICubicWorldInternal) worldServer).getLightingManager().processUpdates();
-        if (maintenance != null) {
-            maintenance.discoverCubes = Math.max(maintenance.discoverCubes, maintenance.cubes.size());
-            maintenance.discoverColumns = Math.max(maintenance.discoverColumns, maintenance.columns.size());
-            return;
-        }
-        for (Cube cube : cubeMap) if (cube.needsSaving()) autosaveCubes.add(cube.getCoords());
-        for (Chunk chunk : loadedChunks.values()) if (chunk.needsSaving(true)) autosaveColumns.add(chunk.getPos());
-        // Continuations run in provider ticks. The initial scan does not serialize dirty cubes.
-    }
-
-    private void tickAutosave() {
-        lastAutosaveProcessed = 0;
-        if (worldServer.disableLevelSaving) return;
-        long start = System.nanoTime();
-        long budget = Math.max(1, CubicChunksConfig.autosaveTimeMillis) * 1_000_000L;
-        int limit = Math.max(1, CubicChunksConfig.autosaveSnapshotsPerTick);
-        if (maintenance != null && maintenance.continuousDiscovery
-                && maintenance.discoverCubes == 0 && maintenance.discoverColumns == 0) {
-            // The existing two independent bounded cursors discover dirty state continuously.
-            // Snapshot publication still runs on this owner thread and honors writer backpressure.
-            maintenance.discoverCubes = maintenance.cubes.size();
-            maintenance.discoverColumns = maintenance.columns.size();
-        }
-        discoverAutosave(start, budget / 2);
-        // Alternate priority, including with a quota of one or an over-budget first snapshot.
-        autosaveColumnsFirst = !autosaveColumnsFirst;
-        long remaining = budget - (System.nanoTime() - start);
-        if (autosaveColumnsFirst) lastAutosaveProcessed = tickAutosaveColumns(Math.min(4, limit), Math.max(1, remaining));
-        remaining = budget - (System.nanoTime() - start);
-        if (remaining > 0 && lastAutosaveProcessed < limit) lastAutosaveProcessed += autosaveCubes.tick(limit - lastAutosaveProcessed, remaining, cubeIO::canAutoSave, pos -> {
-            Cube cube = getLoadedCube(pos);
-            if (cube != null && cube.needsSaving()) cubeIO.saveCube(cube);
-        }, System::nanoTime);
-        remaining = budget - (System.nanoTime() - start);
-        if (!autosaveColumnsFirst && remaining > 0 && lastAutosaveProcessed < limit)
-            lastAutosaveProcessed += tickAutosaveColumns(Math.min(4, limit - lastAutosaveProcessed), remaining);
-    }
-
-    private int tickAutosaveColumns(int limit, long budget) {
-        return autosaveColumns.tick(limit, budget, cubeIO::canAutoSave, pos -> {
-            Chunk column = getLoadedColumn(pos.x, pos.z);
-            if (column != null && column.needsSaving(true)) cubeIO.saveColumn(column);
-        }, System::nanoTime);
+        autosave.begin(cubeMap, loadedChunks.values());
     }
 
     /** Pending owner-thread snapshots, distinct from the writer's serialized-NBT backlog. */
-    public int getPendingAutosaveCount() { return autosaveCubes.size() + autosaveColumns.size(); }
-    public int getLastAutosaveProcessedCount() { return lastAutosaveProcessed; }
+    public int getPendingAutosaveCount() { return autosave.pending(); }
+    public int getLastAutosaveProcessedCount() { return autosave.lastProcessed(); }
 
-    public int getPendingAutosaveDiscoveryCount() {
-        return maintenance == null ? 0 : maintenance.discoverCubes + maintenance.discoverColumns;
-    }
-
-    private void discoverAutosave(long start, long budget) {
-        if (maintenance == null) return;
-        for (int inspected = 0; inspected < CubicChunksConfig.maintenanceInspectionsPerTick
-                && (maintenance.discoverCubes > 0 || maintenance.discoverColumns > 0)
-                && getPendingAutosaveCount() < CubicChunksConfig.autosavePendingThreshold
-                && (inspected == 0 || System.nanoTime() - start < budget); inspected++) {
-            maintenance.discoveryColumnFirst = !maintenance.discoveryColumnFirst;
-            if (maintenance.discoverColumns > 0 && (maintenance.discoveryColumnFirst || maintenance.discoverCubes == 0)) {
-                maintenance.discoverColumns--;
-                Chunk column = maintenance.columns.next(true);
-                if (column == null) maintenance.discoverColumns = 0;
-                else if (column.needsSaving(true)) autosaveColumns.add(column.getPos());
-            } else {
-                maintenance.discoverCubes--;
-                Cube cube = maintenance.cubes.next(true);
-                if (cube == null) maintenance.discoverCubes = 0;
-                else if (cube.needsSaving()) autosaveCubes.add(cube.getCoords());
-            }
-        }
-    }
+    public int getPendingAutosaveDiscoveryCount() { return autosave.pendingDiscovery(); }
 
     DeliveryMode getDeliveryMode() { return deliveryMode; }
 
@@ -372,7 +302,7 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
     public boolean tick() {
         // NOTE: the return value is completely ignored
         profiler.startSection("providerTick");
-        tickAutosave();
+        autosave.tick();
         long i = System.currentTimeMillis();
         Random rand = this.world.rand;
         Iterator<Cube> watchersIterator = demand().getCubeIterator();
