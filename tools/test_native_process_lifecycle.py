@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-import cubic_lab as lab
+import lab_process
 from native_process_lifecycle import FileTime, ProcessMemoryCountersEx, ProcessLifecycle
 
 
@@ -152,11 +152,11 @@ class ProcessLifecycleTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             evidence = Path(temporary); probe, process, api = self.make()
             process.lab_lifecycle = probe
-            lab.write_process_receipt(evidence, process)
+            lab_process.write_process_receipt(evidence, process)
             probe.observe_line('Done (fixture)')
-            lab.capture_process_endpoint(evidence, process, 'ready')
-            lab.capture_process_endpoint(evidence, process, 'endBeforeQuit')
-            result = {}; lab.retain_process_lifecycles(evidence, [process], result)
+            lab_process.capture_process_endpoint(evidence, process, 'ready')
+            lab_process.capture_process_endpoint(evidence, process, 'endBeforeQuit')
+            result = {}; lab_process.retain_process_lifecycles(evidence, [process], result)
             receipt = json.loads((evidence / 'server-process.json').read_text())
             self.assertEqual(receipt['pid'], 4242); self.assertEqual(receipt['command'], process.args)
             self.assertEqual(receipt['lifecycle'], result['processLifecycle']['server'])
@@ -166,9 +166,9 @@ class ProcessLifecycleTest(unittest.TestCase):
 
     def test_optional_receipt_failure_cannot_abort_owned_cleanup(self):
         probe, process, api = self.make(); process.lab_lifecycle = probe
-        with mock.patch.object(lab, 'write_json', side_effect=OSError('fixture disk failure')):
-            lab.capture_process_endpoint(Path('unused'), process, 'endBeforeQuit')
-            result = {}; lab.retain_process_lifecycles(Path('unused'), [process], result)
+        with mock.patch.object(lab_process, 'write_json', side_effect=OSError('fixture disk failure')):
+            lab_process.capture_process_endpoint(Path('unused'), process, 'endBeforeQuit')
+            result = {}; lab_process.retain_process_lifecycles(Path('unused'), [process], result)
         self.assertEqual(api.closed, [77])
         self.assertIn('disk failure', result['processLifecycle']['server']['receiptFailure'])
 

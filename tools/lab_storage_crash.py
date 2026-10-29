@@ -34,6 +34,7 @@ def inspect_crash_files(fixture,boundary):
 def run(args):
     import cubic_lab as lab
     import lab_files
+    import lab_process
     if not args.crash_id or not re.fullmatch('[a-z0-9-]{1,48}',args.crash_id) or not args.crash_boundary:
         raise ValueError('storage-crash requires --crash-id and --crash-boundary')
     lab.prime(args);target,manifest=lab.load_lab(args)
@@ -50,9 +51,9 @@ def run(args):
             row={'mode':mode,'passed':False};result['phases'].append(row)
             try:
                 _,manifest=lab.load_lab(args)
-                server=lab.spawn(lab.argv(manifest,False),server_dir,phase/'server.log',messages,lifecycle_role='server')
-                lab.write_process_receipt(phase,server);lab.await_line(messages,'Done (',[server],300)
-                lab.send(server,f'cubiclab storage-{mode} {args.crash_id} {args.crash_boundary} isolated-files')
+                server=lab_process.spawn(lab_process.argv(manifest,False),server_dir,phase/'server.log',messages,lifecycle_role='server')
+                lab_process.write_process_receipt(phase,server);lab_process.await_line(messages,'Done (',[server],300)
+                lab_process.send(server,f'cubiclab storage-{mode} {args.crash_id} {args.crash_boundary} isolated-files')
                 if mode=='crash':
                     marker=fixture/'boundary-ready.json';deadline=time.monotonic()+75
                     while not marker.exists():
@@ -66,23 +67,23 @@ def run(args):
                             if time.monotonic()>deadline:raise TimeoutError('Incomplete storage boundary receipt')
                             time.sleep(.05)
                     if ready['boundary']!=args.crash_boundary:raise RuntimeError('Wrong storage boundary')
-                    shutil.copy2(marker,phase/'boundary-ready.json');lab.capture_process_endpoint(phase,server,'endBeforeQuit')
+                    shutil.copy2(marker,phase/'boundary-ready.json');lab_process.capture_process_endpoint(phase,server,'endBeforeQuit')
                     row['lifecycleEndReason']='Intentional owned-process termination at the observed storage boundary'
                     if server.poll() is not None:raise RuntimeError('Server exited before controller termination')
                     row['controllerTerminatedPid']=server.pid;server.kill();server.wait(timeout=20)
                     row['independentBeforeRecovery']=inspect_crash_files(fixture,args.crash_boundary)
                     row['passed']=server.returncode!=0 and row['independentBeforeRecovery']['passed']
                 else:
-                    row['receipt']=lab.await_line(messages,'CUBICLAB_CRASH_RECOVERED id='+args.crash_id+' PASS',[server],60).strip()
-                    lab.send(server,'stop');server.wait(timeout=90)
+                    row['receipt']=lab_process.await_line(messages,'CUBICLAB_CRASH_RECOVERED id='+args.crash_id+' PASS',[server],60).strip()
+                    lab_process.send(server,'stop');server.wait(timeout=90)
                     recovery=json.loads((fixture/'recovery.json').read_text());shutil.copy2(fixture/'recovery.json',phase/'recovery.json')
                     row['passed']=server.returncode==0 and recovery['passed'] is True
             finally:
                 if server is not None:
                     if server.poll() is None:
-                        try:lab.send(server,'stop');server.wait(timeout=10)
+                        try:lab_process.send(server,'stop');server.wait(timeout=10)
                         except (OSError,subprocess.TimeoutExpired):server.kill();server.wait(timeout=20)
-                    row['exitCode']=server.returncode;lab.retain_process_lifecycles(phase,[server],row)
+                    row['exitCode']=server.returncode;lab_process.retain_process_lifecycles(phase,[server],row)
                     lab_files.write_json(phase/'result.json',row)
             if not row['passed']:raise RuntimeError('Crash phase failed: '+mode)
             print('STORAGE_CRASH '+args.crash_boundary+' '+mode+' passed',flush=True)

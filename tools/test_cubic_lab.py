@@ -9,6 +9,7 @@ from unittest import mock
 import zipfile
 import cubic_lab as lab
 import lab_files
+import lab_process
 import lab_profiles as profiles
 
 class LabControlTest(unittest.TestCase):
@@ -26,7 +27,7 @@ class LabControlTest(unittest.TestCase):
     def test_wait_checks_guard_before_accepting_success_marker(self):
         messages=queue.Queue();messages.put('SUCCESS')
         guard=mock.Mock();guard.require_clean.side_effect=RuntimeError('foreign-java')
-        with self.assertRaisesRegex(RuntimeError,'foreign-java'):lab.await_line(messages,'SUCCESS',[],1,workload_guard=guard)
+        with self.assertRaisesRegex(RuntimeError,'foreign-java'):lab_process.await_line(messages,'SUCCESS',[],1,workload_guard=guard)
 
     def test_guard_close_failure_does_not_skip_owned_process_cleanup(self):
         class Process:
@@ -251,7 +252,7 @@ class LabControlTest(unittest.TestCase):
 
     def test_color_coded_join_is_detected(self):
         messages = queue.Queue(); messages.put('\x1b[0;33;1mCubicLab\x1b[m\x1b[0;33;1m joined the game\x1b[m')
-        self.assertIn('CubicLab joined the game', lab.await_line(messages, 'CubicLab joined the game', [], 1))
+        self.assertIn('CubicLab joined the game', lab_process.await_line(messages, 'CubicLab joined the game', [], 1))
     def test_artifact_and_native_entries_merge_without_losing_java_classes(self):
         components = [{'libraries': [
             {'name': 'org.lwjgl:lwjgl:3.4.3', 'downloads': {'artifact': {'sha1': 'abc'}}},

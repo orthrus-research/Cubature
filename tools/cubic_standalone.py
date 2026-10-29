@@ -13,6 +13,7 @@ import uuid
 
 import cubic_lab as lab
 import lab_files
+import lab_process
 import lab_profiles
 
 
@@ -62,8 +63,8 @@ def prepare(args):
         f'level-type=DEFAULT\nlevel-seed={args.seed}\nview-distance=12\ngamemode=1\n'
         'difficulty=0\nallow-flight=true\nmax-players=1\nmax-tick-time=-1\n'
         'enable-command-block=false\nenable-rcon=false\nmotd=CubicChunks only - local performance\n')
-    player_uuid = str(uuid.UUID(bytes=hashlib.md5(('OfflinePlayer:' + lab.PLAYER).encode()).digest(), version=3))
-    lab_files.write_json(server / 'ops.json', [{'uuid': player_uuid, 'name': lab.PLAYER, 'level': 4,
+    player_uuid = str(uuid.UUID(bytes=hashlib.md5(('OfflinePlayer:' + lab_process.PLAYER).encode()).digest(), version=3))
+    lab_files.write_json(server / 'ops.json', [{'uuid': player_uuid, 'name': lab_process.PLAYER, 'level': 4,
                                          'bypassesPlayerLimit': False}])
     lab_profiles.configure_jvm(server)
     runtime = lab.prepare_client(server, client, files['prism'], root, donor['java'], donor['release'])
@@ -109,13 +110,13 @@ def play(args):
     with lab.native_measurement_lease(args.workspace.resolve(), 'standalone-' + args.name):
         command_file = target / 'commands.txt'
         command_file.write_text('')
-        server = lab.spawn(lab.argv(manifest, False), Path(manifest['server']), target / 'server-console.log', messages)
+        server = lab_process.spawn(lab_process.argv(manifest, False), Path(manifest['server']), target / 'server-console.log', messages)
         client = None
         try:
             lab_files.write_json(target / 'processes.json', {'controller': os.getpid(), 'server': server.pid})
-            lab.await_line(messages, 'Done (', [server], 600)
+            lab_process.await_line(messages, 'Done (', [server], 600)
             client_messages = queue.Queue()
-            client = lab.spawn(lab.argv(manifest, True), Path(manifest['client']), target / 'client-console.log', client_messages)
+            client = lab_process.spawn(lab_process.argv(manifest, True), Path(manifest['client']), target / 'client-console.log', client_messages)
             lab_files.write_json(target / 'processes.json', {'controller': os.getpid(), 'server': server.pid, 'client': client.pid})
             print('CC-only server ready; client launched. Closing the client saves and stops this owned server.', flush=True)
             with command_file.open('r', encoding='utf-8') as commands:
@@ -125,11 +126,11 @@ def play(args):
                             pending.get_nowait()
                     for line in commands:
                         if line.strip():
-                            lab.send(server, line.strip())
+                            lab_process.send(server, line.strip())
                     time.sleep(0.5)
         finally:
             if server.poll() is None:
-                lab.send(server, 'stop')
+                lab_process.send(server, 'stop')
                 try:
                     server.wait(timeout=180)
                 except subprocess.TimeoutExpired:
