@@ -89,10 +89,16 @@ class LabControlTest(unittest.TestCase):
                             load=load,prime_lab=prime_lab,select=select,record=record,retain=retain,validate=validate)
                 self.assertEqual(calls,['load','select','prime','load','record','retain','validate']);calls.clear()
                 def retain_survey(value,hashes,evidence):calls.append('retain');raise RuntimeError('retained')
+                def record_survey(value):calls.append('record');return dict.fromkeys(lab.PREGENERATION_INPUTS,{})
                 with self.assertRaisesRegex(RuntimeError,'retained'):
                     lab.survey(argparse.Namespace(native_operation='pregenerate',survey_id='fixture',jfr=False),
+                               load=load,prime_lab=prime_lab,record=record_survey,retain=retain_survey)
+                self.assertEqual(calls,['prime','load','record','retain']);calls.clear()
+                # A record without the inputs pregeneration compares afterwards stops before anything launches.
+                with self.assertRaisesRegex(ValueError,'nothing was launched'):
+                    lab.survey(argparse.Namespace(native_operation='pregenerate',survey_id='fixture',jfr=False),
                                load=load,prime_lab=prime_lab,record=record,retain=retain_survey)
-                self.assertEqual(calls,['prime','load','record','retain'])
+                self.assertEqual(calls,['prime','load','record'])
             self.assertFalse(process.alive)
 
     def test_measurement_lease_rejects_overlap_and_releases_after_failure(self):

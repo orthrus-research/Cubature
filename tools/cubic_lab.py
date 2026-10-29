@@ -23,6 +23,8 @@ from lab_process import (PLAYER, argv, await_line, capture_process_endpoint, ret
 from lab_profiles import validate_jvm_capture, validate_view_distance_capture
 import lab_workload
 
+# Input hashes a pregeneration compares before and after its native work.
+PREGENERATION_INPUTS = ('mods', 'controllerSources', 'generationInputsSha256')
 
 
 @contextmanager
@@ -265,7 +267,10 @@ def survey(args, *, load=None, prime_lab=None, record=None, retain=None):
     messages = queue.Queue(); processes = []
     result = {'passed': False, 'inputHashesBeforeLaunch': record(manifest),
               'scope': ('Native LIGHT/save/unload job; independent saved coverage and client inspection remain separate.' if terrain else 'Native generated and saved cubes; population/lighting and settled gameplay costs are separate.')}
-    if terrain: result['preLaunchInputSnapshots'] = retain(manifest, result['inputHashesBeforeLaunch'], evidence)
+    if terrain:
+        missing = [key for key in PREGENERATION_INPUTS if key not in result['inputHashesBeforeLaunch']]
+        if missing: raise ValueError('Pregeneration input record lacks ' + ', '.join(missing) + '; nothing was launched')
+        result['preLaunchInputSnapshots'] = retain(manifest, result['inputHashesBeforeLaunch'], evidence)
     try:
         command = argv(manifest, False, evidence / 'server.jfr' if args.jfr else None)
         server = spawn(command, Path(manifest['server']), evidence / 'server.log', messages); processes.append(server)
@@ -291,7 +296,7 @@ def survey(args, *, load=None, prime_lab=None, record=None, retain=None):
         result['seconds']=time.monotonic()-started
         if terrain:
             result['inputHashesAfterWork'] = record(manifest)
-            for key in ('mods', 'controllerSources', 'generationInputsSha256'):
+            for key in PREGENERATION_INPUTS:
                 if result['inputHashesBeforeLaunch'][key] != result['inputHashesAfterWork'][key]:
                     raise RuntimeError('Pregeneration inputs changed during native work: ' + key)
         send(server,'save-all');send(server,'stop');server.wait(timeout=180)
