@@ -50,6 +50,47 @@ class LabControlTest(unittest.TestCase):
             self.assertFalse(saved['passed']);self.assertFalse(saved['hostWorkloadGuard']['passed'])
             self.assertIn('stop\n',[call.args[0] for call in process.stdin.write.call_args_list])
 
+    def test_run_and_survey_use_the_preparation_their_caller_passes(self):
+        class Process:
+            pid=778
+            def __init__(self):self.alive=True;self.stdin=mock.Mock()
+            def poll(self):return None if self.alive else 0
+            def wait(self,timeout=None):self.alive=False;return 0
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary);server=root/'server';client=root/'client';process=Process();guard=mock.Mock()
+            guard.report.return_value={'passed':True};run_id='00000000-0000-4000-8000-000000000000'
+            for side,directory in [('server',server),('client',client)]:
+                (directory/'cubiclab-results'/run_id).mkdir(parents=True)
+                (directory/'cubiclab-results'/run_id/(side+'.json')).write_text(json.dumps({'side':side}))
+            manifest={'server':str(server),'client':str(client)};calls=[]
+            def load(args):calls.append('load');return root,manifest
+            def select(args,value):calls.append('select');self.assertIs(value,manifest);return ['route']
+            def prime_lab(args):calls.append('prime')
+            def record(value):calls.append('record');return {'files':{}}
+            def retain(value,hashes,evidence):calls.append('retain');self.assertEqual(hashes,{'files':{}});return {'schema':1}
+            def validate(value,server_data,client_data):calls.append('validate');raise RuntimeError('validated '+server_data['side']+' '+client_data['side'])
+            lines=iter(['Done (','joined','screen=none','CUBICLAB_STARTED scenario=route runId='+run_id,
+                        'CUBICLAB_SERVER_RESULT runId='+run_id+' PASS','CUBICLAB_CLIENT_RESULT runId='+run_id])
+            unused=mock.Mock(side_effect=AssertionError('module default used'))
+            patches=[mock.patch.object(lab,name,unused) for name in ['load_lab','selected_scenarios','prime','record_inputs','retain_prelaunch_inputs']]
+            patches+=[mock.patch.object(lab.lab_workload,'validate_capture',unused),mock.patch.object(lab,'JavaWorkloadGuard',return_value=guard),
+                mock.patch.object(lab,'argv',return_value=['java']),mock.patch.object(lab,'spawn',return_value=process),
+                mock.patch.object(lab,'await_line',side_effect=lambda *a,**k:next(lines)),mock.patch.object(lab,'validate_view_distance_capture'),
+                mock.patch.object(lab,'validate_jvm_capture'),mock.patch('lab_storage_evidence.validate_complete_ticks')]
+            from contextlib import ExitStack
+            with ExitStack() as stack:
+                for patch in patches:stack.enter_context(patch)
+                with self.assertRaisesRegex(RuntimeError,'validated server client'):
+                    lab.run(argparse.Namespace(phase='write',jfr=False,scenario_start_timeout=10,client_report_timeout=30),
+                            load=load,prime_lab=prime_lab,select=select,record=record,retain=retain,validate=validate)
+                self.assertEqual(calls,['load','select','prime','load','record','retain','validate']);calls.clear()
+                def retain_survey(value,hashes,evidence):calls.append('retain');raise RuntimeError('retained')
+                with self.assertRaisesRegex(RuntimeError,'retained'):
+                    lab.survey(argparse.Namespace(native_operation='pregenerate',survey_id='fixture',jfr=False),
+                               load=load,prime_lab=prime_lab,record=record,retain=retain_survey)
+                self.assertEqual(calls,['prime','load','record','retain'])
+            self.assertFalse(process.alive)
+
     def test_measurement_lease_rejects_overlap_and_releases_after_failure(self):
         with tempfile.TemporaryDirectory() as temporary:
             root=Path(temporary)

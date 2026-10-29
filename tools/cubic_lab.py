@@ -682,17 +682,24 @@ def selected_scenarios(args, manifest):
     return scenarios
 
 
-def run(args):
+def run(args, *, load=None, prime_lab=None, select=None, record=None, retain=None, validate=None):
+    """Run the selected scenarios natively and retain their evidence. A caller that prepares its own
+    instances passes its preparation boundary: load returns (target, manifest), prime_lab primes the
+    instance, select names the scenarios, record hashes the inputs before launch, retain keeps their
+    proofs and validate checks each capture. Each defaults to this lab's own."""
+    load, prime_lab, select = load or load_lab, prime_lab or prime, select or selected_scenarios
+    record, retain = record or record_inputs, retain or retain_prelaunch_inputs
+    validate = validate or lab_workload.validate_capture
     from lab_storage_evidence import lifecycle_names, retain_lifecycle
-    target, prepared = load_lab(args)
-    scenarios = selected_scenarios(args, prepared)
+    target, prepared = load(args)
+    scenarios = select(args, prepared)
     guard = JavaWorkloadGuard()
     guard.observe()
     preflight = target / 'runs' / ('java-workload-preflight-' + uuid.uuid4().hex + '.json')
     write_json(preflight, guard.report())
     guard.require_clean()
-    prime(args)
-    target, manifest = load_lab(args)
+    prime_lab(args)
+    target, manifest = load(args)
     server_dir, client_dir = Path(manifest['server']), Path(manifest['client'])
     lifecycle_before = lifecycle_names(server_dir)
     phase = args.phase
@@ -702,12 +709,12 @@ def run(args):
     evidence.mkdir(parents=True, exist_ok=False)
     server_messages, client_messages = queue.Queue(), queue.Queue()
     processes = []; result = {'schema': 1, 'phase': phase, 'passed': False, 'scenarios': [], 'jfr': args.jfr,
-        'inputHashesBeforeLaunch': record_inputs(manifest)}
+        'inputHashesBeforeLaunch': record(manifest)}
     result['scenarioSequence'] = scenarios
     result['javaWorkloadPreflight'] = {'path':str(preflight), 'sha256':sha(preflight)}
     if manifest.get('benchmarkWorkload'):
         result['benchmarkWorkload'] = {k: manifest['benchmarkWorkload'][k] for k in ['schema','id','seed','sha256']}
-    result['preLaunchInputSnapshots'] = retain_prelaunch_inputs(manifest, result['inputHashesBeforeLaunch'], evidence)
+    result['preLaunchInputSnapshots'] = retain(manifest, result['inputHashesBeforeLaunch'], evidence)
     server_jfr_settings = None
     if getattr(args, 'server_jfr_settings', None):
         server_jfr_settings = evidence / 'server-settings.jfc'
@@ -777,7 +784,7 @@ def run(args):
             validate_jvm_capture(server_data, client_data, manifest)
             from lab_storage_evidence import validate_complete_ticks
             validate_complete_ticks(manifest,server_data)
-            lab_workload.validate_capture(manifest, server_data, client_data)
+            validate(manifest, server_data, client_data)
             if 'seed' in manifest and server_data.get('worldSeed') != manifest['seed']:
                 raise RuntimeError('Native world seed differs from preparation')
             if not client_data['frameIntervals']['count']: raise RuntimeError('No real rendered frames captured')
@@ -861,20 +868,23 @@ def retain_incomplete_scenarios(result, server_dir, client_dir, evidence):
     result['incompleteScenarios'] = incomplete
 
 
-def survey(args):
-    """Resume an explicitly bounded native pregeneration job using the reviewed launcher."""
+def survey(args, *, load=None, prime_lab=None, record=None, retain=None):
+    """Resume an explicitly bounded native pregeneration job using the reviewed launcher. A caller that
+    prepares its own instances passes load, prime_lab, record and retain, as for run."""
+    load, prime_lab = load or load_lab, prime_lab or prime
+    record, retain = record or record_inputs, retain or retain_prelaunch_inputs
     operation = getattr(args, 'native_operation', 'pregenerate')
     if operation != 'pregenerate': raise ValueError('Unsupported native bulk operation')
     terrain = operation == 'pregenerate'
     prefix = 'CUBICLAB_PREGEN_' if terrain else 'CUBICLAB_SURVEY_'
-    prime(args)
-    target, manifest = load_lab(args)
+    prime_lab(args)
+    target, manifest = load(args)
     evidence = target / 'runs' / (operation + '-' + args.survey_id + '-' + uuid.uuid4().hex[:8])
     evidence.mkdir(parents=True, exist_ok=False)
     messages = queue.Queue(); processes = []
-    result = {'passed': False, 'inputHashesBeforeLaunch': record_inputs(manifest),
+    result = {'passed': False, 'inputHashesBeforeLaunch': record(manifest),
               'scope': ('Native LIGHT/save/unload job; independent saved coverage and client inspection remain separate.' if terrain else 'Native generated and saved cubes; population/lighting and settled gameplay costs are separate.')}
-    if terrain: result['preLaunchInputSnapshots'] = retain_prelaunch_inputs(manifest, result['inputHashesBeforeLaunch'], evidence)
+    if terrain: result['preLaunchInputSnapshots'] = retain(manifest, result['inputHashesBeforeLaunch'], evidence)
     try:
         command = argv(manifest, False, evidence / 'server.jfr' if args.jfr else None)
         server = spawn(command, Path(manifest['server']), evidence / 'server.log', messages); processes.append(server)
@@ -899,7 +909,7 @@ def survey(args):
                 break
         result['seconds']=time.monotonic()-started
         if terrain:
-            result['inputHashesAfterWork'] = record_inputs(manifest)
+            result['inputHashesAfterWork'] = record(manifest)
             for key in ('mods', 'controllerSources', 'generationInputsSha256'):
                 if result['inputHashesBeforeLaunch'][key] != result['inputHashesAfterWork'][key]:
                     raise RuntimeError('Pregeneration inputs changed during native work: ' + key)
