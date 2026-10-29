@@ -12,6 +12,7 @@ import time
 import uuid
 
 import cubic_lab as lab
+import lab_files
 import lab_profiles
 
 
@@ -62,22 +63,22 @@ def prepare(args):
         'difficulty=0\nallow-flight=true\nmax-players=1\nmax-tick-time=-1\n'
         'enable-command-block=false\nenable-rcon=false\nmotd=CubicChunks only - local performance\n')
     player_uuid = str(uuid.UUID(bytes=hashlib.md5(('OfflinePlayer:' + lab.PLAYER).encode()).digest(), version=3))
-    lab.write_json(server / 'ops.json', [{'uuid': player_uuid, 'name': lab.PLAYER, 'level': 4,
+    lab_files.write_json(server / 'ops.json', [{'uuid': player_uuid, 'name': lab.PLAYER, 'level': 4,
                                          'bypassesPlayerLimit': False}])
     lab_profiles.configure_jvm(server)
     runtime = lab.prepare_client(server, client, files['prism'], root, donor['java'], donor['release'])
     # Freeze installer output and client libraries; no Riven configs, scripts or lab mod are copied.
-    server_files = {str(p.relative_to(server)): lab.sha(p) for p in (server / 'libraries').rglob('*') if p.is_file()}
+    server_files = {str(p.relative_to(server)): lab_files.sha(p) for p in (server / 'libraries').rglob('*') if p.is_file()}
     universal = server / 'libraries/com/cleanroommc/cleanroom' / pins['runtime_version'] / ('cleanroom-' + pins['runtime_version'] + '-universal.jar')
-    if lab.sha(universal) != pins['universal_sha256']:
+    if lab_files.sha(universal) != pins['universal_sha256']:
         raise RuntimeError('Installer output differs from reviewed universal artifact')
     manifest = {key: donor[key] for key in ['release', 'runtimeVersion', 'java', 'javaRuntime']}
     manifest.update(name=args.name, server=str(server), client=str(client), port=args.port, seed=args.seed,
         jvmProfile=lab_profiles.jvm_profile(), clientRuntime=runtime, viewDistance=lab_profiles.view_distance_profile(),
-        serverRuntimeHashes=server_files, cubicJar={'source': str(args.cubic_jar.resolve()), 'sha256': lab.sha(args.cubic_jar)},
+        serverRuntimeHashes=server_files, cubicJar={'source': str(args.cubic_jar.resolve()), 'sha256': lab_files.sha(args.cubic_jar)},
         purpose='Interactive CC-only: vanilla compatibility terrain, creative/peaceful, no instrumentation mod',
         height={'minY': -128, 'maxYExclusive': 384}, modFiles=['cubicchunks.jar'])
-    lab.write_json(target / 'standalone.json', manifest)
+    lab_files.write_json(target / 'standalone.json', manifest)
     print(target, flush=True)
 
 
@@ -89,15 +90,15 @@ def load(args):
     lab_profiles.validate_jvm_inputs(manifest)
     for side in ['server', 'client']:
         directory = Path(manifest[side])
-        actual = {str(p.relative_to(directory / 'mods')): lab.sha(p) for p in (directory / 'mods').rglob('*') if p.is_file()}
+        actual = {str(p.relative_to(directory / 'mods')): lab_files.sha(p) for p in (directory / 'mods').rglob('*') if p.is_file()}
         if actual != {'cubicchunks.jar': manifest['cubicJar']['sha256']}:
             raise RuntimeError('CC-only mod set changed: ' + side)
     for relative, digest in manifest['serverRuntimeHashes'].items():
-        if lab.sha(Path(manifest['server']) / relative) != digest:
+        if lab_files.sha(Path(manifest['server']) / relative) != digest:
             raise RuntimeError('Server runtime changed: ' + relative)
     runtime = manifest['clientRuntime']
     for artifact in runtime['libraries'] + [{'path': runtime['minecraft'], 'sha1': runtime['minecraft_sha1']}]:
-        if lab.sha(Path(artifact['path']), 'sha1') != artifact['sha1']:
+        if lab_files.sha(Path(artifact['path']), 'sha1') != artifact['sha1']:
             raise RuntimeError('Client runtime changed: ' + artifact['path'])
     return target, manifest
 
@@ -111,11 +112,11 @@ def play(args):
         server = lab.spawn(lab.argv(manifest, False), Path(manifest['server']), target / 'server-console.log', messages)
         client = None
         try:
-            lab.write_json(target / 'processes.json', {'controller': os.getpid(), 'server': server.pid})
+            lab_files.write_json(target / 'processes.json', {'controller': os.getpid(), 'server': server.pid})
             lab.await_line(messages, 'Done (', [server], 600)
             client_messages = queue.Queue()
             client = lab.spawn(lab.argv(manifest, True), Path(manifest['client']), target / 'client-console.log', client_messages)
-            lab.write_json(target / 'processes.json', {'controller': os.getpid(), 'server': server.pid, 'client': client.pid})
+            lab_files.write_json(target / 'processes.json', {'controller': os.getpid(), 'server': server.pid, 'client': client.pid})
             print('CC-only server ready; client launched. Closing the client saves and stops this owned server.', flush=True)
             with command_file.open('r', encoding='utf-8') as commands:
                 while server.poll() is None and client.poll() is None:

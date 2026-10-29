@@ -8,6 +8,7 @@ import unittest
 from unittest import mock
 import zipfile
 import cubic_lab as lab
+import lab_files
 import lab_profiles as profiles
 
 class LabControlTest(unittest.TestCase):
@@ -167,7 +168,7 @@ class LabControlTest(unittest.TestCase):
             files = [Path(temporary) / name for name in ('java.exe', 'release', 'modules', 'jvm.dll')]
             for p in files: p.write_bytes(p.name.encode())
             manifest = {'java': str(files[0]), 'javaRuntime': {'major': 26, 'criticalArtifacts': [
-                {'path': str(p.resolve()), 'sha256': lab.sha(p)} for p in files]}}
+                {'path': str(p.resolve()), 'sha256': lab_files.sha(p)} for p in files]}}
             lab.validate_java26_inputs(manifest)
             files[3].write_bytes(b'changed JVM')
             with self.assertRaisesRegex(RuntimeError, 'runtime changed'):
@@ -216,7 +217,7 @@ class LabControlTest(unittest.TestCase):
             root = Path(temporary); directory = root / '.local/cubic-lab/check'
             directory.mkdir(parents=True)
             artifact = root / 'loader.jar'; artifact.write_bytes(b'reviewed loader bytes')
-            manifest = {'runtimeArtifacts': {'client': {'path': str(artifact), 'sha256': lab.sha(artifact)}}}
+            manifest = {'runtimeArtifacts': {'client': {'path': str(artifact), 'sha256': lab_files.sha(artifact)}}}
             (directory / 'lab.json').write_text(json.dumps(manifest), encoding='utf-8')
             args = argparse.Namespace(riven_workspace=root, name='check')
             self.assertEqual(lab.load_lab(args)[1], manifest)

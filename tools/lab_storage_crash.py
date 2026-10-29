@@ -33,6 +33,7 @@ def inspect_crash_files(fixture,boundary):
 
 def run(args):
     import cubic_lab as lab
+    import lab_files
     if not args.crash_id or not re.fullmatch('[a-z0-9-]{1,48}',args.crash_id) or not args.crash_boundary:
         raise ValueError('storage-crash requires --crash-id and --crash-boundary')
     lab.prime(args);target,manifest=lab.load_lab(args)
@@ -82,10 +83,10 @@ def run(args):
                         try:lab.send(server,'stop');server.wait(timeout=10)
                         except (OSError,subprocess.TimeoutExpired):server.kill();server.wait(timeout=20)
                     row['exitCode']=server.returncode;lab.retain_process_lifecycles(phase,[server],row)
-                    lab.write_json(phase/'result.json',row)
+                    lab_files.write_json(phase/'result.json',row)
             if not row['passed']:raise RuntimeError('Crash phase failed: '+mode)
             print('STORAGE_CRASH '+args.crash_boundary+' '+mode+' passed',flush=True)
         result['passed']=True
     except Exception as error:result['failure']=str(error);raise
-    finally:lab.write_json(evidence/'result.json',result)
+    finally:lab_files.write_json(evidence/'result.json',result)
     print(evidence/'result.json',flush=True);return 0

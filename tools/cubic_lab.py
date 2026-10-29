@@ -22,6 +22,7 @@ import uuid
 import zipfile
 from native_process_lifecycle import ProcessLifecycle
 from native_workload_guard import JavaWorkloadGuard
+from lab_files import sha, write_json
 from lab_input_snapshot import retain_prelaunch_inputs
 from lab_profiles import (client_options, validate_cube_experiments, validate_jvm_capture, validate_jvm_inputs,
                           validate_view_distance_capture, validate_view_distance_inputs)
@@ -56,16 +57,6 @@ def native_measurement_lease(root, name):
             stream.seek(0)
             if os.name == 'nt': msvcrt.locking(stream.fileno(), msvcrt.LK_UNLCK, 1)
             else: fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
-
-
-def write_json(path, data):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=2) + '\n', encoding='utf-8')
-
-
-def sha(path, algorithm='sha256'):
-    with path.open('rb') as stream:
-        return hashlib.file_digest(stream, algorithm).hexdigest()
 
 
 def fetch(url, target, expected, algorithm='sha1', candidates=()):
