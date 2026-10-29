@@ -297,6 +297,44 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
         arrivals.tick(currentTime);
 
         getWorldServer().profiler.startSection("addPendingPlayers");
+        addPendingPlayers();
+        getWorldServer().profiler.endStartSection("tickEntries");
+        updateWatchers(currentTime);
+        getWorldServer().profiler.endStartSection("sortTickableTracker");
+        tickableCubeTracker.tick();
+
+        getWorldServer().profiler.endStartSection("sortToGenerate");
+        this.cubesToGenerate.tick();
+        this.columnsToGenerate.tick();
+
+        getWorldServer().profiler.endStartSection("sortToSend");
+        this.cubesToSendToClients.tick();
+        this.columnsToSendToClients.tick();
+        this.watchersToAddPlayersTo.tick();
+
+        getWorldServer().profiler.endStartSection("generate");
+        boolean concurrent = cubeCache.concurrentGenerationActive();
+        generationBudget.reset(System.nanoTime(), TimeUnit.MILLISECONDS.toNanos(concurrent
+                        ? CubicChunksConfig.concurrentGenerationTickMillis : CubicChunksConfig.maxCubeGenerationTimeMillis),
+                CubicChunksConfig.maxGeneratedCubesPerTick);
+        // Watchers make delivery requests: generation goes to the workers and is installed when ready.
+        generateColumns(canGenerateChunkPredicate);
+        generateCubes(canGenerateChunkPredicate, concurrent);
+        getWorldServer().profiler.endStartSection("send");
+        sendColumnsToClients();
+        sendCubesToClients();
+        addPlayersToWatchers();
+        getWorldServer().profiler.endStartSection("unload");
+        unloadIfNoPlayers();
+        getWorldServer().profiler.endStartSection("sendCubes");//unload
+        sender.send();
+        if (deliveryMode.prefetch()) prepareAhead(canGenerateChunkPredicate, currentTime);
+        if (deliveryMode.incremental()) maintain();
+        getWorldServer().profiler.endSection();//sendCubes
+        getWorldServer().profiler.endSection();//playerCubeMapTick
+    }
+
+    private void addPendingPlayers() {
         if (!pendingPlayerAddToCubeMap.isEmpty()) {
             // copy in case player still isn't in world
             Set<EntityPlayerMP> players = pendingPlayerAddToCubeMap;
@@ -305,7 +343,10 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
                 addPlayer(player);
             }
         }
-        getWorldServer().profiler.endStartSection("tickEntries");
+    }
+
+    /** Updates every cube watcher every 8000 ticks, and each watcher queued for an update. */
+    private void updateWatchers(long currentTime) {
         //force update-all every 8000 ticks (400 seconds)
         if (currentTime - this.previousWorldTime > 8000L) {
             this.previousWorldTime = currentTime;
@@ -327,24 +368,9 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
             this.columnWatchersToUpdate.forEach(ColumnWatcher::update);
             this.columnWatchersToUpdate.clear();
         }
-        getWorldServer().profiler.endStartSection("sortTickableTracker");
-        tickableCubeTracker.tick();
+    }
 
-        getWorldServer().profiler.endStartSection("sortToGenerate");
-        this.cubesToGenerate.tick();
-        this.columnsToGenerate.tick();
-
-        getWorldServer().profiler.endStartSection("sortToSend");
-        this.cubesToSendToClients.tick();
-        this.columnsToSendToClients.tick();
-        this.watchersToAddPlayersTo.tick();
-
-        getWorldServer().profiler.endStartSection("generate");
-        boolean concurrent = cubeCache.concurrentGenerationActive();
-        generationBudget.reset(System.nanoTime(), TimeUnit.MILLISECONDS.toNanos(concurrent
-                        ? CubicChunksConfig.concurrentGenerationTickMillis : CubicChunksConfig.maxCubeGenerationTimeMillis),
-                CubicChunksConfig.maxGeneratedCubesPerTick);
-        // Watchers make delivery requests: generation goes to the workers and is installed when ready.
+    private void generateColumns(Predicate<EntityPlayerMP> canGenerateChunkPredicate) {
         if (!this.columnsToGenerate.isEmpty()) {
             getWorldServer().profiler.startSection("columns");
             Iterator<ColumnWatcher> iter = this.columnsToGenerate.iterator();
@@ -370,6 +396,10 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
 
             getWorldServer().profiler.endSection(); // columns
         }
+    }
+
+    /** Generates or installs queued cubes within the generation budget, then offers them to players. */
+    private void generateCubes(Predicate<EntityPlayerMP> canGenerateChunkPredicate, boolean concurrent) {
         if (!this.cubesToGenerate.isEmpty()) {
             getWorldServer().profiler.startSection("cubes");
 
@@ -409,7 +439,9 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
 
             getWorldServer().profiler.endSection(); // chunks
         }
-        getWorldServer().profiler.endStartSection("send");
+    }
+
+    private void sendColumnsToClients() {
         if (!this.columnsToSendToClients.isEmpty()) {
             getWorldServer().profiler.startSection("columns");
 
@@ -426,6 +458,9 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
             }
             getWorldServer().profiler.endSection(); // columns
         }
+    }
+
+    private void sendCubesToClients() {
         if (!this.cubesToSendToClients.isEmpty()) {
             getWorldServer().profiler.startSection("cubes");
             int toSend = CubicChunksConfig.cubesToSendPerTick;
@@ -442,7 +477,10 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
             }
             getWorldServer().profiler.endSection(); // cubes
         }
+    }
 
+    /** Adds scheduled players to their watchers, cubesToSendPerTick at a time. */
+    private void addPlayersToWatchers() {
         if (!watchersToAddPlayersTo.isEmpty()) {
             int toSend = CubicChunksConfig.cubesToSendPerTick;
             for (Iterator<CubeWatcher> iter = watchersToAddPlayersTo.iterator(); toSend > 0 && iter.hasNext(); ) {
@@ -460,7 +498,9 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
                 iter.remove();
             }
         }
-        getWorldServer().profiler.endStartSection("unload");
+    }
+
+    private void unloadIfNoPlayers() {
         //if there are no players - unload everything
         if (this.players.isEmpty()) {
             WorldProvider worldprovider = this.getWorldServer().provider;
@@ -469,26 +509,26 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
                 this.getWorldServer().getChunkProvider().queueUnloadAll();
             }
         }
-        getWorldServer().profiler.endStartSection("sendCubes");//unload
-        sender.send();
-        if (deliveryMode.prefetch()) {
-            PlayerWrapper[] candidates=players.valueCollection().toArray(new PlayerWrapper[0]);
-            for(int i=0;i<candidates.length;i++) {
-                PlayerWrapper player=candidates[(i+(int)Math.floorMod(currentTime,(long)candidates.length))%candidates.length];
-                if(!canGenerateChunkPredicate.apply(player.playerEntity)){player.ahead.close();continue;}
-                player.ahead.update(player.playerEntity,horizontalViewDistance,verticalViewDistance,currentTime);
-                player.ahead.service(cubeCache,generationBudget,64);
-            }
+    }
+
+    /** PREFETCH: each player's ahead preparation, starting with a different player each tick. */
+    private void prepareAhead(Predicate<EntityPlayerMP> canGenerateChunkPredicate, long currentTime) {
+        PlayerWrapper[] candidates=players.valueCollection().toArray(new PlayerWrapper[0]);
+        for(int i=0;i<candidates.length;i++) {
+            PlayerWrapper player=candidates[(i+(int)Math.floorMod(currentTime,(long)candidates.length))%candidates.length];
+            if(!canGenerateChunkPredicate.apply(player.playerEntity)){player.ahead.close();continue;}
+            player.ahead.update(player.playerEntity,horizontalViewDistance,verticalViewDistance,currentTime);
+            player.ahead.service(cubeCache,generationBudget,64);
         }
-        if (deliveryMode.incremental()) {
-            // Collection follows demand reconciliation on the world owner. It is serviced once
-            // per world tick, independent of player speed and whether players are moving at all.
-            for (PlayerWrapper player : players.valueCollection().toArray(new PlayerWrapper[0]))
-                updateMovingPlayer(player.playerEntity);
-            this.chunkGc.tick();
-        }
-        getWorldServer().profiler.endSection();//sendCubes
-        getWorldServer().profiler.endSection();//playerCubeMapTick
+    }
+
+    /** Incremental maintenance: reconcile every player's view, then collect, once per world tick. */
+    private void maintain() {
+        // Collection follows demand reconciliation on the world owner. It is serviced once
+        // per world tick, independent of player speed and whether players are moving at all.
+        for (PlayerWrapper player : players.valueCollection().toArray(new PlayerWrapper[0]))
+            updateMovingPlayer(player.playerEntity);
+        this.chunkGc.tick();
     }
 
     /** Teleports held while generation workers prepare their destination column. */
