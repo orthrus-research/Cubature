@@ -24,6 +24,7 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.server;
 
+import io.github.opencubicchunks.cubicchunks.core.server.delivery.MaintenanceState;
 import io.github.opencubicchunks.cubicchunks.api.world.IColumn;
 import io.github.opencubicchunks.cubicchunks.core.CubicChunks;
 import io.github.opencubicchunks.cubicchunks.core.CubicChunksConfig;
@@ -72,10 +73,7 @@ public class ChunkGc {
 
     /** Incremental maintenance: start a GC pass over every loaded cube and column, once per interval. */
     private void beginIncrementalGc() {
-        if (maintenance != null && maintenance.gcCubes == 0 && maintenance.gcColumns == 0) {
-            maintenance.gcCubes = maintenance.cubes.size();
-            maintenance.gcColumns = maintenance.columns.size();
-        }
+        if (maintenance != null) maintenance.beginGcPass();
     }
 
     /** Incremental maintenance: inspect and unload within this tick's maintenance budget. */
@@ -85,28 +83,25 @@ public class ChunkGc {
         long budget = CubicChunksConfig.maintenanceTimeMillis * 1_000_000L;
         int unloaded = 0;
         for (int inspected = 0; inspected < CubicChunksConfig.maintenanceInspectionsPerTick
-                && (maintenance.gcCubes > 0 || maintenance.gcColumns > 0) && unloaded < CubicChunksConfig.maintenanceUnloadsPerTick
+                && maintenance.gcPending() && unloaded < CubicChunksConfig.maintenanceUnloadsPerTick
                 && (inspected == 0 || System.nanoTime() - start < budget); inspected++) {
-            maintenance.gcColumnFirst = !maintenance.gcColumnFirst;
-            if (maintenance.gcColumns > 0 && (maintenance.gcColumnFirst || maintenance.gcCubes == 0)) {
-                maintenance.gcColumns--;
-                Chunk column = maintenance.columns.next(false);
-                if (column == null) maintenance.gcColumns = 0;
-                else if (cubeCache.loadedChunks.get(ChunkPos.asLong(column.x, column.z)) != column) maintenance.columns.remove(column);
+            if (maintenance.gcColumnTurn()) {
+                Chunk column = maintenance.nextGcColumn();
+                if (column == null) continue;
+                if (cubeCache.loadedChunks.get(ChunkPos.asLong(column.x, column.z)) != column) maintenance.columns().remove(column);
                 else if (cubeCache.tryUnloadColumn(column)) {
                     if (cubeCache.loadedChunks.get(ChunkPos.asLong(column.x, column.z)) == column)
                         cubeCache.loadedChunks.remove(ChunkPos.asLong(column.x, column.z));
-                    maintenance.columns.remove(column);
+                    maintenance.columns().remove(column);
                     unloaded++;
                 }
             } else {
-                maintenance.gcCubes--;
-                Cube cube = maintenance.cubes.next(false);
-                if (cube == null) maintenance.gcCubes = 0;
-                else if (cubeCache.getLoadedCube(cube.getX(), cube.getY(), cube.getZ()) != cube) maintenance.cubes.remove(cube);
+                Cube cube = maintenance.nextGcCube();
+                if (cube == null) continue;
+                if (cubeCache.getLoadedCube(cube.getX(), cube.getY(), cube.getZ()) != cube) maintenance.cubes().remove(cube);
                 else if (cubeCache.tryUnloadCube(cube)) {
                     if (cubeCache.getLoadedCube(cube.getX(), cube.getY(), cube.getZ()) == cube) cubeCache.forgetCube(cube);
-                    maintenance.cubes.remove(cube);
+                    maintenance.cubes().remove(cube);
                     unloaded++;
                 }
             }

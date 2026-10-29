@@ -1,4 +1,4 @@
-package io.github.opencubicchunks.cubicchunks.core.server;
+package io.github.opencubicchunks.cubicchunks.core.server.delivery;
 import io.github.opencubicchunks.cubicchunks.api.util.CubePos;
 import org.junit.Test;
 import java.util.*;

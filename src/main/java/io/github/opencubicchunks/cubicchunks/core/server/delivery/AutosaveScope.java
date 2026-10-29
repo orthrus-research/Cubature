@@ -1,4 +1,4 @@
-package io.github.opencubicchunks.cubicchunks.core.server;
+package io.github.opencubicchunks.cubicchunks.core.server.delivery;
 
 /**
  * Marks only the periodic server save (MixinMinecraftServer). Its one reader is

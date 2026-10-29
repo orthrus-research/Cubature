@@ -1,4 +1,4 @@
-package io.github.opencubicchunks.cubicchunks.core.server;
+package io.github.opencubicchunks.cubicchunks.core.server.delivery;
 
 import static io.github.opencubicchunks.cubicchunks.api.util.Coords.blockToCube;
 
@@ -33,7 +33,7 @@ public final class DeferredArrivals {
      * workers (CubeProviderServer.arrivalReady).
      */
     @FunctionalInterface
-    interface Readiness {
+    public interface Readiness {
         boolean ready(int columnX, int columnZ);
     }
 
@@ -61,7 +61,7 @@ public final class DeferredArrivals {
     /** Set while a held teleport completes, so it is not held again. */
     private boolean completing;
 
-    DeferredArrivals(WorldServer world, Readiness readiness) {
+    public DeferredArrivals(WorldServer world, Readiness readiness) {
         this.world = world;
         this.readiness = readiness;
     }
@@ -109,7 +109,7 @@ public final class DeferredArrivals {
     }
 
     /** Completes each held teleport whose column is prepared or whose wait has run out. */
-    void tick(long now) {
+    public void tick(long now) {
         if (arrivals.isEmpty()) return;
         world.profiler.startSection("arrivals");
         Iterator<Map.Entry<UUID, Arrival>> it = arrivals.entrySet().iterator();

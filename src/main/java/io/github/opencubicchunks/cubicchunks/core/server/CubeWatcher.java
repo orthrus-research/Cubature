@@ -24,6 +24,7 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.server;
 
+import io.github.opencubicchunks.cubicchunks.core.server.delivery.PlayerCubeDelivery;
 import com.google.common.base.Predicate;
 import gnu.trove.list.TShortList;
 import gnu.trove.list.array.TShortArrayList;
@@ -224,11 +225,11 @@ public class CubeWatcher implements ITicket, ICubeWatcher, BucketSorterEntry {
         return sentToPlayers;
     }
 
-    boolean isSentToPlayer(EntityPlayerMP player) {
+    public boolean isSentToPlayer(EntityPlayerMP player) {
         return PlayerCubeDelivery.isSent(players, player, sentPlayerCount);
     }
 
-    void onCubeSent(EntityPlayerMP player) {
+    public void onCubeSent(EntityPlayerMP player) {
         sentPlayerCount = PlayerCubeDelivery.markSent(players, player, sentPlayerCount);
     }
 
@@ -360,7 +361,7 @@ public class CubeWatcher implements ITicket, ICubeWatcher, BucketSorterEntry {
         sendPacketToAllPlayers(packet);
     }
 
-    boolean containsPlayer(EntityPlayerMP player) {
+    public boolean containsPlayer(EntityPlayerMP player) {
         return this.players.contains(player);
     }
 

@@ -1,10 +1,10 @@
-package io.github.opencubicchunks.cubicchunks.core.server;
+package io.github.opencubicchunks.cubicchunks.core.server.delivery;
 
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.util.List;
 
 /** Delivered players occupy the existing subscription list's prefix; no per-cube set is allocated. */
-final class PlayerCubeDelivery {
+public final class PlayerCubeDelivery {
     private PlayerCubeDelivery() { }
 
     interface Publication<C, W, P> {
@@ -20,12 +20,12 @@ final class PlayerCubeDelivery {
         for (int i = 0; i < size; i++) publication.notifySent(cubes.get(i), originalWatchers.get(i), player);
     }
 
-    static <P> boolean isSent(ObjectArrayList<P> players, P player, int sent) {
+    public static <P> boolean isSent(ObjectArrayList<P> players, P player, int sent) {
         int index = players.indexOf(player);
         return index >= 0 && index < sent;
     }
 
-    static <P> int markSent(ObjectArrayList<P> players, P player, int sent) {
+    public static <P> int markSent(ObjectArrayList<P> players, P player, int sent) {
         int index = players.indexOf(player);
         if (index < 0 || index < sent) return sent;
         players.set(index, players.get(sent));
@@ -33,7 +33,7 @@ final class PlayerCubeDelivery {
         return sent + 1;
     }
 
-    static <P> int remove(ObjectArrayList<P> players, P player, int sent) {
+    public static <P> int remove(ObjectArrayList<P> players, P player, int sent) {
         int index = players.indexOf(player);
         if (index < 0) return sent;
         if (index < sent) {

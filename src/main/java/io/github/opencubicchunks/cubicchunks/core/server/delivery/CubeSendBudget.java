@@ -1,4 +1,4 @@
-package io.github.opencubicchunks.cubicchunks.core.server;
+package io.github.opencubicchunks.cubicchunks.core.server.delivery;
 
 /** Soft limits checked between indivisible full packets; at least one packet can make progress. */
 final class CubeSendBudget {

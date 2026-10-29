@@ -1,4 +1,4 @@
-package io.github.opencubicchunks.cubicchunks.core.server;
+package io.github.opencubicchunks.cubicchunks.core.server.delivery;
 
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;

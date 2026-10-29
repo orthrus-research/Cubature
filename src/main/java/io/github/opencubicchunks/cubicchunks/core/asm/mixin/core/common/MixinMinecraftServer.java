@@ -27,7 +27,7 @@ package io.github.opencubicchunks.cubicchunks.core.asm.mixin.core.common;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
 import io.github.opencubicchunks.cubicchunks.core.asm.mixin.ICubicWorldInternal;
 import io.github.opencubicchunks.cubicchunks.core.server.SpawnCubes;
-import io.github.opencubicchunks.cubicchunks.core.server.AutosaveScope;
+import io.github.opencubicchunks.cubicchunks.core.server.delivery.AutosaveScope;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.World;
 import net.minecraftforge.common.DimensionManager;

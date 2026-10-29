@@ -66,7 +66,7 @@ final class LabPreparationView {
         if(waiting){
             // Cubature completes a held teleport within TIMEOUT_TICKS: a participant still away 200 ticks
             // later lost its teleport, so fail now, naming that, instead of at the full-view timeout.
-            long waited=job.elapsedTicks-teleportTick, limit=io.github.opencubicchunks.cubicchunks.core.server.DeferredArrivals.TIMEOUT_TICKS+200;
+            long waited=job.elapsedTicks-teleportTick, limit=io.github.opencubicchunks.cubicchunks.core.server.delivery.DeferredArrivals.TIMEOUT_TICKS+200;
             if(waited>limit)throw new IllegalStateException("Full-view participant did not arrive within "+limit+" ticks of its teleport; Cubature completes a held teleport within "+(limit-200)+" ticks, so the teleport was lost");
             if(System.nanoTime()-start>job.fullViewTimeoutSeconds*1000000000L)throw new IllegalStateException("Full-view participant did not arrive within " + job.fullViewTimeoutSeconds + " seconds");
             return false;

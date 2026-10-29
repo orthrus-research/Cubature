@@ -1,5 +1,6 @@
-package io.github.opencubicchunks.cubicchunks.core.server;
+package io.github.opencubicchunks.cubicchunks.core.server.delivery;
 
+import io.github.opencubicchunks.cubicchunks.core.server.CubeProviderServer;
 import io.github.opencubicchunks.cubicchunks.api.util.CubePos;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubeProviderServer;
 import io.github.opencubicchunks.cubicchunks.core.util.ticket.ITicket;
@@ -9,15 +10,15 @@ import net.minecraft.entity.player.EntityPlayerMP;
 import java.util.*;
 
 /** Owner-thread speculation only. Never publishes extra client cubes or changes the mandatory view. */
-final class AheadCubePreparation implements ITicket {
+public final class AheadCubePreparation implements ITicket {
     private final Map<CubePos,Cube> held = new HashMap<>();
     private final ArrayDeque<CubePos> queue = new ArrayDeque<>();
     private double lastX,lastZ;
     private long movedAt;
     private int cx=Integer.MIN_VALUE,cy,cz,dx,dz,h,v;
-    AheadCubePreparation(EntityPlayerMP player) { lastX=player.posX;lastZ=player.posZ; }
+    public AheadCubePreparation(EntityPlayerMP player) { lastX=player.posX;lastZ=player.posZ; }
     @Override public boolean shouldTick() { return false; }
-    void update(EntityPlayerMP player,int horizontal,int vertical,long tick) {
+    public void update(EntityPlayerMP player,int horizontal,int vertical,long tick) {
         double mx=player.posX-lastX,mz=player.posZ-lastZ;lastX=player.posX;lastZ=player.posZ;
         int nextDx=dx,nextDz=dz;
         if(Math.max(Math.abs(mx),Math.abs(mz))>.01) {
@@ -34,7 +35,7 @@ final class AheadCubePreparation implements ITicket {
         queue.clear();
         for(CubePos pos:desired)if(!held.containsKey(pos))queue.addLast(pos);
     }
-    void service(CubeProviderServer provider,GenerationBudget mandatory,int quota) {
+    public void service(CubeProviderServer provider,GenerationBudget mandatory,int quota) {
         int used=0;
         // Use only the remainder of the mandatory generation deadline. An independent small
         // time slice cannot prepare a full leading face at the measured 625-cube/s demand.
@@ -46,7 +47,7 @@ final class AheadCubePreparation implements ITicket {
             if(cube!=null&&!(cube instanceof BlankCube)){cube.getTickets().add(this);held.put(pos,cube);}
         }
     }
-    void close() {
+    public void close() {
         for(Cube cube:held.values())cube.getTickets().remove(this);
         held.clear();queue.clear();cx=Integer.MIN_VALUE;dx=dz=0;
     }

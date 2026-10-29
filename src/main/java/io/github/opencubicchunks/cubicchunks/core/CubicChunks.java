@@ -33,7 +33,7 @@ import io.github.opencubicchunks.cubicchunks.core.asm.mixin.ICubicWorldSettings;
 import io.github.opencubicchunks.cubicchunks.core.asm.mixin.core.common.IIntegratedServer;
 import io.github.opencubicchunks.cubicchunks.core.client.ClientEventHandler;
 import io.github.opencubicchunks.cubicchunks.core.network.PacketDispatcher;
-import io.github.opencubicchunks.cubicchunks.core.server.ServerDeliveryMode;
+import io.github.opencubicchunks.cubicchunks.core.server.delivery.ServerDeliveryMode;
 import io.github.opencubicchunks.cubicchunks.core.server.chunkio.RegionCubeStorage;
 import io.github.opencubicchunks.cubicchunks.core.util.CompatHandler;
 import io.github.opencubicchunks.cubicchunks.core.util.SideUtils;

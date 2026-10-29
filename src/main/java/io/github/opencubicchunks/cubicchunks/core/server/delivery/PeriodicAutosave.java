@@ -1,5 +1,6 @@
-package io.github.opencubicchunks.cubicchunks.core.server;
+package io.github.opencubicchunks.cubicchunks.core.server.delivery;
 
+import io.github.opencubicchunks.cubicchunks.core.server.CubeProviderServer;
 import io.github.opencubicchunks.cubicchunks.api.util.CubePos;
 import io.github.opencubicchunks.cubicchunks.core.CubicChunksConfig;
 import io.github.opencubicchunks.cubicchunks.core.asm.mixin.ICubicWorldInternal;
@@ -16,7 +17,7 @@ import javax.annotation.Nullable;
  * columns within the autosave budget (autosaveTimeMillis, autosaveSnapshotsPerTick), alternating which
  * goes first, while the writer accepts them (ICubeIO.canAutoSave).
  */
-final class PeriodicAutosave {
+public final class PeriodicAutosave {
     private final CubeProviderServer provider;
     /** The provider's incremental maintenance, or null without it. */
     @Nullable private final MaintenanceState maintenance;
@@ -25,13 +26,13 @@ final class PeriodicAutosave {
     private int lastAutosaveProcessed;
     private boolean autosaveColumnsFirst;
 
-    PeriodicAutosave(CubeProviderServer provider, @Nullable MaintenanceState maintenance) {
+    public PeriodicAutosave(CubeProviderServer provider, @Nullable MaintenanceState maintenance) {
         this.provider = provider;
         this.maintenance = maintenance;
     }
 
     /** The periodic save: selects what is dirty now among the provider's loaded cubes and columns. */
-    void begin(Iterable<Cube> cubes, Iterable<Chunk> columns) {
+    public void begin(Iterable<Cube> cubes, Iterable<Chunk> columns) {
         ((ICubicWorldInternal) provider.world).getLightingManager().processUpdates();
         if (maintenance != null) {
             maintenance.discoverCubes = Math.max(maintenance.discoverCubes, maintenance.cubes.size());
@@ -44,14 +45,14 @@ final class PeriodicAutosave {
     }
 
     /** Drops every selection: a full save has just written everything dirty. */
-    void clear() {
+    public void clear() {
         autosaveCubes.clear();
         autosaveColumns.clear();
         if (maintenance != null) maintenance.discoverCubes = maintenance.discoverColumns = 0;
     }
 
     /** One provider tick of snapshots within the autosave budget. */
-    void tick() {
+    public void tick() {
         lastAutosaveProcessed = 0;
         if (provider.world.disableLevelSaving) return;
         long start = System.nanoTime();
@@ -87,11 +88,11 @@ final class PeriodicAutosave {
     }
 
     /** Pending owner-thread snapshots, distinct from the writer's serialized-NBT backlog. */
-    int pending() { return autosaveCubes.size() + autosaveColumns.size(); }
+    public int pending() { return autosaveCubes.size() + autosaveColumns.size(); }
 
-    int lastProcessed() { return lastAutosaveProcessed; }
+    public int lastProcessed() { return lastAutosaveProcessed; }
 
-    int pendingDiscovery() {
+    public int pendingDiscovery() {
         return maintenance == null ? 0 : maintenance.discoverCubes + maintenance.discoverColumns;
     }
 

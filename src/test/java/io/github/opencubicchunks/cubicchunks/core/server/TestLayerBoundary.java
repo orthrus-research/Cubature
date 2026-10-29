@@ -11,13 +11,17 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
  * The provider and lighting sit below cube delivery: they reach the player cube map only through
- * CubeDemand and SurfaceHeightListener, never by its class.
+ * CubeDemand and SurfaceHeightListener, never by its class. Cube delivery, in core.server.delivery, reaches the
+ * server package only through the provider, cube watchers and the vanilla network handler.
  */
 public class TestLayerBoundary {
     private static final String CORE = "src/main/java/io/github/opencubicchunks/cubicchunks/core";
@@ -34,6 +38,24 @@ public class TestLayerBoundary {
         for (Path source : below)
             if (new String(Files.readAllBytes(source), StandardCharsets.UTF_8).contains("PlayerCubeMap")) naming.add(core.relativize(source));
         assertEquals("Name the player cube map below delivery", new ArrayList<Path>(), naming);
+    }
+
+    @Test public void deliveryNamesOnlyItsServerCollaborators() throws IOException {
+        Path core = core();
+        List<String> allowed = Arrays.asList("CubeProviderServer", "CubeWatcher", "VanillaNetworkHandler");
+        Pattern server = Pattern.compile("core\\.server\\.(\\w+|\\*)");
+        List<Path> sources;
+        try (Stream<Path> delivery = Files.walk(core.resolve("server/delivery"))) {
+            sources = delivery.filter(p -> p.toString().endsWith(".java")).collect(Collectors.toList());
+        }
+        assertTrue("Delivery sources not found under " + core, sources.size() > 10);
+        List<String> named = new ArrayList<>();
+        for (Path source : sources) {
+            Matcher match = server.matcher(new String(Files.readAllBytes(source), StandardCharsets.UTF_8));
+            while (match.find())
+                if (!match.group(1).equals("delivery") && !allowed.contains(match.group(1))) named.add(core.relativize(source) + ": " + match.group(1));
+        }
+        assertEquals("Reach the server package from delivery beyond its collaborators", new ArrayList<String>(), named);
     }
 
     /** Cubature's core sources, found from the test's working directory (the root or a loader build). */

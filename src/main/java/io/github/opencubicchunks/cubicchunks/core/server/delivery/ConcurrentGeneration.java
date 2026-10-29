@@ -1,4 +1,4 @@
-package io.github.opencubicchunks.cubicchunks.core.server;
+package io.github.opencubicchunks.cubicchunks.core.server.delivery;
 
 import io.github.opencubicchunks.cubicchunks.api.util.CubePos;
 import io.github.opencubicchunks.cubicchunks.api.worldgen.CubePrimer;
@@ -22,7 +22,7 @@ import javax.annotation.Nullable;
  * ask to schedule (delivery requests and arrivals) hand work to the workers; every other request
  * generates synchronously as before.
  */
-final class ConcurrentGeneration {
+public final class ConcurrentGeneration {
     private final ICubeGenerator generator;
     private final ThreadPoolExecutor workers;
     private final GenerationQueue<CubePos, CubePrimer> cubes;
@@ -50,7 +50,7 @@ final class ConcurrentGeneration {
 
     /** Null unless the generator declares concurrent generation and the worker count is not zero. */
     @Nullable
-    static ConcurrentGeneration create(ICubeGenerator generator, String world) {
+    public static ConcurrentGeneration create(ICubeGenerator generator, String world) {
         if (!generator.supportsConcurrentCubeGeneration()) return null;
         int threads = CubicChunksConfig.concurrentGenerationThreads;
         if (threads < 0) threads = Math.max(1, Math.min(4, Runtime.getRuntime().availableProcessors() / 4));
@@ -60,14 +60,14 @@ final class ConcurrentGeneration {
         return new ConcurrentGeneration(generator, threads, CubicChunksConfig.concurrentGenerationQueue, world);
     }
 
-    boolean saturated() { return cubes.saturated() || columns.saturated(); }
+    public boolean saturated() { return cubes.saturated() || columns.saturated(); }
 
     /**
      * With {@code schedule}, hands the column to the workers if they do not hold it yet and reports
      * WAITING until they have prepared it; without, READY unless they are preparing it now. On READY
      * a prepared column is warm in the generator's own cache, and its marker is spent.
      */
-    GeneratorReadyState pollColumn(int columnX, int columnZ, boolean schedule) {
+    public GeneratorReadyState pollColumn(int columnX, int columnZ, boolean schedule) {
         GeneratorReadyState own = generator.pollAsyncColumnGenerator(columnX, columnZ);
         if (own != GeneratorReadyState.READY) return own;
         ChunkPos pos = new ChunkPos(columnX, columnZ);
@@ -77,7 +77,7 @@ final class ConcurrentGeneration {
     }
 
     /** As {@link #pollColumn}; on READY the caller takes the result with {@link #takeCube}, or generates now. */
-    GeneratorReadyState pollCube(int cubeX, int cubeY, int cubeZ, boolean schedule) {
+    public GeneratorReadyState pollCube(int cubeX, int cubeY, int cubeZ, boolean schedule) {
         GeneratorReadyState own = generator.pollAsyncCubeGenerator(cubeX, cubeY, cubeZ);
         if (own != GeneratorReadyState.READY) return own;
         return cubes.poll(new CubePos(cubeX, cubeY, cubeZ), schedule) == GenerationQueue.State.READY
@@ -86,11 +86,11 @@ final class ConcurrentGeneration {
 
     /** The cube generated off-thread, or null when the caller must generate it now. */
     @Nullable
-    CubePrimer takeCube(int cubeX, int cubeY, int cubeZ) {
+    public CubePrimer takeCube(int cubeX, int cubeY, int cubeZ) {
         return cubes.take(new CubePos(cubeX, cubeY, cubeZ));
     }
 
-    void close() {
+    public void close() {
         cubes.close();
         columns.close();
         workers.shutdownNow();

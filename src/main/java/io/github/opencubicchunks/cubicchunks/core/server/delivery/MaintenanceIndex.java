@@ -1,10 +1,10 @@
-package io.github.opencubicchunks.cubicchunks.core.server;
+package io.github.opencubicchunks.cubicchunks.core.server.delivery;
 
 import java.util.IdentityHashMap;
 import java.util.Iterator;
 
 /** Owner-thread round-robin cursors. No iterator or per-inspection allocation survives a tick. */
-final class MaintenanceIndex<T> {
+public final class MaintenanceIndex<T> {
     private static final class Node<T> {
         final T value;
         Node<T> gcPrevious, gcNext, savePrevious, saveNext;
@@ -13,7 +13,7 @@ final class MaintenanceIndex<T> {
     private final IdentityHashMap<T, Node<T>> nodes = new IdentityHashMap<>();
     private Node<T> gc, save;
 
-    void add(T value) {
+    public void add(T value) {
         if (nodes.containsKey(value)) return;
         Node<T> node = new Node<>(value);
         nodes.put(value, node);
@@ -34,7 +34,7 @@ final class MaintenanceIndex<T> {
         }
     }
 
-    void remove(T value) {
+    public void remove(T value) {
         Node<T> node = nodes.remove(value);
         if (node == null) return;
         if (node.gcNext == node) { gc = save = null; return; }
@@ -46,16 +46,16 @@ final class MaintenanceIndex<T> {
         node.saveNext.savePrevious = node.savePrevious;
     }
 
-    T next(boolean autosave) {
+    public T next(boolean autosave) {
         Node<T> node = autosave ? save : gc;
         if (node == null) return null;
         if (autosave) save = node.saveNext; else gc = node.gcNext;
         return node.value;
     }
 
-    int size() { return nodes.size(); }
+    public int size() { return nodes.size(); }
 
-    Iterator<T> track(Iterator<T> source) {
+    public Iterator<T> track(Iterator<T> source) {
         return new Iterator<T>() {
             private T last;
             @Override public boolean hasNext() { return source.hasNext(); }

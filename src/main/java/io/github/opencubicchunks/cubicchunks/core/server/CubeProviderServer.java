@@ -24,6 +24,9 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.server;
 
+import io.github.opencubicchunks.cubicchunks.core.server.delivery.ConcurrentGeneration;
+import io.github.opencubicchunks.cubicchunks.core.server.delivery.MaintenanceState;
+import io.github.opencubicchunks.cubicchunks.core.server.delivery.PeriodicAutosave;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
 import io.github.opencubicchunks.cubicchunks.api.world.storage.StorageFormatProviderBase;
 import io.github.opencubicchunks.cubicchunks.core.CubicChunksConfig;
@@ -399,7 +402,7 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
 
     /** A delivery request: generation it needs, population included, goes to the workers instead of this thread. */
     @Nullable
-    Cube getCubeForDelivery(int cubeX, int cubeY, int cubeZ, Requirement req) {
+    public Cube getCubeForDelivery(int cubeX, int cubeY, int cubeZ, Requirement req) {
         return getCube(cubeX, cubeY, cubeZ, req, Timing.SCHEDULE);
     }
 
@@ -449,8 +452,8 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
         if (cube != null) {
             Cube previous = cubeMap.put(cube); // cache the Cube
             if (maintenance != null) {
-                if (previous != cube) maintenance.cubes.remove(previous);
-                maintenance.cubes.add(cube);
+                if (previous != cube) maintenance.cubes().remove(previous);
+                maintenance.cubes().add(cube);
             }
             //synchronous loading may cause it to be called twice when async loading has been already queued
             //because AsyncWorldIOExecutor only executes one task for one cube and because only saving a cube
@@ -715,7 +718,7 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
         }
         if (column != null) {
             loadedChunks.put(ChunkPos.asLong(columnX, columnZ), column);
-            if (maintenance != null) maintenance.columns.add(column);
+            if (maintenance != null) maintenance.columns().add(column);
             column.setLastSaveTime(this.worldServer.getTotalWorldTime()); // the column was just loaded
             column.onLoad();
             return column;
@@ -732,7 +735,7 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
         }
 
         loadedChunks.put(ChunkPos.asLong(columnX, columnZ), column);
-        if (maintenance != null) maintenance.columns.add(column);
+        if (maintenance != null) maintenance.columns().add(column);
         column.setLastSaveTime(this.worldServer.getTotalWorldTime()); // the column was just generated
         column.onLoad();
         return column;
@@ -795,12 +798,12 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
     }
 
     Iterator<Cube> cubesIterator() {
-        return maintenance == null ? cubeMap.iterator() : maintenance.cubes.track(cubeMap.iterator());
+        return maintenance == null ? cubeMap.iterator() : maintenance.cubes().track(cubeMap.iterator());
     }
 
     @SuppressWarnings("unchecked")
     Iterator<Chunk> columnsIterator() {
-        return maintenance == null ? loadedChunks.values().iterator() : maintenance.columns.track(loadedChunks.values().iterator());
+        return maintenance == null ? loadedChunks.values().iterator() : maintenance.columns().track(loadedChunks.values().iterator());
     }
 
     boolean tryUnloadCube(Cube cube) {

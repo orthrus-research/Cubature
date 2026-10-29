@@ -1,5 +1,7 @@
-package io.github.opencubicchunks.cubicchunks.core.server;
+package io.github.opencubicchunks.cubicchunks.core.server.delivery;
 
+import io.github.opencubicchunks.cubicchunks.core.server.CubeWatcher;
+import io.github.opencubicchunks.cubicchunks.core.server.VanillaNetworkHandler;
 import io.github.opencubicchunks.cubicchunks.api.util.CubePos;
 import io.github.opencubicchunks.cubicchunks.api.world.CubeWatchEvent;
 import io.github.opencubicchunks.cubicchunks.core.CubicChunksConfig;
@@ -25,9 +27,9 @@ import javax.annotation.Nullable;
  * maxCubePacketCubes). A batch is published to its watchers before any callback runs; leashed
  * entities and CubeWatchEvent follow.
  */
-final class CubeSender {
+public final class CubeSender {
     /** What the sender asks of the player cube map. */
-    interface Watchers {
+    public interface Watchers {
         @Nullable CubeWatcher getCubeWatcher(CubePos pos);
 
         /** Whether this is the map's current instance of the player (not one from before a respawn). */
@@ -60,26 +62,26 @@ final class CubeSender {
                 }
             };
 
-    CubeSender(WorldServer world, Watchers watchers) {
+    public CubeSender(WorldServer world, Watchers watchers) {
         this.world = world;
         this.vanilla = ((ICubicWorldInternal.Server) world).getVanillaNetworkHandler();
         this.watchers = watchers;
     }
 
-    void schedule(Cube cube, EntityPlayerMP player) {
+    public void schedule(Cube cube, EntityPlayerMP player) {
         pending.add(player, cube, System.nanoTime());
     }
 
-    void unschedule(Cube cube, EntityPlayerMP player) {
+    public void unschedule(Cube cube, EntityPlayerMP player) {
         pending.remove(player, cube);
     }
 
-    void removePlayer(EntityPlayerMP player) {
+    public void removePlayer(EntityPlayerMP player) {
         pending.removePlayer(player);
     }
 
     /** Sends queued cubes within this tick's time and byte budget, one packet per player in turn. */
-    void send() {
+    public void send() {
         if (pending.isEmpty()) return;
         CubeSendDiagnostics.Observer observer = CubeSendDiagnostics.getObserver();
         int timeMillis = CubicChunksConfig.maxCubeSendTimeMillis;
