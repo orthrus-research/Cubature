@@ -56,6 +56,12 @@ have cubes generated off the server thread. The `deliveryMode` config option sel
 are unloaded, saved and prefetched, and [docs/DISTANT-HORIZONS.md](docs/DISTANT-HORIZONS.md)
 describes the Distant Horizons adapter.
 
+With concurrent generation active, `NetHandlerPlayServer.setPlayerLocation` into a column that is
+neither loaded nor saved is held, for at most 600 ticks, while the workers prepare that column. The
+player stays where they are meanwhile, so code that reads the player's position right after the call
+still sees the old one. `PlayerCubeMap.teleportNow` moves a player at once, generating the column on
+the server thread if it must.
+
 ## Building from source
 
 The supported build is the Unimined project in `cleanroom/`, which needs JDK 25 (and JDK 8 for the

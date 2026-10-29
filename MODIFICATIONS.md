@@ -19,7 +19,11 @@ and `distantHorizonsNativeFeed` can limit DH rebuilds to edited columns.
 On October 29, 2026, `deliveryMode` became the only delivery input: it is read when the server
 starts and shared by every dimension, the `incrementalMaintenance` option and the
 `cubature.deliveryExperiment` system property were removed, and `maintenanceUnloadsPerTick`
-(now 64 by default) applies in every incremental stage.
+(now 64 by default) applies in every incremental stage. The same day the periodic autosave became
+a named provider call reached only from vanilla's periodic save, so `saveChunks` always saves at
+once; only watcher and ahead-preparation requests schedule generation on the workers, and other
+requests never see work in flight as absent; and `PacketCubes` sorts a copy of its batch and is
+told by its sender whether to compute an exact size.
 The Cubature name and license packaging were adopted on October 19, 2026;
 that change added no terrain or scheduling algorithm.
 
