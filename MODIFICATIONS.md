@@ -35,7 +35,12 @@ holding at most twice that while tasks block) and offers it to its generator for
 own parallel work, then withdraws it when the world closes, so that work stays inside the worker
 budget instead of the JVM's common pool.
 The same day the Forge 14.23.5.2860 / Java 8 fallback build was retired: Cubature builds for
-Cleanroom only, as Java 25 bytecode tested on Java 26.
+Cleanroom only, as Java 25 bytecode tested on Java 26. `ICubeGenerator` also gained
+`preparationRegionBlocks` and `prepareRegion`: each world prepares its generator's regional plans
+ahead of the players on the build pool (`RegionalPreparation`), within
+`regionalPreparationReachBlocks`, nearest by time to reach first. Regions within the native view
+run up to the pool's size; those beyond run under `PreparationGovernor`, which reads CPU
+contention rather than tick time alone. The generator declines when its caches lack room.
 The Cubature name and license packaging were adopted on October 19, 2026;
 that change added no terrain or scheduling algorithm.
 

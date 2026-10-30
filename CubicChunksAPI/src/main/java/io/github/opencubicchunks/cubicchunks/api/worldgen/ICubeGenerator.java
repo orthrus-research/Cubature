@@ -153,6 +153,29 @@ public interface ICubeGenerator {
     }
 
     /**
+     * The side in blocks of the square regions {@link #prepareRegion} prepares, or 0 (the default) when the generator
+     * prepares none.
+     */
+    default int preparationRegionBlocks() {
+        return 0;
+    }
+
+    /**
+     * Builds one region's own plans ahead of demand, called off the server thread on the world's build pool, nearest
+     * the players first. Like {@link #prepareColumn} it must be thread-safe, must not touch the world, and may only warm
+     * the generator's own caches, never change what generation produces. It returns false when the generator declines
+     * because its caches lack room to hold more, so the server stops widening preparation for a while; true when the
+     * region is prepared or needs nothing.
+     *
+     * @param regionX region X: block X divided by {@link #preparationRegionBlocks}, floored
+     * @param regionZ region Z: block Z divided by {@link #preparationRegionBlocks}, floored
+     * @return false when declined for lack of room
+     */
+    default boolean prepareRegion(int regionX, int regionZ) {
+        return false;
+    }
+
+    /**
      * Checks whether the generator is ready to generate a given cube.
      *
      * @param cubeX X coordinate of the cube

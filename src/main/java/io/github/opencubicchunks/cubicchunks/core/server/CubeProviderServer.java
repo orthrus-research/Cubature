@@ -28,6 +28,7 @@ import io.github.opencubicchunks.cubicchunks.core.server.delivery.ConcurrentGene
 import io.github.opencubicchunks.cubicchunks.core.server.delivery.GeneratorBuildPool;
 import io.github.opencubicchunks.cubicchunks.core.server.delivery.MaintenanceState;
 import io.github.opencubicchunks.cubicchunks.core.server.delivery.PeriodicAutosave;
+import io.github.opencubicchunks.cubicchunks.core.server.delivery.RegionalPreparation;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
 import io.github.opencubicchunks.cubicchunks.api.world.storage.StorageFormatProviderBase;
 import io.github.opencubicchunks.cubicchunks.core.CubicChunksConfig;
@@ -110,6 +111,7 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
     @Nonnull private final ICubeGenerator cubeGen;
     @Nullable private final ConcurrentGeneration concurrentGeneration;
     @Nonnull private final GeneratorBuildPool buildPool;
+    @Nonnull private final RegionalPreparation regionalPreparation;
     @Nonnull private final Profiler profiler;
     // some mods will try to access blocks in ChunkDataEvent.Load
     // this needs the column to be already known by the chunk provider so that it can load cubes without trying to load the column again
@@ -127,6 +129,7 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
         this.autosave = new PeriodicAutosave(this, maintenance);
         // The build pool first, so the generator holds it before any cube generates.
         this.buildPool = GeneratorBuildPool.open(cubeGen, "dimension " + worldServer.provider.getDimension());
+        this.regionalPreparation = RegionalPreparation.open(cubeGen, buildPool, "dimension " + worldServer.provider.getDimension());
         this.concurrentGeneration = ConcurrentGeneration.create(cubeGen, "dimension " + worldServer.provider.getDimension());
         this.worldServer = worldServer;
         this.profiler = worldServer.profiler;
@@ -760,10 +763,16 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
 
     boolean concurrentGenerationSaturated() { return concurrentGeneration != null && concurrentGeneration.saturated(); }
 
-    /** Stops the generation workers, then withdraws and stops the build pool their work may use. */
+    /** Stops regional preparation and the generation workers, then withdraws and stops the build pool they use. */
     public void closeConcurrentGeneration() {
+        regionalPreparation.close();
         if (concurrentGeneration != null) concurrentGeneration.close();
         buildPool.close();
+    }
+
+    /** Regional preparation ahead of these players (see {@link RegionalPreparation}); once per world tick. */
+    void prepareRegions(java.util.Collection<net.minecraft.entity.player.EntityPlayerMP> players, int viewChunks) {
+        regionalPreparation.tick(worldServer, players, viewChunks);
     }
 
     private ICubeGenerator.GeneratorReadyState pollCube(int cubeX, int cubeY, int cubeZ, Timing timing) {

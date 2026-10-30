@@ -54,7 +54,9 @@ function of seed and coordinates can declare concurrent generation
 (`concurrentGenerationThreads`, `concurrentGenerationQueue`, `concurrentGenerationTickMillis`) to
 have cubes generated off the server thread. It can also take each world's build pool through
 `ICubeGenerator.useBuildPool` (`generatorBuildThreads`) for its own parallel work, so that work
-stays inside the worker budget instead of the JVM's common pool. The `deliveryMode` config option selects how cubes
+stays inside the worker budget instead of the JVM's common pool, and prepare its regional plans
+ahead of the players there (`preparationRegionBlocks`, `prepareRegion`,
+`regionalPreparationReachBlocks`). The `deliveryMode` config option selects how cubes
 are unloaded, saved and prefetched, and [docs/DISTANT-HORIZONS.md](docs/DISTANT-HORIZONS.md)
 describes the Distant Horizons adapter.
 

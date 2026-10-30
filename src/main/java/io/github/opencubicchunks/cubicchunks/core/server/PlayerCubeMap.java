@@ -334,7 +334,9 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
         sender.send();
         if (deliveryMode.prefetch()) prepareAhead(canGenerateChunkPredicate, currentTime);
         if (deliveryMode.incremental()) maintain();
-        getWorldServer().profiler.endSection();//sendCubes
+        getWorldServer().profiler.endStartSection("prepareRegions");
+        prepareRegions(canGenerateChunkPredicate);
+        getWorldServer().profiler.endSection();//prepareRegions
         getWorldServer().profiler.endSection();//playerCubeMapTick
     }
 
@@ -513,6 +515,14 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
                 this.getWorldServer().getChunkProvider().queueUnloadAll();
             }
         }
+    }
+
+    /** Regional preparation ahead of the players who may generate, in every delivery mode. */
+    private void prepareRegions(Predicate<EntityPlayerMP> canGenerateChunkPredicate) {
+        java.util.List<EntityPlayerMP> generating = new java.util.ArrayList<>(players.size());
+        for (PlayerWrapper player : players.valueCollection())
+            if (canGenerateChunkPredicate.apply(player.playerEntity)) generating.add(player.playerEntity);
+        cubeCache.prepareRegions(generating, horizontalViewDistance);
     }
 
     /** PREFETCH: each player's ahead preparation, starting with a different player each tick. */

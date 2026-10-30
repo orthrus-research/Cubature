@@ -111,6 +111,12 @@ public class CubicChunksConfig {
             + "-1: a quarter of the processors, 1 to 4; 0: no pool, so that work runs on the calling thread.")
     public static int generatorBuildThreads = -1;
 
+    @Config.RangeInt(min = 0, max = 65536)
+    @Config.Comment("Blocks around each player within which a generator's regional plans (ICubeGenerator.prepareRegion) "
+            + "are prepared ahead of demand on the build pool, nearest by time to reach first. Regions within the native "
+            + "view run up to the pool's size; those beyond yield to CPU contention. 0: no regional preparation.")
+    public static int regionalPreparationReachBlocks = 8192;
+
     @Config.RangeInt(min = 16, max = 65536)
     @Config.RequiresWorldRestart
     @Config.Comment("Maximum cubes, and separately columns, in flight or finished but not yet installed.")
