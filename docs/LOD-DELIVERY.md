@@ -35,11 +35,11 @@ moved, and why.
 ## Evidence
 
 **Setup:**
-- Captures, from 2026-10-30:
-  - Riven `ab3-land-base`, and `ab4-land-base` repeating it;
-  - `ab3-land-health`, with DH's health check ignored;
-  - `ab4-land-native2`, with DH on the client only and no distant generation.
-- Preview survey: `survey-route-20261030b`.
+- Captures with Riven's lab, from 2026-10-30:
+  - a base run, and a second one repeating it;
+  - one with DH's health check ignored;
+  - one with DH on the client only and no distant generation.
+- Preview survey: one `cubiclab preview-survey` run on the route.
 - Workstation: i9-13900K, 32 logical CPUs.
 - Runtime: Java 26, ZGC with 8 GiB per JVM.
 - DH: 8 workers.
@@ -47,8 +47,6 @@ moved, and why.
 - Native view distance: 12 chunks, so 192 blocks and 15,625 view cubes.
 - Repeats: the base run twice. The ignored-health and native-only runs once
   each.
-- Local evidence: Riven `.local/` (lod-reports, cubic-standalone,
-  atlas/pop-route-full).
 
 ### Native view
 
