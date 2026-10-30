@@ -179,6 +179,7 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
             players.valueCollection().stream().map(p -> p.playerEntity).filter(NOT_SPECTATOR).collect(Collectors.toList()));
 
     private int horizontalViewDistance;
+    private volatile boolean nativeBehind;
     private int verticalViewDistance;
 
     /**
@@ -522,8 +523,13 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
         java.util.List<EntityPlayerMP> generating = new java.util.ArrayList<>(players.size());
         for (PlayerWrapper player : players.valueCollection())
             if (canGenerateChunkPredicate.apply(player.playerEntity)) generating.add(player.playerEntity);
-        // Native first: cubes still to generate or send hold back new regional preparation.
-        cubeCache.prepareRegions(generating, horizontalViewDistance, cubesToGenerate.size() + cubesToSendToClients.size());
+        int face = 2 * horizontalViewDistance + 1;
+        nativeBehind = cubesToGenerate.size() + cubesToSendToClients.size() > face * face;
+        cubeCache.prepareRegions(generating, horizontalViewDistance, nativeBehind);
+    }
+
+    @Override public boolean nativeBehind() {
+        return nativeBehind;
     }
 
     /** PREFETCH: each player's ahead preparation, starting with a different player each tick. */

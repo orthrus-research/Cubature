@@ -18,4 +18,11 @@ public interface CubeDemand {
      * it (its load callback may still be pending) or it lies within a player's delivery view.
      */
     boolean holdsCube(int cubeX, int cubeY, int cubeZ);
+
+    /**
+     * Whether more than one face of the native view, {@code (2 x view + 1)^2} cubes, waits to generate or to be sent:
+     * a join or a teleport. Native delivery comes first, so meanwhile neither regional preparation nor a Distant
+     * Horizons preview tile starts. Updated each tick; other threads may read it.
+     */
+    boolean nativeBehind();
 }

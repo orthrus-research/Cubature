@@ -771,8 +771,8 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
     }
 
     /** Regional preparation ahead of these players (see {@link RegionalPreparation}); once per world tick. */
-    void prepareRegions(java.util.Collection<net.minecraft.entity.player.EntityPlayerMP> players, int viewChunks, int nativeDebt) {
-        regionalPreparation.tick(worldServer, players, viewChunks, nativeDebt);
+    void prepareRegions(java.util.Collection<net.minecraft.entity.player.EntityPlayerMP> players, int viewChunks, boolean nativeBehind) {
+        regionalPreparation.tick(worldServer, players, viewChunks, nativeBehind);
     }
 
     private ICubeGenerator.GeneratorReadyState pollCube(int cubeX, int cubeY, int cubeZ, Timing timing) {

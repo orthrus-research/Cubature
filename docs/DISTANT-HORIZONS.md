@@ -67,8 +67,13 @@ native column at each requested cell's integer center, writes relative heights
 using the real world minimum, and returns the data through DH's normal future.
 At coarse levels this is a surface approximation. It creates no gameplay cubes,
 terrain cache, private worker pool or population work. DH owns admission, rate
-limits, propagation, persistence, server delivery and rendering. Pooled sources
-are retained only until their generation future completes; closing cancels work.
+limits, propagation, persistence, server delivery and rendering, with one
+exception: native view first. While more than one face of a world's native
+view, `(2 x view + 1)^2` cubes, waits to generate or be sent (a join or a
+teleport), `MixinDistantHorizonsNativeFirst` makes DH find the generator busy,
+so no preview tile starts; tiles already running finish, and DH resumes its own
+order as the native view catches up. Pooled sources are retained only until
+their generation future completes; closing cancels work.
 
 Minecraft 1.12.2's DH startup forces `INTERNAL_SERVER` and hides its built-in
 rough-generation plans. CC keeps that global fallback intact. Its world packet

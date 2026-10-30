@@ -12,6 +12,7 @@ import com.seibel.distanthorizons.core.wrapperInterfaces.world.IBiomeWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
 import io.github.opencubicchunks.cubicchunks.api.worldgen.ICubicTerrainPreview;
 import io.github.opencubicchunks.cubicchunks.core.CubicChunks;
+import io.github.opencubicchunks.cubicchunks.core.server.CubeDemand;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.concurrent.CancellationException;
@@ -23,10 +24,15 @@ import java.util.function.Consumer;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.block.BlockLiquid;
 import net.minecraft.init.Blocks;
+import net.minecraft.server.management.PlayerChunkMap;
+import net.minecraft.world.WorldServer;
 import net.minecraft.world.biome.Biome;
 
-/** DH owns admission, worker threads, pooled data, persistence and network delivery. */
-final class CubicTerrainPreviewGenerator implements IDhApiWorldGenerator {
+/**
+ * DH owns admission, worker threads, pooled data, persistence and network delivery, except that no tile starts while
+ * the world's native view is behind (PreviewAdmission).
+ */
+final class CubicTerrainPreviewGenerator implements IDhApiWorldGenerator, PreviewAdmission {
     private final ICubicTerrainPreview provider;
     private final ILevelWrapper level;
     private final int minY,maxY;
@@ -45,6 +51,14 @@ final class CubicTerrainPreviewGenerator implements IDhApiWorldGenerator {
     @Override public EDhApiWorldGeneratorReturnType getReturnType() { return EDhApiWorldGeneratorReturnType.API_DATA_SOURCES; }
     @Override public void preGeneratorTaskStart() {}
     @Override public void close() { closed=true; }
+
+    /** Native view first: the native view of this generator's world is behind (CubeDemand.nativeBehind). */
+    @Override public boolean holdsNewTiles() {
+        Object world=level.getWrappedMcObject();
+        if (!(world instanceof WorldServer)) return false;
+        PlayerChunkMap map=((WorldServer)world).getPlayerChunkMap();
+        return map instanceof CubeDemand && ((CubeDemand)map).nativeBehind();
+    }
 
     @Override public CompletableFuture<Void> generateLod(int minChunkX,int minChunkZ,int lodX,int lodZ,byte detail,
             IDhApiFullDataSource data,EDhApiDistantGeneratorMode mode,ExecutorService executor,

@@ -19,6 +19,16 @@ The LGPL-3.0 and accompanying GPL-3.0 texts are packaged under
 `META-INF/licenses/distanthorizons/`. This explicit exception takes precedence
 over the MIT default below; Riven's NRR license does not cover it.
 
+## Distant Horizons native-first admission patch
+
+`MixinDistantHorizonsNativeFirst.java`, copyright (c) 2026 Orthrus Research,
+is licensed under LGPL-3.0-only. This source-level runtime integration targets
+DH 3.3.3's `WorldGenerationQueue`: it reports the generator busy while
+Cubature's native view is behind, and retains DH's queue, selection and
+generation code. The LGPL-3.0 and accompanying GPL-3.0 texts are packaged under
+`META-INF/licenses/distanthorizons/`. This explicit exception takes precedence
+over the MIT default below; Riven's NRR license does not cover it.
+
 ## Async chunk loading
 The asynchronous chunk loading executor code in `io.github.opencubicchunks.cubicchunks.core.server.chunkio.async.forge` is based on parts of
 [MinecraftForge](https://github.com/MinecraftForge/MinecraftForge) and licensed under the

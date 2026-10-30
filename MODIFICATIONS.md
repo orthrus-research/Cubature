@@ -148,6 +148,15 @@ preserves the interrupt flag; OS scheduling can extend the requested delay.
 The patch file carries LGPL-3.0-only terms and its matching source is included
 in the sources JAR. No DH class is replaced on disk.
 
+On October 30, 2026, `MixinDistantHorizonsNativeFirst` made DH 3.3.3's
+`WorldGenerationQueue.isGeneratorBusy` report the generator busy while
+Cubature's preview generator holds new tiles: while more than one face of the
+world's native view waits to generate or be sent (`CubeDemand.nativeBehind`,
+the rule regional preparation already used), no preview tile starts. Tiles
+running finish; DH's selection, generation and delivery are unchanged. It is a
+required match, carries LGPL-3.0-only terms, and its source is in the sources
+JAR.
+
 Both supported builds include `NOTICE.md`, this file, the upstream MIT text,
 the full LGPL-2.1 text and component notices in binary and matching sources
 JARs. The sources JAR includes the mod and API Java sources. It is not by

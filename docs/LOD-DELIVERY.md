@@ -270,10 +270,18 @@ Figures are p95, in blocks:
 
 - **Native debt.** Cubature's `PlayerCubeMap` already keeps `cubesToGenerate`
   and `cubesToSendToClients`. Their sizes are the native debt.
-- **The gate.** Previews start only while the debt is below one face of the
-  view, `(2 x view distance + 1)^2` cubes (625 at distance 12). At join and
-  teleport, previews therefore wait for the native view, while steady flight
-  stays under the gate.
+- **The gate** (done, `MixinDistantHorizonsNativeFirst`). Previews start only
+  while the debt is below one face of the view, `(2 x view distance + 1)^2`
+  cubes (625 at distance 12); regional preparation shares the rule
+  (`CubeDemand.nativeBehind`). At join and teleport, previews therefore wait
+  for the native view, while steady flight stays under the gate. Land route,
+  two runs each, after Riven's flood-cell and climate-lattice memos: the first
+  preview tile finished 29 and 34 s after full view began, against 11 and 12 s
+  without the gate; full view took 25.5 and 28.1 s, against 28.6 and 31.1 s
+  without it and 29.8 and 28.4 s with previews off. Those memos had already
+  closed most of the join gap, so on the workstation the gate mostly guarantees
+  the order; flight is unchanged (median tick 22 to 27 ms with previews, 9 to
+  10 ms without), which step 3 addresses.
 - **Covered sections.** Waiting preview tasks for sections fully covered by
   sent native columns are cancelled, through `removeRetrievalRequestIf` on
   DH's world generation queue. Cubature's native snapshots supply DH there.
