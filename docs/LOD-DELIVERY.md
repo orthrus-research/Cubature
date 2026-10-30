@@ -290,9 +290,22 @@ parity references), and the golden atlas digests do not change. The first two
 items free the native view as much as the preview.
 
 1. **Hydrology off the shared pool, without parking.**
-   - **Plans before the scan.** Before `Drainage.build` scans a continent,
-     build the `Hydro` plans it will read, one task per plan, so no scan task
-     waits on another's plan.
+   - **Plans before the scan** (done in Riven). Before `Drainage.build` scans
+     a continent, Riven builds the `Hydro` plans under its land, one task per
+     plan, so no scan task waits on another's plan. Riven's
+     `RegionalCacheProbe` (12 dispersed players, cold pass) measured
+     common-pool waits on plans falling from 305 s to 12 s at 8 km and from
+     438 s to 6 s at 32 km. At 8 km the common pool kept its 31 threads
+     instead of growing to 53.
+   - **A plan memo sized to the world** (done in Riven). The plan memo grows
+     with the layout scale squared: 512 plans at 8 km and 8,192 at 32 km,
+     where 12 dispersed players read 726. At 32 km, plans rebuilt on
+     repeated demand fell from 89 to 0.
+   - **Single builds publish before release** (done in Riven). A miss that
+     raced a finishing build no longer builds the key again.
+   - **What remains on the common pool:** drainage networks that
+     `Drainage.prepare` builds in parallel, 49 s at 8 km and 86 s at 32 km.
+     The bounded pool below covers them.
    - **A bounded pool.** Run Riven's in-build parallelism on an executor sized
      from `P` and supplied by Cubature, or on the calling worker, never the
      JVM's common pool.
