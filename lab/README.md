@@ -35,6 +35,14 @@ python -B -m unittest discover -s tools -p "test_*.py"
 | `jfr/` | JFR settings for generation, reload and tail-latency recordings |
 | `profiles/`, `runtime.properties` | Client renderer profiles and the pinned runtime the lab launches |
 
+`-Dcubiclab.lodTrace=<directory>` (no spaces) streams Distant Horizons LOD stage events from JVM
+start until exit to `lod-client.csv` or `lod-server.csv` there, with a `lod-<side>.json` summary
+rewritten every second (`LabLodTrace`). Its Mixins (`MixinLod*`, `cubiclab.lod.mixins.json`) are
+independently authored read-only observers: they inject at the head or return of DH 3.3.3 methods
+and lambdas by exact name, read fields by reflection and attach completion callbacks, and change no
+result. Every injection is required, so another DH version needs a fresh review. Without a workload
+the rest of the lab stays idle, so a traced instance can be played normally.
+
 Some probes live in Cubature's own packages (`core.server`, `core.server.chunkio`) so they can call
 package-private members such as `CubeProviderServer.tryUnloadCube` and `cubesIterator`, as unit tests
 in the same package do. They are tests: Cubature keeps those members package-private rather than

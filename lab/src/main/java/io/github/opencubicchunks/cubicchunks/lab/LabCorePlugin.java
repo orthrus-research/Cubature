@@ -17,6 +17,7 @@ public final class LabCorePlugin implements IFMLLoadingPlugin {
         boolean renderDiagnostics = Boolean.getBoolean("cubiclab.renderDiagnostics");
         boolean delivery = Boolean.getBoolean("cubiclab.deliveryTrace");
         if (delivery) Mixins.addConfiguration("cubiclab.delivery.mixins.json");
+        if (!System.getProperty("cubiclab.lodTrace", "").isEmpty()) Mixins.addConfiguration("cubiclab.lod.mixins.json");
         boolean renderReady = Boolean.getBoolean("cubiclab.fullViewRenderReady") || delivery;
         if (renderDiagnostics || renderReady) Mixins.addConfiguration("cubiclab.render-task.mixins.json");
         if (renderReady) Mixins.addConfiguration("cubiclab.render-ready.mixins.json");

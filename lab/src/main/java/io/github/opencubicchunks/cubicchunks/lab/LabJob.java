@@ -136,7 +136,7 @@ final class LabJob {
             controlSent = true;
         }
         if (!ready.containsAll(peers)) return;
-        if (started == 0) { LabStorageTrace.start(); LabDeliveryTrace.begin(); captureStartLoadedCubes=provider.getLoadedCubeCount();started = System.nanoTime(); startUtc = Instant.now().toString(); gcStart = LabData.gc(); threadCosts = new LabThreadCosts(); LabHooks.serverPackets = packets; }
+        if (started == 0) { LabStorageTrace.start(); LabDeliveryTrace.begin(); LabLodTrace.mark("lab-start");captureStartLoadedCubes=provider.getLoadedCubeCount();started = System.nanoTime(); startUtc = Instant.now().toString(); gcStart = LabData.gc(); threadCosts = new LabThreadCosts(); LabHooks.serverPackets = packets; }
         elapsedTicks++;
         switch (scenario) {
             case "spectator-flight":case "lifecycle-settle":case "lifecycle-save-purge":
@@ -339,6 +339,7 @@ final class LabJob {
         long[] gcEnd = LabData.gc();
         Map<String, Object> data = new LinkedHashMap<>();
         if(LabDeliveryTrace.ENABLED)data.put("deliveryTrace",LabDeliveryTrace.finish(output));
+        if(started!=0)LabLodTrace.mark("lab-finish");
         if (threadCosts != null) data.put("threadCosts", threadCosts.finish());
         data.put("schema", "cubiclab.server.v1"); data.put("runId", id); data.put("scenario", scenario);
         if(benchmark.identity!=null){data.put("benchmarkWorkload",benchmark.identity);data.put("fixtureDefinition",benchmark.data.get("fixture"));}

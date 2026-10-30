@@ -28,6 +28,7 @@ public final class CubicLab {
         Network.initialize(); MinecraftForge.EVENT_BUS.register(this); proxy.initialize();
         LabStorageContent.initialize();MinecraftForge.EVENT_BUS.register(new LabStorageContent());
         LabHooks.installDiagnostics();
+        LabLodTrace.mark("trace-start");
     }
     @Mod.EventHandler public void serverStarting(FMLServerStartingEvent event) { event.registerServerCommand(new LabCommand()); }
     @Mod.EventHandler public void stopping(FMLServerStoppingEvent event) {

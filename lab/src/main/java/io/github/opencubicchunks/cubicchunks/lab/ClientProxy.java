@@ -21,6 +21,7 @@ public final class ClientProxy extends CommonProxy {
     private LabOverlayProbe overlays;
     private long pendingAt;
     private int pendingOverlayTicks;
+    private long lodTicks;
     private String last = "Ready: /cubiclab run vertical";
     private String lastScreen;
     public void initialize() { overlays=new LabOverlayProbe();MinecraftForge.EVENT_BUS.register(this); }
@@ -39,6 +40,9 @@ public final class ClientProxy extends CommonProxy {
         Minecraft mc = Minecraft.getMinecraft();
         if (event.phase == TickEvent.Phase.END && mc.world != null && mc.player != null) {
             overlays.observe(mc);
+            // Twice a second: block position and yaw, so a free flight's sections can be placed against the camera.
+            if (LabLodTrace.ENABLED && lodTicks++ % 10 == 0)
+                LabLodTrace.event("player", 0, (long) Math.floor(mc.player.posX), (long) Math.floor(mc.player.posY), (long) Math.floor(mc.player.posZ), (long) mc.player.rotationYaw);
             String screen = mc.currentScreen == null ? "none" : mc.currentScreen.getClass().getName();
             if (!screen.equals(lastScreen)) { lastScreen = screen; System.out.println("CUBICLAB_CLIENT_VIEW screen=" + screen); }
         }
@@ -48,6 +52,7 @@ public final class ClientProxy extends CommonProxy {
             active = new Capture(pending,pendingBenchmark,pendingOverlayTicks,System.nanoTime()-pendingAt); pending = null; LabHooks.clientPackets = active.packets;
             LabRenderDiagnostics.beginCapture(active.id);
             LabDeliveryTrace.begin();
+            LabLodTrace.mark("lab-start");
             Network.CHANNEL.sendToServer(new Network.ServerMessage(CubicLab.control("ready", active.id, active.scenario)));
         }
         if (active == null) return;
@@ -96,6 +101,7 @@ public final class ClientProxy extends CommonProxy {
     }
     private void finish() {
         Minecraft mc = Minecraft.getMinecraft(); Capture capture = active; active = null; LabHooks.clientPackets = null;
+        LabLodTrace.mark("lab-finish");
         long finished=System.nanoTime();String finishedUtc=Instant.now().toString();
         if(capture.fullView!=null)capture.fullView.close();
         Map<String, Object> rendererDiagnostics = LabRenderDiagnostics.finishCapture();
