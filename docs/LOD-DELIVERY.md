@@ -303,15 +303,22 @@ items free the native view as much as the preview.
      repeated demand fell from 89 to 0.
    - **Single builds publish before release** (done in Riven). A miss that
      raced a finishing build no longer builds the key again.
-   - **What remains on the common pool:** drainage networks that
-     `Drainage.prepare` builds in parallel, 49 s at 8 km and 86 s at 32 km.
-     The bounded pool below covers them.
-   - **A bounded pool** (decided 2026-10-30, Riven `docs/DECISIONS.md`). Run
-     Riven's in-build parallelism on an executor that Cubature supplies, sized
-     from `P` inside the worker budget, never the JVM's common pool. Running it
-     on the calling worker was measured and rejected: with the common pool
-     shrunk to 0, 32 km network builds took 13.1 s on average (41 s at worst)
-     against 4.7 s, and workers waited 186 s on them against 70 s.
+   - **A bounded pool** (done). Each world offers its generator a build pool
+     through `ICubeGenerator.useBuildPool` (`generatorBuildThreads`, a quarter
+     of the processors, 1 to 4, at most twice that while tasks block), and
+     Riven runs every in-build loop there, never the JVM's common pool.
+     Running on the calling worker alone was measured and rejected: 32 km
+     network builds took 13.1 s on average (41 s at worst) against 4.7 s.
+     - **Offline,** with 12 players: common-pool waits fell to zero at both
+       sizes, and network builds averaged 1.15 s at 8 km and 4.8 s at 32 km.
+     - **On the land route:**
+       - full view 30.4 s against 28.7 and 28.8 s;
+       - tick p95 62.5 ms in the full view and 45.7 ms in flight,
+         against 70 to 71 and 47 to 50 ms;
+       - flight tick median 22.8 ms against 18 to 20 ms;
+       - DH paused generation in 51% of samples against 57%.
+     - **Trade-off:** tails improved, while first-touch work slowed with 4
+       threads instead of 31. Step 2 item 2 is what recovers that time.
    - **Target:** no common-pool bursts, and no 50 ms ticks in the seconds that
      had them.
 2. **Regional plans before a worker needs them.** Today, plans that block
