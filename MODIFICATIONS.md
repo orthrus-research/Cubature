@@ -29,6 +29,10 @@ whether delivery still holds a cube) and `SurfaceHeightListener` (column heights
 map implements; `TestLayerBoundary` keeps it so. A teleport that leaves the player where they are
 (vanilla re-sending an unconfirmed teleport, or correcting a rejected move) no longer cancels a held
 teleport; before, one arriving during a hold dropped it and left the player where they stood.
+On October 30, 2026, `ICubeGenerator` gained a default `useBuildPool`: each world opens a
+ForkJoin build pool (`generatorBuildThreads`, by default a quarter of the processors, 1 to 4)
+and offers it to its generator for the generator's own parallel work, then withdraws it when the
+world closes, so that work stays inside the worker budget instead of the JVM's common pool.
 The Cubature name and license packaging were adopted on October 19, 2026;
 that change added no terrain or scheduling algorithm.
 

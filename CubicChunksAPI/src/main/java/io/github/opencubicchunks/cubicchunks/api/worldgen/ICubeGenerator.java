@@ -26,6 +26,7 @@ package io.github.opencubicchunks.cubicchunks.api.worldgen;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ForkJoinPool;
 
 import javax.annotation.Nullable;
 import javax.annotation.ParametersAreNonnullByDefault;
@@ -137,6 +138,18 @@ public interface ICubeGenerator {
      * @param columnZ Z coordinate of the column
      */
     default void prepareColumn(int columnX, int columnZ) {
+    }
+
+    /**
+     * Offers a bounded pool for the generator's own parallel work, such as regional plans split across threads, so
+     * that work stays inside the server's worker budget instead of the JVM's common pool. The server calls it before
+     * the world generates, and with null when the world closes; the server sizes and stops the pool, so the generator
+     * must not shut it down. Like {@link #prepareColumn}, the pool may change only when work finishes, never what
+     * generation produces, and a generator must still work without one. The default ignores it.
+     *
+     * @param pool the world's build pool, or null when there is none or it is closing
+     */
+    default void useBuildPool(@Nullable ForkJoinPool pool) {
     }
 
     /**

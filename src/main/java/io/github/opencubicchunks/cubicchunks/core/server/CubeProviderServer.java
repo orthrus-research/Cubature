@@ -25,6 +25,7 @@
 package io.github.opencubicchunks.cubicchunks.core.server;
 
 import io.github.opencubicchunks.cubicchunks.core.server.delivery.ConcurrentGeneration;
+import io.github.opencubicchunks.cubicchunks.core.server.delivery.GeneratorBuildPool;
 import io.github.opencubicchunks.cubicchunks.core.server.delivery.MaintenanceState;
 import io.github.opencubicchunks.cubicchunks.core.server.delivery.PeriodicAutosave;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
@@ -108,6 +109,7 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
     @Nonnull private final CubePrimer cubePrimer;
     @Nonnull private final ICubeGenerator cubeGen;
     @Nullable private final ConcurrentGeneration concurrentGeneration;
+    @Nonnull private final GeneratorBuildPool buildPool;
     @Nonnull private final Profiler profiler;
     // some mods will try to access blocks in ChunkDataEvent.Load
     // this needs the column to be already known by the chunk provider so that it can load cubes without trying to load the column again
@@ -123,6 +125,8 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
         this.deliveryMode = deliveryMode;
         this.maintenance = deliveryMode.incremental() ? new MaintenanceState(deliveryMode.continuousSave()) : null;
         this.autosave = new PeriodicAutosave(this, maintenance);
+        // The build pool first, so the generator holds it before any cube generates.
+        this.buildPool = GeneratorBuildPool.open(cubeGen, "dimension " + worldServer.provider.getDimension());
         this.concurrentGeneration = ConcurrentGeneration.create(cubeGen, "dimension " + worldServer.provider.getDimension());
         this.worldServer = worldServer;
         this.profiler = worldServer.profiler;
@@ -756,7 +760,11 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
 
     boolean concurrentGenerationSaturated() { return concurrentGeneration != null && concurrentGeneration.saturated(); }
 
-    public void closeConcurrentGeneration() { if (concurrentGeneration != null) concurrentGeneration.close(); }
+    /** Stops the generation workers, then withdraws and stops the build pool their work may use. */
+    public void closeConcurrentGeneration() {
+        if (concurrentGeneration != null) concurrentGeneration.close();
+        buildPool.close();
+    }
 
     private ICubeGenerator.GeneratorReadyState pollCube(int cubeX, int cubeY, int cubeZ, Timing timing) {
         return concurrentGeneration == null ? cubeGen.pollAsyncCubeGenerator(cubeX, cubeY, cubeZ)
