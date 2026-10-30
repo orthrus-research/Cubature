@@ -32,6 +32,39 @@ public class TestLabLodTrace {
         assertEquals(-1,LabLodTrace.outcome(null,new IllegalStateException()));
     }
 
+    /** The enabled path builds INSTANCE during class initialization; every static it reads must exist by then. */
+    @Test public void initializesWhenEnabled() throws Exception {
+        Path dir=Files.createTempDirectory("lod-trace-enabled");
+        String prefix=LabLodTrace.class.getName();
+        ClassLoader isolated=new ClassLoader(getClass().getClassLoader()) {
+            @Override protected Class<?> loadClass(String name,boolean resolve) throws ClassNotFoundException {
+                if(!name.startsWith(prefix))return super.loadClass(name,resolve);
+                synchronized(getClassLoadingLock(name)) {
+                    Class<?> loaded=findLoadedClass(name);
+                    if(loaded!=null)return loaded;
+                    try(java.io.InputStream in=getParent().getResourceAsStream(name.replace('.','/')+".class")) {
+                        if(in==null)throw new ClassNotFoundException(name);
+                        java.io.ByteArrayOutputStream bytes=new java.io.ByteArrayOutputStream();
+                        byte[] buffer=new byte[8192];for(int n;(n=in.read(buffer))>0;)bytes.write(buffer,0,n);
+                        return defineClass(name,bytes.toByteArray(),0,bytes.size());
+                    } catch(java.io.IOException e) { throw new ClassNotFoundException(name,e); }
+                }
+            }
+        };
+        String previous=System.getProperty(LabLodTrace.PROPERTY);
+        System.setProperty(LabLodTrace.PROPERTY,dir.toString());
+        try {
+            Class<?> type=Class.forName(prefix,true,isolated);
+            type.getMethod("mark",String.class).invoke(null,"trace-start");
+            assertTrue((Boolean)type.getField("ENABLED").get(null));
+            try(DirectoryStream<Path> files=Files.newDirectoryStream(dir,"lod-*.json")) {
+                assertTrue(files.iterator().hasNext());
+            }
+        } finally {
+            if(previous==null)System.clearProperty(LabLodTrace.PROPERTY);else System.setProperty(LabLodTrace.PROPERTY,previous);
+        }
+    }
+
     @Test public void streamsRowsAndKeepsASummaryCurrent() throws Exception {
         Path dir=Files.createTempDirectory("lod-trace");
         LabLodTrace trace=new LabLodTrace(dir,"test");

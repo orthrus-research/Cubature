@@ -38,11 +38,29 @@ public final class CubicLab {
     }
     @SubscribeEvent public void tick(TickEvent.ServerTickEvent event) {
         if (event.phase == TickEvent.Phase.START) { tickStarted = System.nanoTime(); return; }
+        if (LabLodTrace.ENABLED) traceTick();
         if(pregenerator!=null){try{pregenerator.tick();if(pregenerator.done)pregenerator=null;}catch(Exception e){pregenerator.message("CUBICLAB_PREGEN_RESULT id="+pregenerator.id+" FAIL "+e);pregenerator=null;}return;}
         LabJob job = active;
         if (job == null) return;
         try { job.tick(); } catch (Exception failure) { job.failure = failure.toString(); job.done = true; }
         if (job.started != 0) job.ticks.add(System.nanoTime() - tickStarted);
+    }
+    private int tracedTicks;
+    /**
+     * Each tick's event-to-event span, and once a second DH's own health inputs from the server's
+     * last 100 tick times: a average and b 99th-percentile microseconds, c 1 when DH counts it healthy
+     * (average under 25 ms and 99th percentile under 50 ms), which is when DH lets generation run.
+     */
+    private void traceTick() {
+        LabLodTrace.event("server-tick", 0, System.nanoTime() - tickStarted);
+        if (++tracedTicks % 20 != 0) return;
+        MinecraftServer server = net.minecraftforge.fml.common.FMLCommonHandler.instance().getMinecraftServerInstance();
+        if (server == null) return;
+        long[] sorted = server.tickTimeArray.clone();
+        Arrays.sort(sorted);
+        long p99 = sorted[Math.max(0, (int) Math.ceil(0.99 * sorted.length) - 1)];
+        double average = Arrays.stream(sorted).average().orElse(0);
+        LabLodTrace.event("dh-health", 0, (long) (average / 1000), p99 / 1000, average < 25e6 && p99 < 50e6 ? 1 : 0, 0);
     }
     /** The ordinary lab timer encloses the actual server tick, including every tick event callback. */
     public static Object serverTickObserver(){return active;}

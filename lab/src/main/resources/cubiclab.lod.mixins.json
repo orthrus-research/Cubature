@@ -3,7 +3,7 @@
   "minVersion": "0.8",
   "package": "io.github.opencubicchunks.cubicchunks.lab.mixin",
   "compatibilityLevel": "JAVA_8",
-  "mixins": ["MixinLodRetrieval", "MixinLodGenerationQueue", "MixinLodRequestHandler", "MixinLodPayload", "MixinLodResponse", "MixinLodPreview"],
+  "mixins": ["MixinLodRetrieval", "MixinLodGenerationQueue", "MixinLodRequestHandler", "MixinLodPayload", "MixinLodResponse", "MixinLodPreview", "MixinLodThreadPools"],
   "client": ["MixinLodSection", "MixinLodQuadTree", "MixinLodNetworkQueue", "MixinLodRequestMessage"],
   "injectors": {"defaultRequire": 1}
 }

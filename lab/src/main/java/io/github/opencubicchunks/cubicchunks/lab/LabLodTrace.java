@@ -24,6 +24,9 @@ public final class LabLodTrace {
     public static final boolean ENABLED = !System.getProperty(PROPERTY, "").isEmpty();
     static final int CAPACITY = 1 << 18;
     static final long MAX_EVENTS = 50_000_000L;
+    /** DH's shared executors, by the pos value their pool rows carry. Declared before INSTANCE, which reads it. */
+    static final String[] POOLS = {"getWorldGenExecutor","getChunkToLodBuilderExecutor","getFileHandlerExecutor",
+        "getNetworkCompressionExecutor","getUpdatePropagatorExecutor","getRenderLoadingExecutor"};
     private static final LabLodTrace INSTANCE = ENABLED ? new LabLodTrace(Paths.get(System.getProperty(PROPERTY)), side()) : null;
 
     final String side;
@@ -37,7 +40,8 @@ public final class LabLodTrace {
     private final Thread writerThread;
     private BufferedWriter writer;
     private long written;
-    private boolean capped, closed;
+    private boolean capped;
+    private volatile boolean closed;
     private String failure;
 
     static final class Row {
@@ -57,6 +61,8 @@ public final class LabLodTrace {
         writeSummary();
         writerThread=new Thread(this::drainLoop,"Cubic lab LOD trace writer");
         writerThread.setDaemon(true);writerThread.start();
+        Thread sampler=new Thread(this::sampleLoop,"Cubic lab LOD pool sampler");
+        sampler.setDaemon(true);sampler.start();
         Runtime.getRuntime().addShutdownHook(new Thread(this::close,"Cubic lab LOD trace close"));
     }
 
@@ -122,6 +128,31 @@ public final class LabLodTrace {
         return name.equals("SUCCESS")?1:name.equals("REQUIRES_SPLITTING")?2:3;
     }
 
+    // ===== DH executor sampler =====
+    private static volatile boolean pools;
+    /** Set by MixinLodThreadPools once DH has built its executors, cleared as it tears them down. */
+    public static void poolsReady(boolean ready) { pools=ready; }
+
+    /** Four times a second while DH's executors exist: one pool row per executor. */
+    private void sampleLoop() {
+        Class<?> util=null;
+        while(!closed) {
+            try {
+                Thread.sleep(250);
+                if(!pools)continue;
+                if(util==null)util=Class.forName("com.seibel.distanthorizons.core.util.threading.ThreadPoolUtil",true,LabLodTrace.class.getClassLoader());
+                for(int i=0;i<POOLS.length;i++) {
+                    Object executor=util.getMethod(POOLS[i]).invoke(null);
+                    if(executor==null)continue;
+                    add("pool",i,number(executor,"getQueueSize"),number(executor,"getRunningTaskCount"),
+                        Boolean.TRUE.equals(call(executor,"canRun"))?1:0,number(executor,"getCompletedTaskCount"));
+                }
+            } catch(InterruptedException e) { return; }
+            catch(ReflectiveOperationException|RuntimeException e) { failure="pool sampler: "+e; return; }
+        }
+    }
+    private static long number(Object owner,String method) { Object v=call(owner,method);return v instanceof Number?((Number)v).longValue():-1; }
+
     // ===== writer =====
     private void drainLoop() {
         List<Row> batch=new ArrayList<>(8192);long lastFlush=System.nanoTime();
@@ -152,9 +183,14 @@ public final class LabLodTrace {
         try { writer.flush(); } catch(IOException e) { fail(e); }
         writeSummary();
     }
-    synchronized void close() {
-        if(closed)return;
+    void close() {
+        // The writer finishes the batch it holds before it sees the interrupt; only then drain the rest.
         writerThread.interrupt();
+        try { writerThread.join(5000); } catch(InterruptedException e) { Thread.currentThread().interrupt(); }
+        finish();
+    }
+    private synchronized void finish() {
+        if(closed)return;
         List<Row> rest=new ArrayList<>();queue.drainTo(rest);write(rest);
         try { if(writer!=null)writer.close(); } catch(IOException e) { fail(e); }
         closed=true;writeSummary();
@@ -170,7 +206,9 @@ public final class LabLodTrace {
         if(failure!=null)out.put("failure",failure);
         out.put("scope","Diagnostic DH LOD stage events. Times are this JVM's monotonic clock from originMonotonicNanos; "
             +"client and server align only through originEpochMicros (wall clock, same machine). "
-            +"pos is DH's packed section position (detail, x, z also decoded); a-d are per-operation values.");
+            +"pos is DH's packed section position (detail, x, z also decoded); a-d are per-operation values. "
+            +"pool rows: pos is the executor index into pools, a queued, b running, c 1 when DH lets it run, d completed.");
+        out.put("pools",Arrays.asList(POOLS));
         Path temporary=json.resolveSibling(json.getFileName()+".tmp");
         try {
             Files.write(temporary,new GsonBuilder().setPrettyPrinting().create().toJson(out).getBytes(StandardCharsets.UTF_8));
