@@ -49,6 +49,20 @@ final class LabPreparationView {
             }
         }
     }
+    /** Each participant still away: where the server has it, whether Cubature still holds its teleport, and the cubes its client last reported. */
+    private String away(LabJob job) {
+        io.github.opencubicchunks.cubicchunks.core.server.delivery.DeferredArrivals arrivals=((PlayerCubeMap)job.world.getPlayerChunkMap()).arrivals();
+        StringBuilder s=new StringBuilder();
+        for(UUID id:clients.keySet()) {
+            EntityPlayerMP p=job.server.getPlayerList().getPlayerByUUID(id);
+            if(p==null||arrived.contains(id))continue;
+            if(s.length()>0)s.append("; ");
+            s.append(String.format("%s at (%.2f, %.2f, %.2f) yaw %.1f pitch %.1f, %s, teleport %s, client cubes %d",
+                    p.getName(),p.posX,p.posY,p.posZ,p.rotationYaw,p.rotationPitch,p.interactionManager.getGameType(),
+                    arrivals.holds(id)?"still held":"not held",clients.get(id)));
+        }
+        return s.toString();
+    }
     boolean tick(LabJob job) {
         if(!rendererFailures.isEmpty())throw new IllegalStateException("Full-view renderer qualification failed: "+rendererFailures);
         // Cubature holds a teleport into an unprepared column until its workers prepare it: wait for
@@ -67,7 +81,7 @@ final class LabPreparationView {
             // Cubature completes a held teleport within TIMEOUT_TICKS: a participant still away 200 ticks
             // later lost its teleport, so fail now, naming that, instead of at the full-view timeout.
             long waited=job.elapsedTicks-teleportTick, limit=io.github.opencubicchunks.cubicchunks.core.server.delivery.DeferredArrivals.TIMEOUT_TICKS+200;
-            if(waited>limit)throw new IllegalStateException("Full-view participant did not arrive within "+limit+" ticks of its teleport; Cubature completes a held teleport within "+(limit-200)+" ticks, so the teleport was lost");
+            if(waited>limit)throw new IllegalStateException("Full-view participant did not arrive within "+limit+" ticks of its teleport; Cubature completes a held teleport within "+(limit-200)+" ticks, so the teleport was lost ("+away(job)+")");
             if(System.nanoTime()-start>job.fullViewTimeoutSeconds*1000000000L)throw new IllegalStateException("Full-view participant did not arrive within " + job.fullViewTimeoutSeconds + " seconds");
             return false;
         }

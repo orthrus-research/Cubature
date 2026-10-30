@@ -2,6 +2,7 @@ package io.github.opencubicchunks.cubicchunks.core.server.delivery;
 
 import static io.github.opencubicchunks.cubicchunks.api.util.Coords.blockToCube;
 
+import io.github.opencubicchunks.cubicchunks.core.CubicChunks;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.network.play.server.SPacketPlayerPosLook;
 import net.minecraft.util.math.MathHelper;
@@ -13,6 +14,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Teleports held while generation workers prepare their destination column. A teleport
@@ -104,15 +106,33 @@ public final class DeferredArrivals {
                 pitch + (relative.contains(SPacketPlayerPosLook.EnumFlags.X_ROT) ? rotationPitch : 0),
                 now);
         if (readiness.ready(arrival.columnX, arrival.columnZ)) {
-            if (!arrival.at(posX, posY, posZ)) arrivals.remove(player);
+            if (!arrival.at(posX, posY, posZ)) {
+                Arrival held = arrivals.remove(player);
+                if (held != null) replaced(player, held, arrival);
+            }
             return false;
         }
-        arrivals.put(player, arrival);
+        Arrival held = arrivals.put(player, arrival);
+        if (held != null) replaced(player, held, arrival);
         return true;
     }
 
+    /**
+     * A held teleport that will never complete is logged with the calls that replaced it, so a lost
+     * teleport can be traced to its caller.
+     */
+    private static void replaced(UUID player, Arrival held, Arrival by) {
+        String callers = StackWalker.getInstance().walk(frames -> frames
+                .filter(f -> !f.getClassName().equals(DeferredArrivals.class.getName()))
+                .limit(4)
+                .map(f -> f.getClassName().substring(f.getClassName().lastIndexOf('.') + 1) + "." + f.getMethodName())
+                .collect(Collectors.joining(" < ")));
+        CubicChunks.LOGGER.info("Cubature: a teleport of {} to ({}, {}, {}) replaced the one held to ({}, {}, {}), from {}",
+                player, by.x, by.y, by.z, held.x, held.y, held.z, callers);
+    }
+
     /** Whether a teleport of the player is held. */
-    boolean holds(UUID player) {
+    public boolean holds(UUID player) {
         return arrivals.containsKey(player);
     }
 
@@ -138,10 +158,15 @@ public final class DeferredArrivals {
             EntityPlayerMP player = world.getMinecraftServer().getPlayerList().getPlayerByUUID(entry.getKey());
             if (player == null || player.world != world || player.connection == null) {
                 it.remove();
+                CubicChunks.LOGGER.info("Cubature: dropped the teleport of {} held to ({}, {}, {}); the player left this world",
+                        entry.getKey(), a.x, a.y, a.z);
                 continue;
             }
-            if (now - a.since < TIMEOUT_TICKS && !readiness.ready(a.columnX, a.columnZ)) continue;
+            boolean waited = now - a.since >= TIMEOUT_TICKS;
+            if (!waited && !readiness.ready(a.columnX, a.columnZ)) continue;
             it.remove();
+            if (waited) CubicChunks.LOGGER.info("Cubature: completing the teleport of {} to ({}, {}, {}) after {} ticks, its wait run out",
+                    entry.getKey(), a.x, a.y, a.z, now - a.since);
             completing = true;
             try {
                 player.connection.setPlayerLocation(a.x, a.y, a.z, a.yaw, a.pitch, Collections.emptySet());

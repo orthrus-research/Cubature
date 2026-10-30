@@ -507,8 +507,16 @@ Land route on the workstation, traced, two runs per condition:
 - **Native data merge.** Should the nearest-mean merge also apply to native
   data? Today that data stays inflated next to unvisited areas, but switching
   could thin built structures at distance.
-- **The 16-worker failure.** With 16 DH workers the full-view teleport was lost
-  in both attempts, and the cause was never diagnosed.
+- **The lost full-view teleport.** The full-view teleport sometimes never
+  completes: in both attempts with 16 DH workers on 2026-10-29, and once with 8
+  on 2026-10-30, after Riven's generation got faster; the 16 runs since, at 8
+  and 16 workers, all passed. In each traced failure the client stayed at its
+  join position and stopped building native sections about 11 s in, as full
+  view began, while DH data kept arriving, and the server, which sent cubes
+  throughout, never moved the player. Cubature logs a held teleport that ends
+  without completing, and the lab's failure says where the server has the
+  player and whether its teleport is still held; the next failure should show
+  which side loses it.
 - **Integrated servers.** No one-JVM run has been measured yet.
 - **Fast flight.** DH pauses generation while the camera moves fast; the
   owned pool does not.
