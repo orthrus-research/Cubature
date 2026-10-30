@@ -35,29 +35,39 @@ moved, and why.
 ## Evidence
 
 **Setup:**
-- Captures: Riven `ab3-land-base` and `ab3-land-health` (DH's health check
-  ignored), from 2026-10-30.
+- Captures, from 2026-10-30:
+  - Riven `ab3-land-base`, and `ab4-land-base` repeating it;
+  - `ab3-land-health`, with DH's health check ignored;
+  - `ab4-land-native2`, with DH on the client only and no distant generation.
+- Preview survey: `survey-route-20261030b`.
 - Workstation: i9-13900K, 32 logical CPUs.
 - Runtime: Java 26, ZGC with 8 GiB per JVM.
 - DH: 8 workers.
 - Route: the land workload, a 60 s spectator flight at 16 blocks/s.
 - Native view distance: 12 chunks, so 192 blocks and 15,625 view cubes.
-- Repeats: one run per condition.
+- Repeats: the base run twice. The ignored-health and native-only runs once
+  each.
 - Local evidence: Riven `.local/` (lod-reports, cubic-standalone,
   atlas/pop-route-full).
 
 ### Native view
 
-| Measure | Base | Health check ignored |
-|---|---|---|
-| Full view delivered after join | 28.7 s | 66.8 s |
-| Server tick median during that | 31 ms | 47 ms |
-| View cubes missing at the client during flight (mean) | 423 | 436 |
+| Measure | Previews off (native only) | Base (two runs) | Health check ignored |
+|---|---|---|---|
+| Full view delivered after join | 23.8 s | 28.7 s, 28.8 s | 66.8 s |
+| Server tick median during that | 29 ms | 31 ms, 30 ms | 47 ms |
+| Server tick during flight, median / p95 | 5.7 / 33 ms | 18 / 47 ms, 20 / 50 ms | |
+| View cubes missing at the client during flight (mean) | 257 | 423, 406 | 436 |
 
-- **Join is the weak point.** Preview work more than doubled the time to
-  deliver the full native view at join.
-- **Flight keeps up.** In both runs the client trails the leading edge by
-  about one cube slice.
+- **Previews cost the native view.** Even while DH paused them for most of
+  the run, previews added 21% to the join (28.8 s against 23.8 s). In flight
+  they tripled the median tick and left 60% more view cubes missing. With the
+  pause off, join took 2.8 times as long.
+- **The native floor is itself slow at join.** 23.8 s for 15,625 view cubes
+  with no previews at all. In the JFR run, native workers spent 38 s blocked
+  on Riven's regional builds (see "Where the headroom goes" below).
+- **Flight keeps up.** The client trails the leading edge by about one cube
+  slice with previews on, and less without them.
 - **No native priority.** Nothing in Cubature puts native work ahead of
   previews. DH's health pause is the only brake, and it is one by accident.
 
@@ -70,11 +80,14 @@ moved, and why.
 | 8 | 4 | 133 | 590 / 1,007 / 1,809 | 53 s / 107 s |
 | 9 | 8 | 79 | 1,104 / 1,616 / 2,128 | 77 s / 118 s |
 
-Distances are in blocks.
+Distances are in blocks. The repeat run agrees for detail 7 to 9 (medians
+of 25, 51 and 74 s). For detail 6 its median wait was 5.9 s, and 46% of
+arrivals came inside 192 blocks.
 
-- **Full detail arrives too late.** 57% of full-detail tiles arrived after
-  their section was already within 192 blocks, where native cubes take over.
-  That is wasted sampling, and the most expensive kind, with exact trees.
+- **Full detail arrives too late.** 46 to 57% of full-detail tiles arrived
+  after their section was already within 192 blocks, where native cubes take
+  over. That is wasted sampling, and the most expensive kind, with exact
+  trees.
 - **Medium distance arrives last.** The order is sound: DH's client sends the
   nearest waiting request whenever one of its 40 slots frees, and the server
   starts the nearest task. The waits come from throughput.
@@ -94,17 +107,125 @@ Distances are in blocks.
 | Tile sampling, p50 (ms) | 322 | 451 | 330 | 413 | 1,920 |
 | Per column (µs) | 79 | 110 | 80 | 101 | 469 |
 
-Every tile has 4,096 columns, whatever its level.
+Every tile has 4,096 columns, whatever its level. The survey below explains
+the 16-block figure: horizon tiles are the first to touch new regions, and
+they wait for regional builds.
 
-**Fine cells:** two lookups resolve a whole native chunk column (all 256
-columns, with caves and ores) to answer a one-column question:
-- `TreeSites.surface`, 29.7% of sampler time in JFR, for exact trees below
-  4-block cells;
-- `GroundCover.waterBeside`, 10.4%, for canes at cells of 1 or 2 blocks.
+### Full resolution against the atlas (preview survey)
 
-**16-block cells:** neither lookup runs, so the cost there has another cause.
-A 1,024-block tile touches many more region plans and drainage networks than
-a fine one. That is the likely cause, but it is not yet profiled.
+**Method:** a lab job, `cubiclab preview-survey`, ran on a fresh server under
+JFR.
+- It ran Riven's real preview sampler over the atlas window below at 1, 2, 4,
+  8, 16, 32 and 64-block cells.
+- It sampled as Cubature samples DH tiles: one column at each cell's centre,
+  one sampler per 64 x 64-cell tile, coarse cells first.
+- Its records: each cell's top, ground and water tops, the kind of the top
+  run, and each tile's CPU time.
+
+**What the atlas gets right:** ground tops match `TerrainMap` in 99.82% of
+columns, and water tops in all of them. The atlas is a faithful height map
+for terrain and water.
+
+**What appears only at full resolution:**
+- **Trees.** Leaves are the top run in 8.0% of columns, 9 blocks above ground
+  at the median (p95 14, max 21). Plants and snow layers top another 11.9%,
+  at one block.
+- **Cave entrances.** These are `CaveMap`'s sinkholes and rift chasms, which
+  the atlas does not sample. There are 10 openings over 0.13% of columns, 107
+  to 195 blocks deep. The two largest cover 1,620 and 2,308 columns, about 40
+  to 48 blocks across.
+- **Boulders.** 0.05% of columns, 1 to 7 blocks high.
+
+### Shape with trees (preview survey)
+
+Figures are p95, in blocks. "Jump" is how far a cell moves when it refines to
+its children's level.
+
+| Cell | Today vs blocks | Terrain only | Today's jump | Exact centre trees vs blocks / jump | DH max merge of full detail | Nearest-mean merge of full detail |
+|---|---|---|---|---|---|---|
+| 2 | 2 | 1 | 2 | 2 / 2 | 2 | 1 |
+| 4 | 11 | 2 | 11 | 3 / 2 | 7 | 3 |
+| 8 | 11 | 3 | 3 | 6 / 6 | 12 | 6 |
+| 16 | 11 | 6 | 6 | 9 / 9 | 16 | 8 |
+| 32 | 13 | 11 | 10 | 13 / 12 | 25 | 12 |
+| 64 | 20 | 19 | 18 | 20 / 18 | 40 | 19 |
+
+- **Trees dominate coarse error.** At 4- to 16-block cells, coarse error is
+  p95 11 with trees, against 2 to 6 for terrain alone.
+- **The largest jump is 4 to 2 blocks, p95 11.** At 4-block cells and up
+  (`coarseFootprintBlocks` = 4), Riven draws a stand canopy; below, it draws
+  exact trees. Exact trees at the cell's centre column would cut that jump
+  to 2.
+- **The stand canopy overdraws at 4 to 8 blocks.**
+  - At 4-block cells it draws canopy on 61% of cells only 1 to 25% under
+    crowns, and on 2.4% of cells with none.
+  - From 16 blocks it follows the majority: canopy on 87 to 99% of cells more
+    than a quarter covered, and under 7% of cells below that.
+- **A merge change alone is not enough at 4 to 8 blocks.** Today's canopy cells
+  differ from a nearest-mean merge of full detail by p95 10 and 9 blocks. With
+  exact centre trees the difference is 2 and 4.
+
+### Where the headroom goes (survey profile and land JFR)
+
+Survey cost per column, in µs (p50, with p90 where tiles vary):
+
+| Cell | 64 (first tile, cold) | 32 | 16 | 8 | 4 | 2 | 1 |
+|---|---|---|---|---|---|---|---|
+| µs per column | 2,502 | 130 | 48 | 71 | 65 | 103 / 633 | 73 / 210 |
+
+**Regional builds, not coarse columns.**
+- Once an area's regional plans exist, coarse columns cost 48 to 130 µs.
+- The first tile into the area took 11.8 s, of which only 2.6 s was CPU on
+  its own thread. It waited for its continent's drainage network.
+
+**Hydrology blocks on the shared ForkJoin pool.**
+- **How it parks.** `Drainage.build` scans a continent with parallel streams.
+  Each scanned point's `TerrainMap.intent` asks `Hydro.receivingWater`, which
+  needs the 2,048-block `Hydro.plan` the point lies in. One task builds that
+  plan while the others park. In the land run, pool threads spent 972 s
+  parked in `Hydro.plan`, and the pool grew to 63 threads to replace them.
+- **Outside the budget.** The pool's parallelism is P − 1: 31 on the
+  workstation, 15 on an 8-core machine with SMT. Cubature's worker budget does
+  not cover it.
+- **Ticks during bursts.** In the land run the pool held 9% of server CPU
+  samples, in bursts:
+
+  | Common-pool work in that second | Mean tick | Seconds with a tick of 50 ms or more |
+  |---|---|---|
+  | A burst (100+ samples) | 98 ms | 90% |
+  | None | 20 ms | 17% |
+
+  That is the tick that pauses DH's generation.
+- **Blocked workers.** Regional builds also block the workers that need them:
+
+  | Threads | Blocked in total | Longest single wait |
+  |---|---|---|
+  | Cubature native generation | 38 s | 3.3 s |
+  | DH World Gen | 56 s | 2.5 s |
+  | Server thread | 1 s | 537 ms (in `Drainage.prepare`) |
+
+  DH World Gen's waits were mostly cold-terrain eligibility (23 s), drainage
+  (16 s) and hydrology plans (9 s).
+
+**Tree sites at full detail.**
+- **Whole chunk columns.** `NativeColumns.build` is on the stack in 39% of
+  samples at 1-block cells and 70% at 2-block cells, mostly through
+  `TreeSites.surface`. That builds a whole native chunk column (256 columns,
+  with caves at 12 to 23% and ore bodies at 11 to 19%) to read one column's
+  surface. `GroundCover.waterBeside` does the same for canes.
+- **Nested builds.** The crowding check builds the earlier layers' nearby sites
+  first, and 22% of full-detail samples sit inside such a nested build.
+- **No unbounded recursion.** The deepest Riven stacks are about 60 frames, and
+  the other repeated frames in the profile are overloads calling each other.
+
+**Coarse cells build boulders they never draw.** `GroundCover.preview` asks
+`Boulders.at` at every footprint, but `TerrainColumn.preview` leaves boulders
+out from 4-block cells. This costs 63% of samples at 32-block cells, 25% at
+16 and 11% at 8.
+
+**Hash maps degraded to trees.** `HashMap$TreeNode.getTreeNode` takes 9.2% of
+self time at 2-block cells and 5.3% at 1-block cells, through `CaveMap.family`
+and `OreMap.patch`.
 
 ### Shape differentials (offline, terrain only)
 
@@ -141,8 +262,9 @@ Figures are p95, in blocks:
     draws crowns only where stand cover reaches half (`coverThreshold` 0.5).
 - **A nearest-mean merge cuts the shift about threefold.** It keeps the child
   column whose top is nearest the four tops' mean. Its error is close to the
-  centre sample's. It also matches Riven's majority rule for canopy: a cell
-  shows crowns where most of it is under crowns.
+  centre sample's. With trees, its error against the blocks is p95 3 to 19
+  blocks at 4- to 64-block cells, against 7 to 40 for DH's merge (survey
+  table above).
 
 ## Plan
 
@@ -157,10 +279,55 @@ Figures are p95, in blocks:
 - **Covered sections.** Waiting preview tasks for sections fully covered by
   sent native columns are cancelled, through `removeRetrievalRequestIf` on
   DH's world generation queue. Cubature's native snapshots supply DH there.
-- **Measure first.** Capture full-view time and flight coverage with DH
-  generation off on the same route. That gives the native-only floor.
+- **The native-only floor** is measured: 23.8 s at join, with a 5.7 ms median
+  tick in flight (`riven_observe.py capture --dh-visited-only`). The gate's
+  target is to stay within 10% of it.
 
-### 2. Owned pool and governor (Cubature)
+### 2. Riven headroom (Riven)
+
+Each change keeps content identical: preview and native output agree (the
+parity references), and the golden atlas digests do not change. The first two
+items free the native view as much as the preview.
+
+1. **Hydrology off the shared pool, without parking.**
+   - **Plans before the scan.** Before `Drainage.build` scans a continent,
+     build the `Hydro` plans it will read, one task per plan, so no scan task
+     waits on another's plan.
+   - **A bounded pool.** Run Riven's in-build parallelism on an executor sized
+     from `P` and supplied by Cubature, or on the calling worker, never the
+     JVM's common pool.
+   - **Target:** no common-pool bursts, and no 50 ms ticks in the seconds that
+     had them.
+2. **Regional plans before a worker needs them.** Today, plans that block
+   workers for 2 to 3 s are built at first touch. Cubature would ask the
+   generator for the regions ahead of the player's motion, on its own bounded
+   pool. These are pure functions, so only timing changes. This needs a
+   decision: the 2026-10-19 generation constraints rule out a preparation
+   coordinator.
+3. **One-column surface queries.** `TreeSites.surface` and
+   `GroundCover.waterBeside` take 30% and 10% of full-detail time. The survey
+   shows the native surface equals the `TerrainMap` top except at cave
+   openings. So a query needs that top and one column's carving, without ores
+   or the other 255 columns. The survey verifies it over 4.2 million columns.
+4. **The crowding cascade.** Measure what is left after item 3. Crowding needs
+   the earlier layers' valid trunks, which today means their full site
+   builds.
+5. **No boulder lookups at coarse cells.** Skip `Boulders.at` in
+   `GroundCover.preview` from 4-block cells, where boulders are not drawn.
+6. **Hash keys and scratch.** Fix the colliding keys in `CaveMap.family` and
+   `OreMap.patch`. Move the per-column arrays of `TerrainColumn.preview` and
+   `TreeSites.canopy` into the task-confined sampler. On Cubature's side,
+   cache `BlockStateWrapper` per block state in the preview writer.
+7. **Later.** `StrictMath` takes 10 to 20% of sampler time. Replacing it
+   changes terrain, so it needs a new terrain version and its own decision.
+
+**Budget for the 8-core baseline:** two preview workers must supply about
+3 tiles/s for 16 blocks/s flight once step 1 skips covered tiles. That is
+0.6 s or less per tile. In the survey, the p90 per tile is 0.86 s at 1-block
+cells and 2.6 s at 2-block cells, so items 3 and 4 decide whether the
+baseline holds.
+
+### 3. Owned pool and governor (Cubature)
 
 DH's World Gen executor can only be on or off, and its health pause stopped
 previews in 58% of samples. Cubic previews therefore move to a Cubature pool,
@@ -195,7 +362,7 @@ ticks.
 
 `previewThreads = 0` keeps DH's executor, for A/B runs and as a fallback.
 
-### 3. One coarse shape (Cubature, with a Riven check)
+### 4. One coarse shape (Cubature and Riven)
 
 **The merge patch:** an LGPL Mixin on `FullDataSourceV2`'s 2 x 2 merge.
 - **Where it applies:** where all four children are generated previews
@@ -206,47 +373,22 @@ ticks.
   built structures do not vanish at distance. Whether natural terrain in
   visited areas should switch too is an open question.
 
-**The generator** keeps its centre sample. Up to 16-block cells, its error is
-within a block of the cell mean's. A 4 x 4 grid would cut the shift at 32
-and 64 blocks further (p95 5 and 8 instead of 7 and 11). Add it only if the
-shape metric asks for it.
+**The generator:**
+- **Terrain** keeps its centre sample. Up to 16-block cells, its error is
+  within a block of the cell mean's.
+- **Exact trees** at the cell's centre column, instead of the stand canopy,
+  up to 8-block cells at least. Raise `coarseFootprintBlocks` from 4 to 16,
+  then measure the cost: exact trees need tree sites, which item 3 of step 2
+  makes cheaper. Native blocks do not change, but it is a definition value,
+  so its fingerprint changes and it needs fresh instances.
+- **Above that cut-off,** the stand canopy stays, since it already follows the
+  local majority from 16 blocks.
 
-**The shape metric** is a Riven check that runs in CI.
-- It runs the real preview sampler, trees included, at every footprint over a
-  fixed window.
-- It merges children as the patched merge does.
-- It reports the error and shift by cell size.
-- Its first run sets the tree thresholds; the terrain-only table above is the
-  floor.
-
-**Canopy:** compare Riven's stand-canopy cells against merged exact-tree
-cells in that metric. Adjust `coverThreshold` or the canopy band where they
-disagree.
-
-### 4. Cheaper columns (Riven)
-
-Each change keeps preview and native output identical. The parity references
-check that, and the golden atlas digests must not change.
-
-1. **One-column queries.** Replace the whole-chunk lookups in
-   `TreeSites.surface` and `GroundCover.waterBeside`, which take 40.1% of
-   sampler time. Cave carving and ore bodies are already computed per column.
-   Confirm that every step is (unstable blocks, for one) before relying on
-   it.
-2. **Scratch reuse.** Move the per-column arrays of `TerrainColumn.preview` and
-   `TreeSites.canopy` into the task-confined sampler.
-3. **Hash keys.** Fix the colliding keys in `CaveMap.family` and `OreMap.patch`.
-   Cubature caches `BlockStateWrapper` per block state in the preview writer.
-4. **Coarse tiles.** Profile the 16-block-cell cost (469 µs per column) by
-   tile, then make region plans and drainage reusable across a coarse tile
-   if they are the cause.
-5. **Later.** `StrictMath` takes 19.3% of sampler time. Replacing it changes
-   terrain, so it needs a new terrain version and its own decision.
-
-**Budget for the 8-core baseline:** two preview workers must supply about
-3 tiles/s for 16 blocks/s flight once step 1 skips covered tiles. That is
-0.6 s or less per tile. Today, at 1- to 8-block cells, the p50 is 0.32 to
-0.45 s and the p90 0.5 to 2.9 s.
+**The shape metric** is the preview survey: `cubiclab preview-survey` plus
+`survey_compare.py`, moved into the lab and Riven's tools. It runs the real
+sampler at every footprint, trees included, merges as the patched merge does,
+and reports error, jump and shift by cell size. A 4 x 4 grid for terrain is
+added only if the metric asks for it at 32 and 64 blocks.
 
 ### 5. Refine before the player arrives (Cubature)
 
@@ -275,21 +417,28 @@ Land route on the workstation, traced, two runs per condition:
 
 | Goal | Today | Target |
 |---|---|---|
-| Native full view at join, previews on, relative to previews off | (to measure) | within 10% |
-| View cubes missing at the client during flight (mean) | 423 | 423 or fewer |
-| Full-detail tiles arriving inside the native view | 57% | under 10% |
-| Wanted to arrival, p50, detail 6 / 7 / 8 | 9.6 / 25 / 53 s | 3 / 7 / 20 s or less |
-| Shape metric, terrain shift p95 at 16-block cells | 11 blocks | 4 or less |
-| Shape metric, with trees | (first run) | set from the first run |
+| Native full view at join, previews off | 23.8 s | shorter, after step 2 items 1 and 2 |
+| Native full view at join, previews on, relative to previews off | +21% (28.8 s) | within 10% |
+| Server tick median during flight, previews on | 18 to 20 ms (5.7 ms off) | 10 ms or less |
+| View cubes missing at the client during flight (mean) | 406 to 423 (257 off) | 300 or fewer |
+| Full-detail tiles arriving inside the native view | 46 to 57% | under 10% |
+| Wanted to arrival, p50, detail 6 / 7 / 8 | 6 to 10 / 25 / 51 to 53 s | 3 / 7 / 20 s or less |
+| Coarse error with trees, p95 at 4 / 8 / 16-block cells | 11 / 11 / 11 blocks | 3 / 6 / 9 or less |
+| Refinement jump from 4 to 2 blocks, p95 | 11 blocks | 3 or less |
+| Parent shift when full detail arrives, terrain, p95 at 16-block cells | 11 blocks | 4 or less |
+| Seconds with common-pool bursts (100+ samples) | 11 in the land run | none |
+| Worker time blocked on regional builds | 38 s native, 56 s DH | under 5 s each |
 | Server tick during flight | median 15 ms, p90 41 ms | median 20 ms or less, p90 45 ms or less |
 
 ## Phases
 
-1. **Measure:** the native-only floor and the shape metric with trees.
-2. **Native first, pool and governor:** steps 1 and 2.
-3. **One coarse shape:** step 3, the merge patch and canopy check, gated by the
-   shape metric.
-4. **Cheaper columns:** step 4, one change at a time.
+1. **Native first and hydrology:** step 1, and items 1 and 2 of step 2. Both
+   take load off the native view.
+2. **Owned pool and governor:** step 3.
+3. **Cheaper columns:** items 3 to 6 of step 2, one change at a time, each
+   checked by the survey.
+4. **One coarse shape:** step 4, the merge patch and exact centre trees, gated
+   by the survey.
 5. **Arrival ordering:** step 5.
 6. **DH pool sizing and integrated servers:** step 6.
 
@@ -300,6 +449,11 @@ Land route on the workstation, traced, two runs per condition:
 - **DH's merge rule.** Changing it alters how DH reduces generated data
   everywhere. It needs its own entry, and a second one if it later covers
   native data.
+- **Riven's parallelism.** Riven's in-build parallelism would run on an
+  executor that Cubature supplies, inside the worker budget.
+- **Regional plans ahead of the player.** This relaxes the 2026-10-19 "no
+  preparation coordinator" constraint, for pure regional plans on Cubature's
+  bounded pool.
 - **DISTANT-HORIZONS.md.** It says the adapter creates no worker pool and that
   DH owns admission. Cubature would own how many previews run, in what order,
   and how generated data merges. DH keeps its request limits, propagation,
@@ -307,8 +461,11 @@ Land route on the workstation, traced, two runs per condition:
 
 ## Open questions
 
-- **Trees.** Only terrain is measured offline. The shape metric's first run
-  answers how much trees add.
+- **Exact trees at coarse cells.** What do exact centre-column trees cost at
+  4- to 16-block cells once surface queries are one column?
+- **Cave entrances at distance.** Sinkholes and chasms 40 to 48 blocks wide
+  appear only where a coarse centre sample falls inside one. Should coarse
+  cells show an entrance that covers most of their footprint?
 - **Native data merge.** Should the nearest-mean merge also apply to native
   data? Today that data stays inflated next to unvisited areas, but switching
   could thin built structures at distance.
@@ -339,7 +496,15 @@ an owned pool and judged success by tiles per second. Critique:
   a quarter of the workstation's capacity. Demand must fall instead: skip
   tiles the native view will cover, and make columns cheaper.
 - **It missed coarse-cell cost.** Its Riven work targeted fine-detail trees
-  only. Coarse cells cost 469 µs per column, for a reason not yet profiled.
+  only. The coarse cost turned out to be cold regional builds.
 
-The pool, governor, sizing and DH admission patches carry over as step 2,
+The pool, governor, sizing and DH admission patches carry over as step 3,
 with the native gate as the governor's first input.
+
+**Second revision.** The preview survey measured trees and profiled the cost.
+- **Trees dominate coarse error.** They, not terrain, set the coarse error, and
+  the stand canopy's switch to exact trees is the largest jump.
+- **Hydrology is the biggest headroom loss.** It blocks on the shared ForkJoin
+  pool, which lines up with the 50 ms ticks, and it stalls native workers.
+- **The plan changed to match.** It gained step 2, Riven headroom, and exact
+  centre trees in step 4.
