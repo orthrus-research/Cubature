@@ -106,7 +106,8 @@ public class CubicChunksConfig {
     @Config.RangeInt(min = -1, max = 32)
     @Config.RequiresWorldRestart
     @Config.Comment("Target threads of each world's build pool, which a generator may use for its own parallel work "
-            + "(ICubeGenerator.useBuildPool; Riven builds regional plans on it) instead of the JVM's common pool. "
+            + "(ICubeGenerator.useBuildPool; Riven builds regional plans on it) instead of the JVM's common pool. A thread "
+            + "blocked on a join is replaced up to twice this count; past that, blocked work waits. "
             + "-1: a quarter of the processors, 1 to 4; 0: no pool, so that work runs on the calling thread.")
     public static int generatorBuildThreads = -1;
 

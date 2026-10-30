@@ -30,9 +30,10 @@ map implements; `TestLayerBoundary` keeps it so. A teleport that leaves the play
 (vanilla re-sending an unconfirmed teleport, or correcting a rejected move) no longer cancels a held
 teleport; before, one arriving during a hold dropped it and left the player where they stood.
 On October 30, 2026, `ICubeGenerator` gained a default `useBuildPool`: each world opens a
-ForkJoin build pool (`generatorBuildThreads`, by default a quarter of the processors, 1 to 4)
-and offers it to its generator for the generator's own parallel work, then withdraws it when the
-world closes, so that work stays inside the worker budget instead of the JVM's common pool.
+ForkJoin build pool (`generatorBuildThreads`, by default a quarter of the processors, 1 to 4,
+holding at most twice that while tasks block) and offers it to its generator for the generator's
+own parallel work, then withdraws it when the world closes, so that work stays inside the worker
+budget instead of the JVM's common pool.
 The same day the Forge 14.23.5.2860 / Java 8 fallback build was retired: Cubature builds for
 Cleanroom only, as Java 25 bytecode tested on Java 26.
 The Cubature name and license packaging were adopted on October 19, 2026;

@@ -15,8 +15,10 @@ import org.junit.Test;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.Assert.*;
 
 public class TestGeneratorBuildPool {
@@ -47,6 +49,35 @@ public class TestGeneratorBuildPool {
         assertEquals(2, generator.offered.size());
         assertNull("The pool is withdrawn before it stops", generator.offered.get(1));
         assertTrue(pool.awaitTermination(10, TimeUnit.SECONDS));
+    }
+
+    @Test public void blockedTasksWaitOnceThePoolHoldsTwiceItsTarget() throws InterruptedException {
+        CubicChunksConfig.generatorBuildThreads = 2;
+        PoolGenerator generator = new PoolGenerator();
+        GeneratorBuildPool build = GeneratorBuildPool.open(generator, "test");
+        ForkJoinPool pool = build.pool();
+        assertNotNull(pool);
+        CompletableFuture<Void> gate = new CompletableFuture<>();
+        AtomicInteger finished = new AtomicInteger();
+        for (int i = 0; i < 12; i++) {
+            pool.execute(() -> {
+                gate.join();
+                finished.incrementAndGet();
+            });
+        }
+        // Blocked threads may be replaced, but never past the maximum.
+        int most = 0;
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(1);
+        while (System.nanoTime() < deadline) {
+            most = Math.max(most, pool.getPoolSize());
+            Thread.sleep(5);
+        }
+        assertTrue("The pool grew to " + most + " threads", most <= GeneratorBuildPool.maximum(2));
+        gate.complete(null);
+        deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (finished.get() < 12 && System.nanoTime() < deadline) Thread.sleep(1);
+        assertEquals(12, finished.get());
+        build.close();
     }
 
     @Test public void aZeroTargetOffersNoPool() {

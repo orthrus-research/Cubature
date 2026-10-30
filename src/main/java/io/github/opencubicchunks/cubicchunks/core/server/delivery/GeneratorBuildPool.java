@@ -6,6 +6,7 @@ import io.github.opencubicchunks.cubicchunks.core.CubicChunksConfig;
 
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinWorkerThread;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.annotation.Nullable;
@@ -14,8 +15,10 @@ import javax.annotation.Nullable;
  * A world's build pool: a ForkJoinPool offered to its generator through {@link ICubeGenerator#useBuildPool} for the
  * generator's own parallel work, so that work stays inside the worker budget instead of the JVM's common pool. Its
  * target is {@code generatorBuildThreads}, by default a quarter of the processors, 1 to 4, as for the generation
- * workers. A thread that blocks on a join is replaced, as ForkJoin does, so the threads running stay at the target.
- * Threads are daemons below normal priority, as generation workers are.
+ * workers. A thread that blocks on a join is replaced, so the threads running stay at the target, but the pool never
+ * holds more than twice the target: past that, a blocked task waits (saturate) instead of adding a thread or failing.
+ * A generator keeps its own loops progressing then (Riven's caller always works its loop). Threads are daemons below
+ * normal priority, as generation workers are, and idle ones end after 30 seconds.
  */
 public final class GeneratorBuildPool {
     private final ICubeGenerator generator;
@@ -40,6 +43,10 @@ public final class GeneratorBuildPool {
         return threads < 0 ? Math.max(1, Math.min(4, Runtime.getRuntime().availableProcessors() / 4)) : threads;
     }
 
+    static int maximum(int threads) {
+        return 2 * threads;
+    }
+
     private static ForkJoinPool create(int threads, String world) {
         AtomicInteger counter = new AtomicInteger();
         return new ForkJoinPool(threads, owner -> {
@@ -48,7 +55,7 @@ public final class GeneratorBuildPool {
             thread.setDaemon(true);
             thread.setPriority(Thread.NORM_PRIORITY - 1);
             return thread;
-        }, null, false);
+        }, null, false, threads, maximum(threads), 1, pool -> true, 30, TimeUnit.SECONDS);
     }
 
     @Nullable ForkJoinPool pool() {
