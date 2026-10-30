@@ -306,17 +306,22 @@ items free the native view as much as the preview.
    - **What remains on the common pool:** drainage networks that
      `Drainage.prepare` builds in parallel, 49 s at 8 km and 86 s at 32 km.
      The bounded pool below covers them.
-   - **A bounded pool.** Run Riven's in-build parallelism on an executor sized
-     from `P` and supplied by Cubature, or on the calling worker, never the
-     JVM's common pool.
+   - **A bounded pool** (decided 2026-10-30, Riven `docs/DECISIONS.md`). Run
+     Riven's in-build parallelism on an executor that Cubature supplies, sized
+     from `P` inside the worker budget, never the JVM's common pool. Running it
+     on the calling worker was measured and rejected: with the common pool
+     shrunk to 0, 32 km network builds took 13.1 s on average (41 s at worst)
+     against 4.7 s, and workers waited 186 s on them against 70 s.
    - **Target:** no common-pool bursts, and no 50 ms ticks in the seconds that
      had them.
 2. **Regional plans before a worker needs them.** Today, plans that block
    workers for 2 to 3 s are built at first touch. Cubature would ask the
    generator for the regions ahead of the player's motion, on its own bounded
-   pool. These are pure functions, so only timing changes. This needs a
-   decision: the 2026-10-19 generation constraints rule out a preparation
-   coordinator.
+   pool. These are pure functions, so only timing changes. Riven's
+   "Preparation within bounds" (2026-10-30) allows it and sets its limits:
+   prepare no more than the memos hold with headroom, after native and preview
+   work, and no further ahead than players arrive before eviction. A 32 km
+   drainage network holds about 14 MB.
 3. **One-column surface queries.** `TreeSites.surface` and
    `GroundCover.waterBeside` take 30% and 10% of full-detail time. The survey
    shows the native surface equals the `TerrainMap` top except at cave
@@ -462,11 +467,11 @@ Land route on the workstation, traced, two runs per condition:
 - **DH's merge rule.** Changing it alters how DH reduces generated data
   everywhere. It needs its own entry, and a second one if it later covers
   native data.
-- **Riven's parallelism.** Riven's in-build parallelism would run on an
-  executor that Cubature supplies, inside the worker budget.
-- **Regional plans ahead of the player.** This relaxes the 2026-10-19 "no
-  preparation coordinator" constraint, for pure regional plans on Cubature's
-  bounded pool.
+- **Riven's parallelism.** Decided 2026-10-30 (Riven `docs/DECISIONS.md`,
+  "Cubature supplies Riven's in-build executor").
+- **Regional plans ahead of the player.** Decided 2026-10-30 (Riven
+  `docs/DECISIONS.md`, "Preparation within bounds"), which supersedes the "no
+  preparation coordinator" constraint.
 - **DISTANT-HORIZONS.md.** It says the adapter creates no worker pool and that
   DH owns admission. Cubature would own how many previews run, in what order,
   and how generated data merges. DH keeps its request limits, propagation,
