@@ -321,14 +321,29 @@ items free the native view as much as the preview.
        threads instead of 31. Step 2 item 2 is what recovers that time.
    - **Target:** no common-pool bursts, and no 50 ms ticks in the seconds that
      had them.
-2. **Regional plans before a worker needs them.** Today, plans that block
-   workers for 2 to 3 s are built at first touch. Cubature would ask the
-   generator for the regions ahead of the player's motion, on its own bounded
-   pool. These are pure functions, so only timing changes. Riven's
-   "Preparation within bounds" (2026-10-30) allows it and sets its limits:
-   prepare no more than the memos hold with headroom, after native and preview
-   work, and no further ahead than players arrive before eviction. A 32 km
-   drainage network holds about 14 MB.
+2. **Regional plans before a worker needs them** (done). Riven's
+   "Preparation within bounds" (2026-10-30) allows it and sets its limits.
+   - **How it runs.** Each world's `RegionalPreparation` asks the generator
+     for regions ahead of the players on the build pool, ranked by time to
+     reach.
+     - Regions within the native view run up to the pool's size; those
+       beyond run under a contention governor, which reads CPU load and the
+       server thread's wait rather than tick time.
+     - Nothing starts while more than one face of the native view waits to
+       generate or be sent.
+   - **What Riven prepares** for each 2,048-block region: its continents'
+     drainage networks, its hydrology plan, and its sediment and rock
+     decisions.
+   - **Its bounds.** Riven declines past a quarter of a set-associative
+     memo, half the drainage memo, or 10 MB x layout squared of networks.
+     Networks were made compact first: a whole 32 km world's take 138 MB.
+   - **Offline, 8 km, 12 players:** preparing the world took 13.5 s. The
+     cold pass then built 4 networks instead of 42 and waited 0 s on them
+     instead of 39 s.
+   - **On the land route:**
+     - full view unchanged at 30.4 s (40.2 s without the native hold);
+     - preview sampling p90 1,441 ms against 1,821 ms;
+     - flight tick median 25.0 ms against 22.8 ms.
 3. **One-column surface queries.** `TreeSites.surface` and
    `GroundCover.waterBeside` take 30% and 10% of full-detail time. The survey
    shows the native surface equals the `TerrainMap` top except at cave
