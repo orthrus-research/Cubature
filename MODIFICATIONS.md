@@ -40,7 +40,8 @@ Cleanroom only, as Java 25 bytecode tested on Java 26. `ICubeGenerator` also gai
 ahead of the players on the build pool (`RegionalPreparation`), within
 `regionalPreparationReachBlocks`, nearest by time to reach first. Regions within the native view
 run up to the pool's size; those beyond run under `PreparationGovernor`, which reads CPU
-contention rather than tick time alone. The generator declines when its caches lack room.
+contention rather than tick time alone. Nothing starts while more than one face of the native
+view waits to generate or be sent, and the generator declines when its caches lack room.
 The Cubature name and license packaging were adopted on October 19, 2026;
 that change added no terrain or scheduling algorithm.
 

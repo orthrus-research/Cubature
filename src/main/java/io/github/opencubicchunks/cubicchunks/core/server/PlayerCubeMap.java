@@ -522,7 +522,8 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
         java.util.List<EntityPlayerMP> generating = new java.util.ArrayList<>(players.size());
         for (PlayerWrapper player : players.valueCollection())
             if (canGenerateChunkPredicate.apply(player.playerEntity)) generating.add(player.playerEntity);
-        cubeCache.prepareRegions(generating, horizontalViewDistance);
+        // Native first: cubes still to generate or send hold back new regional preparation.
+        cubeCache.prepareRegions(generating, horizontalViewDistance, cubesToGenerate.size() + cubesToSendToClients.size());
     }
 
     /** PREFETCH: each player's ahead preparation, starting with a different player each tick. */

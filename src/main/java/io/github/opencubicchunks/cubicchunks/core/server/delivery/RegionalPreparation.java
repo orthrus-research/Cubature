@@ -33,8 +33,10 @@ import javax.annotation.Nullable;
  * player's speed toward it plus a walking baseline, so a standing player's regions go nearest first and a moving
  * player's regions ahead go before those behind. Regions within the native view run up to the build pool's size:
  * generation would build them on demand anyway, so preparing them only starts that work earlier. Regions beyond run
- * under the {@link PreparationGovernor}. When the generator declines a region for lack of room, regions beyond the
- * native view wait 30 seconds. A prepared region is not prepared again. The server thread owns all of this; the pool's
+ * under the {@link PreparationGovernor}. Native delivery comes first: while more than one face of the view, {@code
+ * (2 x view + 1)^2} cubes, waits to generate or to be sent (a join or a teleport), no preparation starts, since a
+ * region's preparation builds far more than the native view needs and would compete with it. When the generator
+ * declines a region for lack of room, regions beyond the native view wait 30 seconds. A prepared region is not prepared again. The server thread owns all of this; the pool's
  * tasks only report back, through a queue.
  */
 public final class RegionalPreparation {
@@ -87,8 +89,11 @@ public final class RegionalPreparation {
         return preparation;
     }
 
-    /** One server tick of a world: players that may generate, and the native view in chunks. */
-    public void tick(WorldServer world, Collection<EntityPlayerMP> players, int viewChunks) {
+    /**
+     * One server tick of a world: players that may generate, the native view in chunks, and the native cubes still to
+     * generate or send.
+     */
+    public void tick(WorldServer world, Collection<EntityPlayerMP> players, int viewChunks, int nativeDebt) {
         if (pool == null || closed) return;
         long now = System.nanoTime();
         if (now >= nextPlan) {
@@ -101,7 +106,7 @@ public final class RegionalPreparation {
                             && maxZ > border.minZ() && minZ < border.maxZ(),
                     systemCpuLoad(), serverWaitMs(world.getMinecraftServer()));
         }
-        pump(now);
+        pump(now, nativeDebt > (2 * viewChunks + 1) * (2 * viewChunks + 1));
     }
 
     /** Ranks the regions within reach once a second and updates the governor. */
@@ -164,14 +169,17 @@ public final class RegionalPreparation {
         }
     }
 
-    /** Takes in finished preparations and starts the next ones the pool, the governor and any pause allow. */
-    void pump(long now) {
+    /**
+     * Takes in finished preparations and starts the next ones the pool, the governor and any pause allow; none while
+     * the native view is behind.
+     */
+    void pump(long now, boolean nativeBehind) {
         for (long[] f; (f = finished.poll()) != null; ) {
             running.remove(f[0]);
             if (f[1] != 0) done.add(f[0]);
             else declinedUntil = now + DECLINED_PAUSE;
         }
-        if (pool == null || closed) return;
+        if (pool == null || closed || nativeBehind) return;
         int outer = 0;
         for (boolean isNear : running.values()) if (!isNear) outer++;
         boolean outerHeld = now < declinedUntil;

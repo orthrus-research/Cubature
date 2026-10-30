@@ -28,7 +28,7 @@ public class TestRegionalPreparation {
         long now = SECOND;
         for (int second = 0; second < 40; second++, now += SECOND) {
             preparation.plan(now, players(1024, 1024), REACH, NEAR, ANYWHERE, .40, .5);
-            preparation.pump(now);
+            preparation.pump(now, false);
         }
         List<Double> distances = new ArrayList<>();
         for (long key : generator.prepared) distances.add(distance(key, 1024, 1024));
@@ -47,7 +47,7 @@ public class TestRegionalPreparation {
         preparation.plan(SECOND, players(1024, 1024), REACH, NEAR, ANYWHERE, .40, .5);
         preparation.plan(2 * SECOND, players(1040, 1024), REACH, NEAR, ANYWHERE, .40, .5);
         long now = 2 * SECOND;
-        for (int i = 0; i < 6; i++, now += SECOND) preparation.pump(now);
+        for (int i = 0; i < 6; i++, now += SECOND) preparation.pump(now, false);
         int east = generator.prepared.indexOf(key(1, 0)), west = generator.prepared.indexOf(key(-1, 0));
         assertTrue("East prepared", east >= 0);
         assertTrue("East before west", west < 0 || east < west);
@@ -59,7 +59,7 @@ public class TestRegionalPreparation {
         // Saturated: the governor holds every region beyond the view, past one trickle.
         preparation.plan(SECOND, players(2048, 2048), REACH, NEAR, ANYWHERE, .99, 10);
         assertEquals(0, preparation.permits());
-        preparation.pump(SECOND);
+        preparation.pump(SECOND, false);
         // The player stands on a corner of four regions, all within the view.
         Set<Long> near = new HashSet<>(List.of(key(0, 0), key(1, 0), key(0, 1), key(1, 1)));
         assertTrue(generator.prepared.containsAll(near));
@@ -72,15 +72,15 @@ public class TestRegionalPreparation {
         RegionalPreparation preparation = new RegionalPreparation(generator, Runnable::run, 4);
         long now = SECOND;
         preparation.plan(now, players(1024, 1024), REACH, NEAR, ANYWHERE, .40, .5);
-        preparation.pump(now);
+        preparation.pump(now, false);
         int attempts = generator.prepared.size();
         assertTrue(attempts >= 1);
         // Declined regions are not done; a pause now holds the regions beyond the view.
         generator.decline = false;
-        preparation.pump(now + SECOND);
+        preparation.pump(now + SECOND, false);
         long beyond = generator.prepared.stream().skip(attempts).filter(k -> distance(k, 1024, 1024) > NEAR).count();
         assertEquals("Held within the pause", 0, beyond);
-        preparation.pump(now + RegionalPreparation.DECLINED_PAUSE + SECOND);
+        preparation.pump(now + RegionalPreparation.DECLINED_PAUSE + SECOND, false);
         beyond = generator.prepared.stream().skip(attempts).filter(k -> distance(k, 1024, 1024) > NEAR).count();
         assertTrue("Resumed after the pause", beyond > 0);
     }
@@ -90,8 +90,19 @@ public class TestRegionalPreparation {
         generator.blocks = 0;
         RegionalPreparation preparation = new RegionalPreparation(generator, Runnable::run, 4);
         preparation.plan(SECOND, players(0, 0), REACH, NEAR, ANYWHERE, .40, .5);
-        preparation.pump(SECOND);
+        preparation.pump(SECOND, false);
         assertTrue(generator.prepared.isEmpty());
+    }
+
+    @Test public void nothingStartsWhileTheNativeViewIsBehind() {
+        RecordingGenerator generator = new RecordingGenerator();
+        RegionalPreparation preparation = new RegionalPreparation(generator, Runnable::run, 4);
+        preparation.plan(SECOND, players(1024, 1024), REACH, NEAR, ANYWHERE, .40, .5);
+        // A join: the native view is far behind, so even the player's own region waits.
+        preparation.pump(SECOND, true);
+        assertTrue(generator.prepared.isEmpty());
+        preparation.pump(2 * SECOND, false);
+        assertEquals(key(0, 0), (long) generator.prepared.get(0));
     }
 
     private static List<RegionalPreparation.Position> players(double x, double z) {

@@ -84,6 +84,7 @@ abstract class SpatialWatchersSortingList<T extends BucketSorterEntry> implement
     public abstract void add(T element);
 
     public boolean isEmpty() { return size == 0; }
+    public int size() { return size; }
     public boolean contains(T element) { return element.getSorterStorage(intrusiveCollectionId) != 0; }
     @Override public Iterator<T> iterator() { return iteratorUpToDistance(buckets.length - 1); }
 
