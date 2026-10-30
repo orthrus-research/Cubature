@@ -63,9 +63,10 @@ describes the Distant Horizons adapter.
 With concurrent generation active, `NetHandlerPlayServer.setPlayerLocation` into a column that is
 neither loaded nor saved is held, for at most 600 ticks, while the workers prepare that column. The
 player stays where they are meanwhile, so code that reads the player's position right after the call
-still sees the old one. A later teleport that moves the player replaces a held one; a teleport to
-where the player already is, as vanilla sends to re-send an unconfirmed teleport or correct a
-rejected move, does not. `PlayerCubeMap.arrivals().teleportNow` moves a player at once, generating
+still sees the old one. A later teleport that moves the player replaces a held one. Vanilla's
+corrections of the client's moves (`processPlayer` re-sending an unconfirmed teleport or putting the
+player back after a rejected move) apply without replacing it, and so does a teleport to where the
+player already is. `PlayerCubeMap.arrivals().teleportNow` moves a player at once, generating
 the column on the server thread if it must.
 
 ## Building from source

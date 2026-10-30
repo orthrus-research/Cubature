@@ -14,6 +14,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.Set;
@@ -22,7 +23,9 @@ import java.util.Set;
  * A teleport into a column that is neither loaded nor saved makes the server thread generate that
  * column at once (Entity.setPositionAndRotation reads its chunk), stalling every player while the
  * generator works. In cubic worlds with generation workers, PlayerCubeMap.arrivals() holds the
- * teleport until the workers have prepared the column, and completes it then.
+ * teleport until the workers have prepared the column, and completes it then. processPlayer's own
+ * setPlayerLocation calls (all four are required matches) correct the client's moves; they run
+ * through DeferredArrivals.correct, so they never replace a held teleport.
  */
 @Mixin(NetHandlerPlayServer.class)
 public abstract class MixinNetHandlerPlayServer_DeferredArrival {
@@ -36,6 +39,17 @@ public abstract class MixinNetHandlerPlayServer_DeferredArrival {
         PlayerChunkMap map = ((WorldServer) player.world).getPlayerChunkMap();
         if (map instanceof PlayerCubeMap && ((PlayerCubeMap) map).arrivals().defer(player, x, y, z, yaw, pitch, relative)) {
             ci.cancel();
+        }
+    }
+
+    @Redirect(method = "processPlayer", require = 4,
+            at = @At(value = "INVOKE", target = "Lnet/minecraft/network/NetHandlerPlayServer;setPlayerLocation(DDDFF)V"))
+    private void cubicchunks$correctMove(NetHandlerPlayServer handler, double x, double y, double z, float yaw, float pitch) {
+        PlayerChunkMap map = player.world instanceof WorldServer ? ((WorldServer) player.world).getPlayerChunkMap() : null;
+        if (map instanceof PlayerCubeMap) {
+            ((PlayerCubeMap) map).arrivals().correct(() -> handler.setPlayerLocation(x, y, z, yaw, pitch));
+        } else {
+            handler.setPlayerLocation(x, y, z, yaw, pitch);
         }
     }
 }

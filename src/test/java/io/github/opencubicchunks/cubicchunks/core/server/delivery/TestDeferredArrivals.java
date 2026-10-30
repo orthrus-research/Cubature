@@ -12,8 +12,7 @@ import java.util.UUID;
 
 /**
  * A teleport into an unprepared column is held; a later teleport that moves the player replaces it,
- * and one that leaves the player in place (vanilla re-sending an unconfirmed teleport, or correcting a
- * move it rejects) does not.
+ * and neither one that leaves the player in place nor vanilla's correction of a client's move does.
  */
 public class TestDeferredArrivals {
     private static final Set<SPacketPlayerPosLook.EnumFlags> ABSOLUTE = EnumSet.noneOf(SPacketPlayerPosLook.EnumFlags.class);
@@ -46,5 +45,19 @@ public class TestDeferredArrivals {
         teleport(3000.5, 160, 3000.5, ABSOLUTE);
         assertFalse(teleport(40.5, 130, 0.5, ABSOLUTE));
         assertFalse(arrivals.holds(player));
+    }
+
+    @Test public void aRejectedMoveKeepsTheHold() {
+        teleport(3000.5, 160, 3000.5, ABSOLUTE);
+        // The client, not yet a spectator, falls into a block it has not received. processPlayer has
+        // moved the player to the client's claim (0.5, 129.9, 0.5) and, the move colliding, puts it
+        // back at (0.5, 130, 0.5): a ready target where the player no longer stands.
+        arrivals.correct(() -> assertFalse(
+                arrivals.defer(player, 0.5, 129.9, 0.5, 0, 0, 0.5, 130, 0.5, 0, 0, ABSOLUTE, 101)));
+        assertTrue(arrivals.holds(player));
+        // A correction into an unprepared column applies too, and holds nothing.
+        arrivals.correct(() -> assertFalse(
+                arrivals.defer(player, 0.5, 130, 0.5, 0, 0, 3000.5, 130, 3000.5, 0, 0, ABSOLUTE, 102)));
+        assertTrue(arrivals.holds(player));
     }
 }

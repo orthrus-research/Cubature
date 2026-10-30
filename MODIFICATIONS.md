@@ -42,6 +42,11 @@ ahead of the players on the build pool (`RegionalPreparation`), within
 run up to the pool's size; those beyond run under `PreparationGovernor`, which reads CPU
 contention rather than tick time alone. Nothing starts while more than one face of the native
 view waits to generate or be sent, and the generator declines when its caches lack room.
+The same day `processPlayer`'s own `setPlayerLocation` calls began running through
+`DeferredArrivals.correct`, so they never replace a held teleport. A held player keeps moving, and
+vanilla puts a move it rejects for colliding back where the player stood before it, after
+`processPlayer` has already moved the player to where the client claimed; read as a teleport
+elsewhere, that dropped the hold, and the player never arrived.
 The Cubature name and license packaging were adopted on October 19, 2026;
 that change added no terrain or scheduling algorithm.
 
