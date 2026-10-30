@@ -10,7 +10,7 @@ The lab is a development tool: it is never installed with Cubature or shipped in
 Build Cubature first (`../cleanroom`), then the lab against that artifact, from this directory:
 
 ```sh
-../cleanroom/gradlew -PcubicLoader=cleanroom build
+../cleanroom/gradlew build
 ```
 
 `tools/build_cubature.py` builds both and runs the tests in one step.

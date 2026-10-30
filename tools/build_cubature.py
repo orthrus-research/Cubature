@@ -1,14 +1,14 @@
 """Build Cubature and its lab observer, run their tests and record the artifacts.
 
 Default: the Cleanroom main artifact with its Java 26 regression tests, then the lab observer
-built against that exact artifact. `--forge` adds the Forge main and lab builds (Java 8 tests).
+built against that exact artifact. Cleanroom is the only target (Java 25 bytecode, Java 26 tests).
 `--skip-tests` assembles only. Writes `.local/builds/cubature-latest.json` in the Riven
 workspace with artifact hashes, the git state and per-module test counts. `--freeze <label>`
 copies the artifacts to the workspace's `.local/frozen/<label>/` beside Riven's.
 
 Examples (from the Cubature checkout or anywhere):
   python tools/build_cubature.py
-  python tools/build_cubature.py --forge --freeze candidate-01
+  python tools/build_cubature.py --freeze candidate-01
 """
 
 from lab_files import sha
@@ -83,7 +83,6 @@ def main():
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument("--workspace", type=Path, default=FORK.parents[1], help="Riven root")
-    parser.add_argument("--forge", action="store_true", help="also build the Forge targets")
     parser.add_argument("--skip-tests", action="store_true", help="assemble without tests")
     parser.add_argument("--no-lab", action="store_true", help="skip the lab observer")
     parser.add_argument("--freeze", metavar="LABEL", help="copy artifacts to .local/frozen/LABEL")
@@ -105,11 +104,8 @@ def main():
     started_wall = time.time()
     started = time.monotonic()
     artifacts, tests = {}, {}
-    loaders = ["cleanroom"] + (["forge"] if args.forge else [])
-    for loader in loaders:
-        main_args = [f"-PcubicLoader={loader}", task, *installations]
-        if loader == "cleanroom":
-            main_args.insert(1, "-PcubicTestJava=26")
+    for loader in ["cleanroom"]:
+        main_args = ["-PcubicTestJava=26", task, *installations]
         gradle(FORK / "cleanroom", main_args, environment, f"Cubature {loader} {task}")
         main_jar = single_jar(FORK / f"cleanroom/build/{loader}/libs", "Cubature-", loader)
         artifacts[f"cubature-{loader}"] = main_jar
@@ -118,7 +114,7 @@ def main():
         )
         if args.no_lab:
             continue
-        lab_args = [f"-PcubicLoader={loader}", f"-PcubicArtifact={main_jar}", task, *installations]
+        lab_args = [f"-PcubicArtifact={main_jar}", task, *installations]
         gradle(FORK / "lab", lab_args, environment, f"Lab observer {loader} {task}")
         artifacts[f"lab-{loader}"] = single_jar(
             FORK / f"lab/build/{loader}/libs", "cubicchunks-lab-", loader

@@ -119,5 +119,4 @@ not qualified by this surface integration.
 
 Native qualification uses Java 26.0.2.1, formal Cleanroom 0.7.9-alpha, 8 GiB/ZGC
 per JVM and actual server horizontal/vertical and client horizontal/vertical
-distances 12. Both Cleanroom and Forge artifacts build; Forge native runtime
-remains unqualified. No isolated test suite or performance improvement is claimed.
+distances 12. Cleanroom is the only build target. No isolated test suite or performance improvement is claimed.

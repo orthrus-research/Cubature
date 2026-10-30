@@ -26,8 +26,8 @@ load as CubicChunks worlds, but no release yet promises compatibility guarantees
 The fork began at upstream commit `53847757c7998f3541fccc8c9b5d23dd23e4077d`.
 [MODIFICATIONS.md](MODIFICATIONS.md) records its changes; in summary:
 
-- Cleanroom support and modern Java (development on JDK 25; the tested runtime is Java 26), with a
-  Forge 14.23.5.2860 / Java 8 build kept as a fallback.
+- Cleanroom support and modern Java (development on JDK 25; the tested runtime is Java 26). The
+  Forge 14.23.5.2860 / Java 8 fallback was retired on October 30, 2026.
 - Asynchronous load completion with clear ownership; persistence, storage-recovery, lighting and
   scheduled-tick fixes.
 - A delivery scheduler: bounded worker threads generate cubes and prepare columns off the server
@@ -68,20 +68,17 @@ the column on the server thread if it must.
 
 ## Building from source
 
-The supported build is the Unimined project in `cleanroom/`, which needs JDK 25 (and JDK 8 for the
-Forge fallback). It compiles against the official Distant Horizons 3.3.3 and Demonica 0.9.0 JARs,
+The supported build is the Unimined project in `cleanroom/`, which needs JDK 25. It compiles against the official Distant Horizons 3.3.3 and Demonica 0.9.0 JARs,
 which are never bundled. Inside Riven's workspace it reads them from Riven's `dev/pins`; in a
 standalone clone, fetch them first (each is checked against its SHA-256):
 
 ```sh
 python tools/fetch_build_inputs.py
 cd cleanroom
-./gradlew -PcubicLoader=cleanroom build
-./gradlew -PcubicLoader=forge build
+./gradlew build
 ```
 
-The builds write `Cubature-*-cleanroom.jar` and `Cubature-*-forge.jar`, each with a sources JAR
-and the component license texts. The root Gradle build is upstream's legacy ForgeGradle setup, not
+The build writes `Cubature-*-cleanroom.jar` with a sources JAR and the component license texts. The root Gradle build is upstream's legacy ForgeGradle setup, not
 the supported build. `tools/build_cubature.py` runs the tests and builds the optional measurement
 lab (`lab/`) against the exact artifact; see [docs/cleanroom-port.md](docs/cleanroom-port.md) and
 the [lab guide](lab/README.md). [CONTRIBUTING.md](CONTRIBUTING.md) lists the checks a change must

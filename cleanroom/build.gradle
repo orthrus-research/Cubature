@@ -5,14 +5,11 @@ plugins {
 
 group = 'cc.orthrus.cubature'
 version = cubic_version
-def targetLoader = providers.gradleProperty('cubicLoader').getOrElse('cleanroom')
-if (!(targetLoader in ['cleanroom', 'forge'])) {
-    throw new GradleException('cubicLoader must be cleanroom or forge')
-}
-def testJavaVersion = providers.gradleProperty('cubicTestJava').map { it.toInteger() }
-        .getOrElse(targetLoader == 'cleanroom' ? 25 : 8)
-if (!(testJavaVersion in (targetLoader == 'cleanroom' ? [25, 26] : [8]))) {
-    throw new GradleException('Cleanroom tests support Java 25/26; Forge tests require Java 8')
+// Cleanroom on Java 25 or 26 is the only target; the Java 8 Forge fallback was retired on 2026-10-30.
+def targetLoader = 'cleanroom'
+def testJavaVersion = providers.gradleProperty('cubicTestJava').map { it.toInteger() }.getOrElse(25)
+if (!(testJavaVersion in [25, 26])) {
+    throw new GradleException('Cleanroom tests support Java 25/26')
 }
 base { archivesName = 'Cubature' }
 layout.buildDirectory = layout.projectDirectory.dir("build/${targetLoader}")
@@ -29,7 +26,7 @@ sourceSets {
         resources.srcDirs = ['../src/main/resources', '../CubicChunksAPI/src/main/resources']
     }
     test {
-        // Every test source compiles and runs on both loaders; exclude one here only with the reason.
+        // Every test source compiles and runs; exclude one here only with the reason.
         java.srcDirs = ['../src/test/java']
     }
 }
@@ -74,26 +71,19 @@ dependencies {
     // The legacy flow-noise embed is unused by both the mod and its API.
     embeddedLibraries('io.github.opencubicchunks:regionlib:0.78.0-20210527.114505-2') { transitive = false }
     compileOnly('org.spigotmc:spigot-api:1.12.2-R0.1-20180712.012057-156') { transitive = false }
-    if (targetLoader == 'forge') {
-        modImplementation 'curse.maven:mixin-booter-419286:8800561'
-    }
     testImplementation 'junit:junit:4.13.2'
 }
 unimined.minecraft {
     version '1.12.2'
     mappings { mcp('stable', '39-1.12') }
-    if (targetLoader == 'cleanroom') {
-        cleanroom { loader cleanroom_version }
-    } else {
-        minecraftForge { loader forge_version }
-    }
+    cleanroom { loader cleanroom_version }
     defaultRemapJar = false
     mods { remap(configurations.modCompileOnly) }
     remap(tasks.named('jar').get()) {
         mixinRemap { enableBaseMixin() }
     }
     runs.all {
-        javaVersion = JavaVersion.toVersion(targetLoader == 'cleanroom' ? 25 : 8)
+        javaVersion = JavaVersion.toVersion(25)
         workingDir = file("run/${targetLoader}/${name}")
         jvmArgs += ['-Xms1G', '-Xmx4G', '-Dfml.coreMods.load=io.github.opencubicchunks.cubicchunks.core.asm.coremod.CubicChunksCoreMod']
         doFirst { workingDir.mkdirs() }
@@ -101,7 +91,6 @@ unimined.minecraft {
 }
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
-    if (targetLoader == 'forge') options.release = 8
 }
 tasks.register('verifyEmbeddedLibraries') {
     inputs.files(configurations.embeddedLibraries)
@@ -131,7 +120,7 @@ jar {
                    'FMLCorePlugin': 'io.github.opencubicchunks.cubicchunks.core.asm.coremod.CubicChunksCoreMod',
                    'FMLCorePluginContainsFMLMod': 'true',
                    'ForceLoadAsMod': 'true')
-        if (targetLoader == 'cleanroom') attributes('ModType': 'CRL')
+        attributes('ModType': 'CRL')
     }
     finalizedBy tasks.named('remapJar')
 }
@@ -193,7 +182,7 @@ tasks.register('verifyRemappedJar') {
             def ownClasses = entries.findAll {
                 it.name.startsWith('io/github/opencubicchunks/') && it.name.endsWith('.class')
             }
-            def expectedMajor = targetLoader == 'cleanroom' ? 69 : 52
+            def expectedMajor = 69
             ownClasses.each { entry ->
                 archive.getInputStream(entry).withCloseable { raw ->
                     def data = new DataInputStream(raw)

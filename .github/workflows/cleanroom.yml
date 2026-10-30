@@ -1,4 +1,4 @@
-name: Cleanroom and Forge port
+name: Cleanroom build
 
 on:
   workflow_dispatch:
@@ -9,24 +9,15 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - loader: cleanroom
-            test-java: 26
-          - loader: forge
-            test-java: 8
     env:
-      TOOLCHAINS: -Porg.gradle.java.installations.fromEnv=JAVA_HOME_8_X64,JAVA_HOME_26_X64
+      TOOLCHAINS: -Porg.gradle.java.installations.fromEnv=JAVA_HOME_26_X64
     steps:
       - uses: actions/checkout@v4
-      # The last version listed becomes JAVA_HOME: Gradle runs on JDK 25; tests use 8 or 26.
+      # The last version listed becomes JAVA_HOME: Gradle runs on JDK 25; tests use 26.
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: |
-            8
             26
             25
       - uses: actions/setup-python@v5
@@ -37,19 +28,17 @@ jobs:
         run: python -B tools/fetch_build_inputs.py
       - name: Build and run focused regressions
         working-directory: cleanroom
-        run: >-
-          bash gradlew -PcubicLoader=${{ matrix.loader }} -PcubicTestJava=${{ matrix.test-java }}
-          $TOOLCHAINS build --console=plain
+        run: bash gradlew -PcubicTestJava=26 $TOOLCHAINS build --console=plain
       - name: Build optional lab and run its focused checks
         working-directory: lab
-        run: bash ../cleanroom/gradlew -PcubicLoader=${{ matrix.loader }} $TOOLCHAINS build --console=plain
+        run: bash ../cleanroom/gradlew $TOOLCHAINS build --console=plain
       - name: Check native lab control code
         run: python -B -m unittest discover -s tools -p test_cubic_lab.py
       - uses: actions/upload-artifact@v4
         with:
-          name: cubature-${{ matrix.loader }}
+          name: cubature-cleanroom
           path: |
-            cleanroom/build/${{ matrix.loader }}/libs/*
-            cleanroom/build/${{ matrix.loader }}/reports/tests/
-            lab/build/${{ matrix.loader }}/libs/*
-            lab/build/${{ matrix.loader }}/reports/tests/
+            cleanroom/build/cleanroom/libs/*
+            cleanroom/build/cleanroom/reports/tests/
+            lab/build/cleanroom/libs/*
+            lab/build/cleanroom/reports/tests/

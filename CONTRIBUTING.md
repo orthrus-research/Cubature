@@ -20,11 +20,10 @@ what is specific to Cubature. Report Cubature problems here, not to upstream Cub
 
 ## Checks
 
-Build both loaders with their tests from `cleanroom/` (JDK 25, plus JDK 8 for Forge):
+Build with the tests from `cleanroom/` (JDK 25; Cleanroom is the only target):
 
 ```sh
-./gradlew -PcubicLoader=cleanroom build
-./gradlew -PcubicLoader=forge build
+./gradlew build
 ```
 
 `tools/build_cubature.py` runs the same tests and also builds the measurement lab against the
