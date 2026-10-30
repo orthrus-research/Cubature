@@ -43,6 +43,14 @@ and lambdas by exact name, read fields by reflection and attach completion callb
 result. Every injection is required, so another DH version needs a fresh review. Without a workload
 the rest of the lab stays idle, so a traced instance can be played normally.
 
+`cubiclab preview-survey <id> <minX> <minZ> <size> <footprints> <threads>` samples the overworld
+generator's `ICubicTerrainPreview` over a square window at each listed footprint (comma-separated
+powers of two, in the order given) as Cubature's DH generator does: one column at each cell's integer
+centre, told the cell width, one sampler per 64 x 64-cell tile (`LabPreviewSurvey`). It writes
+`cubiclab-surveys/<id>/` in the server directory: per footprint, rasters of the top, ground and water
+tops and the top run's kind, each tile's thread CPU time, and `summary.json`. It places nothing in the
+world; thread names carry the footprint, so a JFR recording separates them.
+
 Some probes live in Cubature's own packages (`core.server`, `core.server.chunkio`) so they can call
 package-private members such as `CubeProviderServer.tryUnloadCube` and `cubesIterator`, as unit tests
 in the same package do. They are tests: Cubature keeps those members package-private rather than

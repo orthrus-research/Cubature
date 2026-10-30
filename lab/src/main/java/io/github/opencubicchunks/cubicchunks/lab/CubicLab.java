@@ -130,6 +130,13 @@ public final class CubicLab {
                 catch(Exception e){throw new CommandException(e.toString());}
                 sender.sendMessage(new TextComponentString("CUBICLAB_PREGEN_STARTED id="+pregenerator.id));return;
             }
+            if(args.length==7&&args[0].equals("preview-survey")){
+                if(active!=null||pregenerator!=null)throw new CommandException("A lab job is active");
+                try{LabPreviewSurvey survey=new LabPreviewSurvey(server,args[1],Integer.parseInt(args[2]),Integer.parseInt(args[3]),Integer.parseInt(args[4]),args[5],Integer.parseInt(args[6]));survey.start();
+                    sender.sendMessage(new TextComponentString("CUBICLAB_SURVEY_STARTED id="+survey.id));}
+                catch(Exception e){throw new CommandException(e.toString());}
+                return;
+            }
             if(pregenerator!=null){
                 if(args.length==1&&args[0].equals("cancel")){try{pregenerator.cancel();pregenerator=null;}catch(java.io.IOException e){throw new CommandException(e.toString());}return;}
                 if(args.length==1&&args[0].equals("status")){sender.sendMessage(new TextComponentString("Pregeneration "+pregenerator.position));return;}
