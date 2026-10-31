@@ -375,15 +375,37 @@ baseline holds.
 
 ### 3. Owned pool and governor (Cubature)
 
-DH's World Gen executor can only be on or off, and its health pause stopped
-previews in 58% of samples. Cubic previews therefore move to a Cubature pool,
-one per server, in place of DH's executor.
+Done (`PreviewPool`, `PreviewGovernor`, `LivePermits`; Riven
+`docs/DECISIONS.md`, 2026-10-30, "Bounded pools for preview sampling"). DH's
+World Gen executor can only be on or off, and its health pause stopped
+previews in 46 to 58% of samples. Cubic previews therefore run on a Cubature
+pool, one per server, in place of DH's executor: DH hands the generator its
+executor, and the generator samples on the pool instead, so no Mixin is
+needed for that.
+
+**What previews cost the tick** (land route, after Riven's flood-cell and
+climate-lattice memos):
+- **Flight tick by DH workers**, p50 / p95: previews off 9.5 / 36 ms; 1 worker
+  14.3 / 39.5; 2: 16.7 / 40.9; 4: 22.1 / 42.6; 8: 22 to 27 / 45 to 47. About
+  4 ms per running tile, plus about 5 ms for DH being there at all.
+- **Not cores, not waits.** A JFR of the flight with 8 workers: the server
+  thread ran 42% more on-CPU samples on the same native work and never
+  waited. GC ran 24 s of the 62 against 3.9 s with previews off, and preview
+  threads allocated 72 GB of the 131 GB (Riven's `TerrainColumn.preview`
+  25 GB, `NativeColumns.build` 24 GB). About a third of the extra time is DH's
+  native feed on the server thread (`CubicChunkSnapshot.capture`), the rest
+  the same work running slower. Neither the machine's CPU load nor the server
+  thread's waits, which regional preparation's governor reads, show this; the
+  ticks do.
 
 **Admission:**
 - DH still chooses which tile comes next.
-- Mixins on `WorldGenerationQueue.isGeneratorBusy` and
-  `GeneratedFullDataSourceProvider.getMaxRetrievalQueueCount` admit at most
-  the pool's permits plus one tile, so DH's choice stays current.
+- `MixinDistantHorizonsNativeFirst` on `WorldGenerationQueue.isGeneratorBusy`
+  admits at most the pool's permits plus one tile, so DH's choice stays
+  current.
+- `GeneratedFullDataSourceProvider.getMaxRetrievalQueueCount` stays DH's: 20 x
+  `numberOfThreads` (160 at 8) bounds the waiting queue DH chooses from, far
+  more than the permits need, so it is not patched.
 - Completion runs DH's update on the pool thread: 11 ms against 365 ms of
   sampling per tile.
 
@@ -396,15 +418,29 @@ one per server, in place of DH's executor.
 | 24 | 4 | 6 | 6 |
 | 32 | 4 | 8 | 8 |
 
-**Governor:** once a second, from the median and p90 of the last 20 server
-ticks.
-- **Halve permits** when the median is 30 ms or more, or the p90 50 ms or
-  more.
-- **Add one permit** when the median is under 20 ms, the p90 under 45 ms, and
-  tiles are waiting.
+The pool is `previewThreads` (by default the preview ceiling); native workers
+and DH's `numberOfThreads` keep their settings until step 6.
+
+**Governor:** the tick's tail within budget (chosen 2026-10-30): a tick has
+50 ms, and previews may use what keeps the p95 tick at or under 45 ms. It
+starts at half the ceiling and acts once a second.
+- **Halve permits** when the p95 of the last 20 ticks is 45 ms or more and
+  tiles ran in that second (a join's slow ticks, while the gate holds every
+  tile, are the native view's own).
+- **Add one permit** when tiles are waiting, two seconds have passed since
+  the last change, and the p95 of the last 40 ticks is under 40 ms.
 - **Zero permits** while step 1's gate is closed; otherwise at least one.
-- **Fast response:** a worker above the permit count parks between rows of
-  its tile, so the governor acts within about 30 ms.
+- **Fast response:** a tile above the permit count waits between its rows, so
+  a cut acts within one row, about 5 ms.
+- The server log carries a line a minute with the permits' range and mean.
+
+**Result** (land route, 8 DH workers, the pool's 8 threads): the flight tick's
+p95 was 44.0, 44.4 and 44.6 ms in three runs, against 47.0 and 45.2 with the
+gate alone and 36.3 and 36.4 with previews off. The median stayed at 23.7 to
+24.4 ms, since the target is the tail. The runs made 669 to 699 tiles, against
+577 and 679, and full view took 26.6 to 28.4 s. In flight the permits averaged
+2.1 to 3.3, between 1 and 8, with about 12 changes a minute; through the join
+they hold at 4.
 
 `previewThreads = 0` keeps DH's executor, for A/B runs and as a fallback.
 
@@ -490,8 +526,8 @@ Land route on the workstation, traced, two runs per condition:
 
 ## Decisions this needs
 
-- **Preview pools.** Extend the 2026-10-23 approval of bounded Cubature worker
-  pools for pure cube generation and storage writes to preview sampling.
+- **Preview pools.** Decided 2026-10-30 (Riven `docs/DECISIONS.md`, "Bounded
+  pools for preview sampling").
 - **DH's merge rule.** Changing it alters how DH reduces generated data
   everywhere. It needs its own entry, and a second one if it later covers
   native data.
@@ -500,10 +536,10 @@ Land route on the workstation, traced, two runs per condition:
 - **Regional plans ahead of the player.** Decided 2026-10-30 (Riven
   `docs/DECISIONS.md`, "Preparation within bounds"), which supersedes the "no
   preparation coordinator" constraint.
-- **DISTANT-HORIZONS.md.** It says the adapter creates no worker pool and that
-  DH owns admission. Cubature would own how many previews run, in what order,
-  and how generated data merges. DH keeps its request limits, propagation,
-  persistence and delivery.
+- **DISTANT-HORIZONS.md.** Updated with step 3: Cubature owns when previews
+  start and how many run; DH keeps the choice of tile, its request limits,
+  propagation, persistence and delivery. Order (step 5) and the merge (step 4)
+  follow with those steps.
 
 ## Open questions
 

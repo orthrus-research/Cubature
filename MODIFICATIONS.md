@@ -155,7 +155,12 @@ world's native view waits to generate or be sent (`CubeDemand.nativeBehind`,
 the rule regional preparation already used), no preview tile starts. Tiles
 running finish; DH's selection, generation and delivery are unchanged. It is a
 required match, carries LGPL-3.0-only terms, and its source is in the sources
-JAR.
+JAR. The same day Cubature's own `PreviewPool` (`previewThreads`, by default a
+quarter of the processors, 1 to 8) began sampling cubic preview tiles in place
+of DH's world generation executor, so DH's server health pause no longer stops
+them. Its governor sets how many run from the server's ticks (the p95 tick at
+or under 45 ms, never fewer than one tile), and the same Mixin admits at most
+its permits plus one tile. `previewThreads=0` keeps DH's executor.
 
 Both supported builds include `NOTICE.md`, this file, the upstream MIT text,
 the full LGPL-2.1 text and component notices in binary and matching sources

@@ -58,7 +58,8 @@ stays inside the worker budget instead of the JVM's common pool, and prepare its
 ahead of the players there (`preparationRegionBlocks`, `prepareRegion`,
 `regionalPreparationReachBlocks`). The `deliveryMode` config option selects how cubes
 are unloaded, saved and prefetched, and [docs/DISTANT-HORIZONS.md](docs/DISTANT-HORIZONS.md)
-describes the Distant Horizons adapter.
+describes the Distant Horizons adapter, including the preview pool (`previewThreads`) that
+samples distant tiles as fast as the server tick allows.
 
 With concurrent generation active, `NetHandlerPlayServer.setPlayerLocation` into a column that is
 neither loaded nor saved is held, for at most 600 ticks, while the workers prepare that column. The

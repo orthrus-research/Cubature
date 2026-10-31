@@ -13,6 +13,7 @@ import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
 import io.github.opencubicchunks.cubicchunks.api.worldgen.ICubicTerrainPreview;
 import io.github.opencubicchunks.cubicchunks.core.CubicChunks;
 import io.github.opencubicchunks.cubicchunks.core.server.CubeDemand;
+import io.github.opencubicchunks.cubicchunks.core.server.delivery.PreviewPool;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.concurrent.CancellationException;
@@ -21,6 +22,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicLongArray;
 import java.util.function.Consumer;
+import javax.annotation.Nullable;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.block.BlockLiquid;
 import net.minecraft.init.Blocks;
@@ -29,19 +31,23 @@ import net.minecraft.world.WorldServer;
 import net.minecraft.world.biome.Biome;
 
 /**
- * DH owns admission, worker threads, pooled data, persistence and network delivery, except that no tile starts while
- * the world's native view is behind (PreviewAdmission).
+ * DH picks the tiles and owns pooled data, persistence and network delivery. Cubature decides when tiles start
+ * (PreviewAdmission): none while the world's native view is behind, and with the server's preview pool, as many as its
+ * governor's permits; the pool samples them in place of DH's world generation executor.
  */
 final class CubicTerrainPreviewGenerator implements IDhApiWorldGenerator, PreviewAdmission {
     private final ICubicTerrainPreview provider;
     private final ILevelWrapper level;
+    @Nullable private final PreviewPool pool;
+    private final Runnable onClose;
     private final int minY,maxY;
     private final AtomicLong tiles=new AtomicLong(),samples=new AtomicLong(),nanos=new AtomicLong();
     private final AtomicLongArray detailTiles=new AtomicLongArray(13);
     private volatile boolean closed;
 
-    CubicTerrainPreviewGenerator(ICubicTerrainPreview provider,ILevelWrapper level) {
-        this.provider=provider;this.level=level;minY=level.getMinHeight();maxY=level.getMaxHeight();
+    CubicTerrainPreviewGenerator(ICubicTerrainPreview provider,ILevelWrapper level,@Nullable PreviewPool pool,Runnable onClose) {
+        this.provider=provider;this.level=level;this.pool=pool;this.onClose=onClose;
+        minY=level.getMinHeight();maxY=level.getMaxHeight();
         if ((long)maxY-minY<=0 || (long)maxY-minY>4095)
             throw new IllegalArgumentException("DH requires a bounded cubic allocation of at most 4095 blocks");
     }
@@ -50,7 +56,13 @@ final class CubicTerrainPreviewGenerator implements IDhApiWorldGenerator, Previe
     @Override public byte getLargestDataDetailLevel() { return 12; }
     @Override public EDhApiWorldGeneratorReturnType getReturnType() { return EDhApiWorldGeneratorReturnType.API_DATA_SOURCES; }
     @Override public void preGeneratorTaskStart() {}
-    @Override public void close() { closed=true; }
+    @Override public void close() {
+        if (closed) return;
+        closed=true;onClose.run();
+    }
+
+    @Override public boolean pooled() { return pool!=null; }
+    @Override public boolean admits(int inProgress) { return pool==null || pool.admits(inProgress); }
 
     /** Native view first: the native view of this generator's world is behind (CubeDemand.nativeBehind). */
     @Override public boolean holdsNewTiles() {
@@ -73,6 +85,7 @@ final class CubicTerrainPreviewGenerator implements IDhApiWorldGenerator, Previe
             Column writer=new Column();
             for (int z=0;z<width;z++) {
                 if (closed || Thread.currentThread().isInterrupted()) throw new CancellationException("Cubic preview closed");
+                betweenRows();
                 for (int x=0;x<width;x++) {
                     // One native column at each coarse cell's integer centre; the sampler is told
                     // the cell width so it may show sub-cell features by their cover.
@@ -89,7 +102,18 @@ final class CubicTerrainPreviewGenerator implements IDhApiWorldGenerator, Previe
             if (detailTiles.incrementAndGet(detail)==1 || done%64==0) CubicChunks.LOGGER.info(
                     "CC/DH distant: tiles={} sampledColumns={} detail={} lastTile=[{},{}] step={} generationMs={}",
                     done,samples.get(),detail,baseX,baseZ,step,nanos.get()/1_000_000.0);
-        },executor);
+        },pool!=null?pool:executor);
+    }
+
+    /** A tile over the pool's permits after a cut waits here, between rows, until one is free. */
+    private void betweenRows() {
+        if (pool==null) return;
+        try {
+            pool.checkpoint();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new CancellationException("Cubic preview interrupted");
+        }
     }
 
     private final class Column implements ICubicTerrainPreview.ColumnConsumer {

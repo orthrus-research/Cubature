@@ -111,6 +111,14 @@ public class CubicChunksConfig {
             + "-1: a quarter of the processors, 1 to 4; 0: no pool, so that work runs on the calling thread.")
     public static int generatorBuildThreads = -1;
 
+    @Config.RangeInt(min = -1, max = 16)
+    @Config.RequiresMcRestart
+    @Config.Comment("Threads of the server's Distant Horizons preview pool, which samples cubic preview tiles in place of "
+            + "DH's world generation executor. Its governor lets as many tiles run as keep the server tick within "
+            + "budget (the p95 tick at or under 45 ms), never fewer than one, and none while a native view is behind. "
+            + "-1: a quarter of the processors, 1 to 8; 0: DH's own executor, paced by DH's server health check.")
+    public static int previewThreads = -1;
+
     @Config.RangeInt(min = 0, max = 65536)
     @Config.Comment("Blocks around each player within which a generator's regional plans (ICubeGenerator.prepareRegion) "
             + "are prepared ahead of demand on the build pool, nearest by time to reach first. Regions within the native "

@@ -61,19 +61,34 @@ content rules and may not access or load a live world. Riven shares its block
 resolver between normal cube filling and this sampler; its terrain, temperature,
 plate and erosion maps remain unchanged.
 
-CC binds a DH `API_DATA_SOURCES` generator for the server level. DH supplies its
-executor, request detail and pooled 64-column-wide data source. CC samples the
-native column at each requested cell's integer center, writes relative heights
-using the real world minimum, and returns the data through DH's normal future.
-At coarse levels this is a surface approximation. It creates no gameplay cubes,
-terrain cache, private worker pool or population work. DH owns admission, rate
-limits, propagation, persistence, server delivery and rendering, with one
-exception: native view first. While more than one face of a world's native
-view, `(2 x view + 1)^2` cubes, waits to generate or be sent (a join or a
-teleport), `MixinDistantHorizonsNativeFirst` makes DH find the generator busy,
-so no preview tile starts; tiles already running finish, and DH resumes its own
-order as the native view catches up. Pooled sources are retained only until
-their generation future completes; closing cancels work.
+CC binds a DH `API_DATA_SOURCES` generator for the server level. DH supplies the
+request detail and pooled 64-column-wide data source. CC samples the native
+column at each requested cell's integer center, writes relative heights using
+the real world minimum, and returns the data through DH's normal future. At
+coarse levels this is a surface approximation. It creates no gameplay cubes,
+terrain cache or population work. DH picks which tile comes next and owns rate
+limits, propagation, persistence, server delivery and rendering; Cubature
+decides when tiles start and where they run:
+
+- **Native view first.** While more than one face of a world's native view,
+  `(2 x view + 1)^2` cubes, waits to generate or be sent (a join or a
+  teleport), `MixinDistantHorizonsNativeFirst` makes DH find the generator
+  busy, so no preview tile starts; tiles already running finish, and DH resumes
+  its own order as the native view catches up.
+- **The preview pool.** The server's `PreviewPool` (`previewThreads`, by
+  default a quarter of the processors, 1 to 8) samples tiles in place of DH's
+  world generation executor, so DH's server health pause no longer stops them.
+  Its governor sets how many run at once from the server's ticks: once a
+  second, a p95 of the last 20 ticks at 45 ms or more halves the permits, and
+  with tiles waiting, two settled seconds with a p95 of the last 40 under 40
+  ms add one; never fewer than one. Admission lets the permits plus one tile be
+  in progress, so DH's choice stays current, and a tile over the permits after
+  a cut waits between its rows. The server log carries a line a minute with
+  the permits' range. `previewThreads=0` keeps DH's executor and its health
+  pause.
+
+Pooled sources are retained only until their generation future completes;
+closing cancels work.
 
 Minecraft 1.12.2's DH startup forces `INTERNAL_SERVER` and hides its built-in
 rough-generation plans. CC keeps that global fallback intact. Its world packet
