@@ -162,6 +162,21 @@ them. Its governor sets how many run from the server's ticks (the p95 tick at
 or under 45 ms, never fewer than one tile), and the same Mixin admits at most
 its permits plus one tile. `previewThreads=0` keeps DH's executor.
 
+On October 31, 2026, `MixinDistantHorizonsArrivalTree`,
+`MixinDistantHorizonsArrivalRequests` and `MixinDistantHorizonsServeInOrder`
+gave a cubic world Cubature's arrival plan (`distantHorizonsArrivalPlan`, on by
+default). On the client, DH 3.3.3's quad tree hands its missing sections to the
+request queue in the plan's order (by when the player reaches them, coarse
+detail first) and leaves out sections the native view covers or will cover
+before their data could arrive; the request queue sends the plan's choice,
+cancels unsent requests the plan now holds back (DH's tree keeps them missing)
+and keeps in flight only what the server answers in about 3 s; and the tree's
+queueing thread ends after half a second without queueing, so DH's next update
+finds the sections wanted then. On the server, `WorldGenerationQueue` starts
+the waiting tile whose request arrived first. All are required matches, carry
+LGPL-3.0-only terms, and their sources are in the sources JAR. DH's request
+limits, network protocol, propagation, persistence and rendering are unchanged.
+
 Both supported builds include `NOTICE.md`, this file, the upstream MIT text,
 the full LGPL-2.1 text and component notices in binary and matching sources
 JARs. The sources JAR includes the mod and API Java sources. It is not by

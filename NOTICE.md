@@ -29,6 +29,21 @@ more tiles, and retains DH's queue, selection and generation code. The LGPL-3.0 
 `META-INF/licenses/distanthorizons/`. This explicit exception takes precedence
 over the MIT default below; Riven's NRR license does not cover it.
 
+## Distant Horizons arrival plan patches
+
+`MixinDistantHorizonsArrivalTree.java`, `MixinDistantHorizonsArrivalRequests.java`
+and `MixinDistantHorizonsServeInOrder.java`, copyright (c) 2026 Orthrus
+Research, are licensed under LGPL-3.0-only. These source-level runtime
+integrations target DH 3.3.3's client `LodQuadTree` and
+`AbstractFullDataNetworkRequestQueue`, where they set the order of a cubic
+world's section requests, hold back and cancel unsent ones, bound how many are
+in flight and end an idle queueing thread, and its server
+`WorldGenerationQueue`, where they start preview tiles in request order. They
+retain DH's tree, queue, request, network and generation code. The LGPL-3.0
+and accompanying GPL-3.0 texts are packaged under
+`META-INF/licenses/distanthorizons/`. This explicit exception takes precedence
+over the MIT default below; Riven's NRR license does not cover it.
+
 ## Async chunk loading
 The asynchronous chunk loading executor code in `io.github.opencubicchunks.cubicchunks.core.server.chunkio.async.forge` is based on parts of
 [MinecraftForge](https://github.com/MinecraftForge/MinecraftForge) and licensed under the

@@ -119,6 +119,12 @@ public class CubicChunksConfig {
             + "-1: a quarter of the processors, 1 to 8; 0: DH's own executor, paced by DH's server health check.")
     public static int previewThreads = -1;
 
+    @Config.Comment("A cubic world's Distant Horizons arrival plan (LOD-DELIVERY step 5). Client: order requests by when "
+            + "the player reaches each section, coarse detail first, and hold back sections the native view covers or "
+            + "will cover before their data could arrive; the detail that goes first follows how the coarse sections "
+            + "arrive. Server: start preview tiles in the order their requests arrived. Off: DH's nearest-first order.")
+    public static boolean distantHorizonsArrivalPlan = true;
+
     @Config.RangeInt(min = 0, max = 65536)
     @Config.Comment("Blocks around each player within which a generator's regional plans (ICubeGenerator.prepareRegion) "
             + "are prepared ahead of demand on the build pool, nearest by time to reach first. Regions within the native "

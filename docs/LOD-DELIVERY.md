@@ -518,18 +518,86 @@ added only if the metric asks for it at 32 and 64 blocks.
 
 ### 5. Refine before the player arrives (Cubature)
 
-A Mixin on `WorldGenerationQueue.tryStartNextWorldGenTask` changes DH's
-selection key.
-- **Order by time to reach.** Today DH divides distance by detail level.
-  Instead, take the distance from the section's edge to the native view's
-  edge and divide by the player's speed toward the section. Sections ahead
-  come first and those behind last. A player standing still keeps DH's
-  order.
-- **Skip what native will cover.** A tile whose section will be inside the
-  native view before the tile could finish is skipped, so the step 1 rule
-  applies ahead of arrival.
-- **Limits:** DH's client still sends its nearest 40, so this reorders what
-  the server holds.
+Sized for the fastest movement to support well, a rocket-boosted elytra:
+about 33 blocks/s in level flight, twice the lab's 16. The goal is coarse
+detail on time ahead (4-block cells and coarser to start), finer detail as
+the budget allows, and no work the native view makes redundant.
+
+**Where the order is decided.** DH's client fills a waiting set of 20
+requests per DH thread (160 here) from its quad tree's missing sections,
+nearest first by Manhattan distance, and sends the nearest waiting request
+by Chebyshev distance, at most `generationRequestRateLimit` (40) per second
+and in flight. It cancels a request only once its section leaves the LOD
+tree, about 4 km behind. The server answers only what was sent, so the order
+is the client's to set; DH's protocol has no answer that declines a request
+cleanly (out of range re-queues it, rate limiting pauses the client for a
+second, rejection fails the section).
+
+**The arrival plan** (`ArrivalPlan`, client Mixins on DH's quad tree and
+request queue, `distantHorizonsArrivalPlan`):
+- **Order:** sections at or coarser than the on-time detail go first; within
+  each group, the sooner the player reaches a section (distance over speed
+  toward it, at least 4 blocks/s) the earlier. Standing still this is nearest
+  first.
+- **Hold:** a section the native view's square holds now, or will hold before
+  its data could arrive (the time from queueing to an answer at its detail,
+  learned as requests return, at most 10 s ahead), is held back: the tree
+  leaves it missing and the queue cancels it if unsent. DH's tree offers it
+  again every pass, so a wrong prediction only delays a request. Predictions
+  apply only while 95% of the native view's columns are loaded; while the
+  player moves with the native view behind, nothing ahead is held.
+- **On-time detail:** follows the coarse sections' arrivals while moving.
+  More than a tenth arriving after the player has come within the ring
+  where finer detail is wanted there steps it coarser (at most every 5 s);
+  none late and coarse requests under half of those sent steps it finer
+  (at most every 15 s). It starts at 4-block cells and stays within 1- to
+  16-block cells.
+- **In flight:** only what the server answers in about 3 s (answers a second
+  times three), at least 8, at most DH's limit, so a choice is seconds old
+  when its tile starts rather than tens of seconds.
+- **Wanted sections stay current:** DH's tree finds newly wanted sections
+  only when its queueing thread starts, and that thread retries for as long
+  as anything stays missing. With the queue full, as in fast flight, it never
+  ended, and terrain ahead was never asked for (no section wanted in a whole
+  34 blocks/s flight). The thread now ends after half a second without
+  queueing, and DH's next tree update restarts it with the sections wanted
+  then.
+- **Server order** (`MixinDistantHorizonsServeInOrder`): the server starts
+  the waiting tile whose request arrived first, not the one nearest a
+  player, so each client's order reaches the preview generator.
+
+Riven's preview columns build their regional plans on their own thread
+(`BuildPool.alone`): on the shared build pool, a distant tile's cold
+regional builds held the helpers native generation's own builds waited for.
+
+The client logs the plan every 10 s (`CC/DH arrival plan`), and
+`riven_observe.py lod` places each arriving tile against the native view and
+the player's travel. The lab flies 4 to 40 blocks/s.
+
+**Results** (land route from x 2200 over forested hills, 8 DH workers, the
+plan against `--no-arrival-plan`, one run each; the 16 blocks/s DH-order run
+predates the build-pool change, which touches only previews; the lab's flight
+screenshots compared in a contact sheet):
+
+| | 16 blocks/s, DH order | 16 blocks/s, plan | 34 blocks/s, DH order | 34 blocks/s, plan |
+|---|---|---|---|---|
+| Preview tiles in the run | 736 | 802 | 734 | 315 |
+| 1-block tiles arriving inside the native view | 42% | 5% | 45% | 17% |
+| 1-block tiles ahead: count, wanted to arrival p50 | 68, 0.8 s | 36, 2.3 s | 5, 27 s | 0 |
+| 4- to 16-block tiles arriving ahead in flight | 72 | 79 | 8 | 37 |
+| Sections wanted during the flight | 420 | 406 | 0 | 169 |
+| Server: native view cubes not ready (mean) | 223 | 304 | 615 | 1,126 |
+| Flight tick p50 / p95 | 16.3 / 43.4 ms | 18.8 / 44.7 ms | 33.1 / 42.9 ms | 36.1 / 48.1 ms |
+
+At 16 blocks/s the plan delivers more tiles, full detail ahead in seconds
+with almost none wasted, and coarse detail ahead on time, for 80 cubes of
+native readiness. At 34 blocks/s DH's order shows no terrain ahead in the
+last third of the flight (it asks for nothing new), while the plan shows
+terrain ahead in every frame; but native generation alone nearly fills the
+server there (435 cubes not ready with no distant generation, tick p50
+19 ms), and the plan's distant tiles, which build cold regional plans, cost
+the native view about 510 cubes more than DH's near ones (an open question
+below). The on-time detail settled at 16-block cells in both flights.
 
 ### 6. DH's own pool and integrated servers
 
@@ -612,6 +680,23 @@ Land route on the workstation, traced, two runs per condition:
   tiles are cheaper?
 - **Biome locks.** `SurfaceTranscription` takes a biome's lock for each
   surface routine; it may limit scaling toward 24 cores.
+- **Native view or coverage ahead at elytra speed.** At 34 blocks/s native
+  generation nearly fills the server, and the arrival plan's distant tiles
+  cost the native view about 510 cubes more than DH's near ones (about 13
+  blocks of depth ahead) for terrain ahead in every frame. The step 1 gate
+  lets previews run until native is one face behind; tightening it while
+  players move fast would keep native deeper and show less ahead. Cheaper
+  distant tiles (coarse samples without full regional plans) would ease both.
+- **Client native feed at speed.** `DistantHorizonsClient` turns at most 2
+  loaded columns a tick into DH data; at 34 blocks/s the native view brings
+  about 53 new columns a second, so 250 to 620 waited through a whole flight
+  (about 10 s of travel), and ground just flown past lacked native-built LOD
+  until it caught up.
+- **On-time detail.** It settled at 16-block cells at 16 and 34 blocks/s,
+  since coarse tiles arrive 12 to 30 s after they are wanted; with the
+  server's throughput in flight (1 to 2.5 answers a second) that wait is the
+  queue of coarse demand itself. Whether lateness should be judged against
+  the server's throughput rather than the ring is open.
 
 ## Changes from the first draft
 

@@ -66,9 +66,9 @@ request detail and pooled 64-column-wide data source. CC samples the native
 column at each requested cell's integer center, writes relative heights using
 the real world minimum, and returns the data through DH's normal future. At
 coarse levels this is a surface approximation. It creates no gameplay cubes,
-terrain cache or population work. DH picks which tile comes next and owns rate
-limits, propagation, persistence, server delivery and rendering; Cubature
-decides when tiles start and where they run:
+terrain cache or population work. DH owns rate limits, propagation,
+persistence, server delivery and rendering; Cubature decides when tiles start,
+where they run and, in a cubic world, in what order they are asked for:
 
 - **Native view first.** While more than one face of a world's native view,
   `(2 x view + 1)^2` cubes, waits to generate or be sent (a join or a
@@ -86,6 +86,16 @@ decides when tiles start and where they run:
   a cut waits between its rows. The server log carries a line a minute with
   the permits' range. `previewThreads=0` keeps DH's executor and its health
   pause.
+- **The arrival plan** (LOD-DELIVERY step 5, `distantHorizonsArrivalPlan`).
+  The client asks for sections by when the player reaches them, at or coarser
+  than an on-time detail first (it follows how coarse sections arrive), holds
+  back sections the native view covers or will cover before their data could
+  arrive, keeps in flight only what the server answers in about 3 s, and lets
+  DH's quad tree find newly wanted sections while its queue is full
+  (`MixinDistantHorizonsArrivalTree`, `MixinDistantHorizonsArrivalRequests`).
+  The server starts the tile whose request arrived first
+  (`MixinDistantHorizonsServeInOrder`). Held requests are only delayed; no
+  section's content changes.
 
 Pooled sources are retained only until their generation future completes;
 closing cancels work.
