@@ -367,12 +367,25 @@ items free the native view as much as the preview.
 5. **No boulder lookups at coarse cells** (done). `GroundCover.preview`
    skips `Boulders.at` from 4-block cells, where boulders are not drawn;
    coarse cells over an undrawn boulder take their neighbours' cover.
-6. **Hash lookups and scratch.** Done: rock-unit membership in `CaveMap` and
-   `OreMap` is a bitmask (`UnitSet`), and Cubature's preview writer caches
-   DH's `BlockStateWrapper` per block state for its tile. To do: move the
-   per-column arrays of `TerrainColumn.preview` and `TreeSites.canopy` into
-   the task-confined sampler (`TerrainColumn.preview` allocated 25 of the
-   72 GB preview threads allocated in a one-minute flight).
+6. **Hash lookups and scratch** (done). Rock-unit membership in `CaveMap` and
+   `OreMap` is a bitmask (`UnitSet`); Cubature's preview writer caches DH's
+   `BlockStateWrapper` per block state for its tile; `TerrainColumn.preview`
+   reuses its run arrays, block array, recorder and canopy from a scratch its
+   caller owns, and the preview's `Surface` holds one column instead of 256;
+   `CaveMap` takes each noise field's rotation once instead of four
+   `StrictMath` calls per read. The lab's preview survey shows every raster
+   at every footprint byte-identical across the scratch change, and
+   `NativeDigestCheck` native blocks identical across the rotation change.
+
+   **Items 3, 5 and 6 together** (land route, 8 DH workers, two runs against
+   four on the pool before): preview sampling p50 258 and 253 ms against 332
+   to 346, p90 718 and 635 ms against 1,225 to 1,480; 697 and 720 tiles;
+   flight tick p95 43.9 and 44.1 ms. In a JFR of the flight, preview threads
+   allocated 60 GB against 72 GB for more tiles (about 85 MB a tile against
+   116), GC cycles ran 14.5 s of 62 against 23.8, and the server thread ran
+   1,625 on-CPU samples against 2,382, as with previews off (1,675). Per
+   footprint in the survey, CPU per column fell from 106.6 to 85.7 us at
+   1-block cells and from 259.8 to 200.4 at 2-block cells.
 7. **Later.** `StrictMath` takes 10 to 20% of sampler time. Replacing it
    changes terrain, so it needs a new terrain version and its own decision.
 
