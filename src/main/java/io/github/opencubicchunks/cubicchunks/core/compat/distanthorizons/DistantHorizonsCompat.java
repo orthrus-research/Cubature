@@ -2,6 +2,8 @@ package io.github.opencubicchunks.cubicchunks.core.compat.distanthorizons;
 
 import io.github.opencubicchunks.cubicchunks.core.CubicChunksConfig;
 import java.util.function.Consumer;
+import java.util.function.IntSupplier;
+import java.util.function.Predicate;
 import java.util.Collections;
 import java.util.Map;
 import java.util.WeakHashMap;
@@ -20,6 +22,16 @@ public final class DistantHorizonsCompat {
     public static void install(Consumer<Chunk> listener) { changedColumn = listener; }
     public static void installServer(Consumer<Chunk> listener) { changedServerColumn = listener; }
     public static boolean hasServerIntegration() { return changedServerColumn!=null; }
+    private static Predicate<Chunk> feedServerNow;
+    private static IntSupplier pendingServerUpdates;
+    public static void installServerFeed(Predicate<Chunk> feed, IntSupplier pending) { feedServerNow=feed; pendingServerUpdates=pending; }
+    /**
+     * Hands a loaded server column to DH now, as the server's native feed does a few a tick (a pregenerator's
+     * columns unload before that feed reaches them). False without DH or its level for that world.
+     */
+    public static boolean feedServerColumnNow(Chunk column) { Predicate<Chunk> f=feedServerNow; return f!=null && f.test(column); }
+    /** Chunk updates DH has queued and not yet turned into LOD data, or 0 without DH. */
+    public static int pendingServerUpdates() { IntSupplier p=pendingServerUpdates; return p==null?0:p.getAsInt(); }
     public static void setRemotePreview(World world,boolean supported) {
         if (supported) remotePreviews.put(world,Boolean.TRUE);else remotePreviews.remove(world);
     }

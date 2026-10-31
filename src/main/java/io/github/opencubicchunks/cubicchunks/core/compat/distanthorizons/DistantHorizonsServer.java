@@ -6,6 +6,7 @@ import com.seibel.distanthorizons.api.methods.events.sharedParameterObjects.DhAp
 import com.seibel.distanthorizons.api.objects.DhApiResult;
 import com.seibel.distanthorizons.common.util.ProxyUtil;
 import com.seibel.distanthorizons.core.api.internal.SharedApi;
+import com.seibel.distanthorizons.core.api.internal.chunkUpdating.WorldChunkUpdateManager;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorldServer;
@@ -42,6 +43,7 @@ public final class DistantHorizonsServer extends DhApiLevelLoadEvent {
         DistantHorizonsServer bridge=new DistantHorizonsServer();
         DhApi.events.bind(DhApiLevelLoadEvent.class,bridge);
         DistantHorizonsCompat.installServer(bridge::changed);
+        DistantHorizonsCompat.installServerFeed(DistantHorizonsServer::feedNow,()->WorldChunkUpdateManager.INSTANCE.getTotalQueuedCount());
         MinecraftForge.EVENT_BUS.register(bridge);
     }
     @Override public void onLevelLoad(DhApiEventParam<EventParam> event) {
@@ -103,9 +105,19 @@ public final class DistantHorizonsServer extends DhApiLevelLoadEvent {
             Map.Entry<Chunk,Long> entry=it.next();Chunk column=entry.getKey();
             if (event.world.getChunkProvider().getLoadedChunk(column.x,column.z)!=column) { it.remove();continue; }
             if (event.world.getTotalWorldTime()-entry.getValue()<3 || SharedApi.isChunkAtChunkPosAlreadyUpdating(level,column.x,column.z)) continue;
-            CubicChunkSnapshot snapshot=CubicChunkSnapshot.capture(column,level);
-            if (snapshot==null) continue;
-            SharedApi.INSTANCE.applyChunkUpdate(snapshot,level,true);count++;it.remove();
+            if (!feed(column,level)) continue;
+            count++;it.remove();
         }
+    }
+    /** A loaded column's snapshot handed to DH's level; false when it yields none. */
+    private static boolean feed(Chunk column, ILevelWrapper level) {
+        CubicChunkSnapshot snapshot=CubicChunkSnapshot.capture(column,level);
+        if (snapshot==null) return false;
+        SharedApi.INSTANCE.applyChunkUpdate(snapshot,level,true);
+        return true;
+    }
+    private static boolean feedNow(Chunk column) {
+        ILevelWrapper level=ProxyUtil.getLevelWrapper(column.getWorld());
+        return level!=null && level.getDhLevel()!=null && feed(column,level);
     }
 }
