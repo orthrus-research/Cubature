@@ -221,9 +221,11 @@ Survey cost per column, in µs (p50, with p90 where tiles vary):
 out from 4-block cells. This costs 63% of samples at 32-block cells, 25% at
 16 and 11% at 8.
 
-**Hash maps degraded to trees.** `HashMap$TreeNode.getTreeNode` takes 9.2% of
-self time at 2-block cells and 5.3% at 1-block cells, through `CaveMap.family`
-and `OreMap.patch`.
+**Hash lookups.** JFR shows `HashMap$TreeNode.getTreeNode` at 9.2% of self
+time at 2-block cells and 5.3% at 1-block cells, through `CaveMap.family` and
+`OreMap.patch`, and through DH's `BlockStateWrapper.fromBlockState`. The keys
+do not collide (identity hashes are distinct on this JVM); JFR folds the
+inlined lookup into that frame, and the cost is the lookups themselves.
 
 ### Shape differentials (offline, terrain only)
 
@@ -350,20 +352,27 @@ items free the native view as much as the preview.
      - full view unchanged at 30.4 s (40.2 s without the native hold);
      - preview sampling p90 1,441 ms against 1,821 ms;
      - flight tick median 25.0 ms against 22.8 ms.
-3. **One-column surface queries.** `TreeSites.surface` and
-   `GroundCover.waterBeside` take 30% and 10% of full-detail time. The survey
-   shows the native surface equals the `TerrainMap` top except at cave
-   openings. So a query needs that top and one column's carving, without ores
-   or the other 255 columns. The survey verifies it over 4.2 million columns.
+3. **One-column surface queries** (done). `TreeSites.surface` and
+   `GroundCover.waterBeside` took 30% and 10% of full-detail time, each
+   building a whole native chunk column to read one column. Riven's
+   `NativeColumns.surface` and `NativeColumns.water` now answer from a held
+   chunk column or resolve just that column (sampled, carved, its runs, no
+   ores), with a per-thread cache; `SurfaceQueryCheck` matches the chunk
+   column at 876,544 columns over six seeds, and the carve is needed (340
+   columns differ without it). Land route, two runs: preview sampling p90
+   1,103 and 1,114 ms against 1,225 to 1,480, p50 unchanged.
 4. **The crowding cascade.** Measure what is left after item 3. Crowding needs
    the earlier layers' valid trunks, which today means their full site
    builds.
-5. **No boulder lookups at coarse cells.** Skip `Boulders.at` in
-   `GroundCover.preview` from 4-block cells, where boulders are not drawn.
-6. **Hash keys and scratch.** Fix the colliding keys in `CaveMap.family` and
-   `OreMap.patch`. Move the per-column arrays of `TerrainColumn.preview` and
-   `TreeSites.canopy` into the task-confined sampler. On Cubature's side,
-   cache `BlockStateWrapper` per block state in the preview writer.
+5. **No boulder lookups at coarse cells** (done). `GroundCover.preview`
+   skips `Boulders.at` from 4-block cells, where boulders are not drawn;
+   coarse cells over an undrawn boulder take their neighbours' cover.
+6. **Hash lookups and scratch.** Done: rock-unit membership in `CaveMap` and
+   `OreMap` is a bitmask (`UnitSet`), and Cubature's preview writer caches
+   DH's `BlockStateWrapper` per block state for its tile. To do: move the
+   per-column arrays of `TerrainColumn.preview` and `TreeSites.canopy` into
+   the task-confined sampler (`TerrainColumn.preview` allocated 25 of the
+   72 GB preview threads allocated in a one-minute flight).
 7. **Later.** `StrictMath` takes 10 to 20% of sampler time. Replacing it
    changes terrain, so it needs a new terrain version and its own decision.
 

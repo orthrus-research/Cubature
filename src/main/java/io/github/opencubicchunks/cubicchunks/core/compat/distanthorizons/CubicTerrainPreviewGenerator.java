@@ -16,6 +16,7 @@ import io.github.opencubicchunks.cubicchunks.core.server.CubeDemand;
 import io.github.opencubicchunks.cubicchunks.core.server.delivery.PreviewPool;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.IdentityHashMap;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -120,6 +121,8 @@ final class CubicTerrainPreviewGenerator implements IDhApiWorldGenerator, Previe
         int[] bottoms=new int[8],tops=new int[8];
         IBlockState[] states=new IBlockState[8];
         final ArrayList<DhApiTerrainDataPoint> points=new ArrayList<>(8);
+        // One tile's states, a few dozen: DH's wrapper for each, asked of DH's shared map once.
+        final IdentityHashMap<IBlockState,BlockStateWrapper> wrappers=new IdentityHashMap<>();
         IBiomeWrapper biome;
         int count,cursor;
         boolean begun;
@@ -170,8 +173,9 @@ final class CubicTerrainPreviewGenerator implements IDhApiWorldGenerator, Previe
             begun=false;
         }
         private void addPoint(int bottom,int top,IBlockState state,int sky) {
-            points.add(DhApiTerrainDataPoint.create((byte)0,0,sky,bottom-minY,top-minY,
-                    BlockStateWrapper.fromBlockState(state,level,null),biome));
+            BlockStateWrapper wrapper=wrappers.get(state);
+            if (wrapper==null) wrappers.put(state,wrapper=BlockStateWrapper.fromBlockState(state,level,null));
+            points.add(DhApiTerrainDataPoint.create((byte)0,0,sky,bottom-minY,top-minY,wrapper,biome));
         }
     }
     private static boolean sourceWater(IBlockState state) {
