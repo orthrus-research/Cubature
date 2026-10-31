@@ -602,6 +602,13 @@ Land route on the workstation, traced, two runs per condition:
   tiles are cheaper?
 - **Biome locks.** `SurfaceTranscription` takes a biome's lock for each
   surface routine; it may limit scaling toward 24 cores.
+- **Save backlog after step 2.** With step 2's cheaper tiles, the PREFETCH
+  lifecycle flight ends with the whole view dirty and 13,500 to 14,900 cubes
+  awaiting autosave discovery, against 4,200 to 8,700 in the four pins before,
+  at the same 56,000 loads. Unloading then pauses 6 to 7 s during the 20 s
+  settle (1 to 4 s before), so both runs end it about 3,200 cubes above the
+  20,538-cube floor; every scenario still passes. Does the busier preview pool
+  take the save path's share, and should the governor count the save backlog?
 
 ## Changes from the first draft
 
