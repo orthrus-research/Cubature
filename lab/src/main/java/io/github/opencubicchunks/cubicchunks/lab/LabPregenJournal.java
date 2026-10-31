@@ -97,11 +97,12 @@ final class LabPregenJournal {
     int width = definition.get("widthColumns").getAsInt();
     int x = definition.get("originChunkX").getAsInt();
     int z = definition.get("originChunkZ").getAsInt();
+    int cubes = (definition.get("maxYExclusive").getAsInt() - definition.get("minY").getAsInt()) >> 4;
     for (int i = first; i < end; i++) {
       JsonObject row = batch.getAsJsonArray("rows").get(i - first).getAsJsonObject();
       if (row.get("chunkX").getAsInt() != x + i % width
           || row.get("chunkZ").getAsInt() != z + i / width
-          || row.get("cubes").getAsInt() != 32) {
+          || row.get("cubes").getAsInt() != cubes) {
         throw new IOException("Pregeneration batch coordinates disagree with definition");
       }
     }

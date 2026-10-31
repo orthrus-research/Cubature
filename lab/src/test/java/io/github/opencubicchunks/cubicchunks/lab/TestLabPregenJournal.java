@@ -20,7 +20,13 @@ public class TestLabPregenJournal {
   @Rule public TemporaryFolder temporary = new TemporaryFolder();
 
   private JsonObject definition() {
+    return definition(-128, 384);
+  }
+
+  private JsonObject definition(int minY, int maxY) {
     JsonObject value = new JsonObject();
+    value.addProperty("minY", minY);
+    value.addProperty("maxYExclusive", maxY);
     value.addProperty("inputsSha256", INPUTS);
     value.addProperty("widthColumns", 4);
     value.addProperty("originChunkX", -2);
@@ -29,6 +35,10 @@ public class TestLabPregenJournal {
   }
 
   private Map<String, Object> batch(int first, int end) {
+    return batch(first, end, 32);
+  }
+
+  private Map<String, Object> batch(int first, int end, int cubes) {
     Map<String, Object> result = new LinkedHashMap<>();
     result.put("firstColumn", first);
     result.put("endColumn", end);
@@ -38,7 +48,7 @@ public class TestLabPregenJournal {
       Map<String, Object> row = new LinkedHashMap<>();
       row.put("chunkX", -2 + i % 4);
       row.put("chunkZ", -2 + i / 4);
-      row.put("cubes", 32);
+      row.put("cubes", cubes);
       rows.add(row);
     }
     result.put("rows", rows);
@@ -89,5 +99,19 @@ public class TestLabPregenJournal {
     Map<String, Object> value = batch(0, 4);
     value.put("rows", batch(4, 8).get("rows"));
     journal.append(value);
+  }
+
+  @Test
+  public void aFullHeightMapRecordsEveryCubeOfEachColumn() throws IOException {
+    Path root = temporary.newFolder().toPath();
+    LabPregenJournal journal = new LabPregenJournal(root, definition(-1664, 384), 16);
+    journal.append(batch(0, 4, 128));
+    assertEquals(4, journal.committed());
+    try {
+      journal.append(batch(4, 8, 32));
+      org.junit.Assert.fail("A full-height map accepted band-sized columns");
+    } catch (IOException expected) {
+      assertEquals(4, journal.committed());
+    }
   }
 }
