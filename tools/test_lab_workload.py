@@ -18,7 +18,8 @@ class WorkloadTest(unittest.TestCase):
         value=workload();value.pop('route');value['scenarios']={'write':['full-view','spectator-flight','lifecycle-settle','lifecycle-save-purge']}
         value['spectatorFlight']={'durationSeconds':60,'blocksPerSecond':16,'settleSeconds':20}
         w.validate(value)
-        for key,bad in [('durationSeconds',1200),('blocksPerSecond',1),('settleSeconds',0)]:
+        changed=copy.deepcopy(value);changed['spectatorFlight']['blocksPerSecond']=34;w.validate(changed)
+        for key,bad in [('durationSeconds',1200),('blocksPerSecond',1),('blocksPerSecond',41),('settleSeconds',0)]:
             changed=copy.deepcopy(value);changed['spectatorFlight'][key]=bad
             with self.assertRaises(ValueError):w.validate(changed)
         value['scenarios']['write']=['spectator-flight','full-view','lifecycle-settle','lifecycle-save-purge']
@@ -74,6 +75,20 @@ class WorkloadTest(unittest.TestCase):
             changed=dict(client);changed[key]=bad
             with self.subTest(key=key),self.assertRaises(RuntimeError):w.validate_capture(manifest,server,changed)
         with self.assertRaises(RuntimeError):w.validate_capture(manifest,dict(server,worldSeed=1),client)
+
+    def test_spectator_flight_distance_follows_the_workload_speed(self):
+        value=workload();value.pop('route');value['scenarios']={'write':['full-view','spectator-flight','lifecycle-settle','lifecycle-save-purge']}
+        value['spectatorFlight']={'durationSeconds':60,'blocksPerSecond':34,'settleSeconds':30}
+        descriptor=w.identity(value,b'test');manifest={'benchmarkWorkload':dict(descriptor,value=value)}
+        pose=[value['camera'][0]+2040,value['camera'][1],value['camera'][2],-90,15]
+        client={'benchmarkWorkload':descriptor,'overlayObservationAvailable':True,'overlayWaitRequired':True,'spectatorFlight':{
+            'passed':True,'moving':True,'inRoutePositionOverrides':0,'movementElapsedNanos':60050000000,'distanceX':2040,
+            'observations':[{}]*60,'finalPose':pose}}
+        server={'benchmarkWorkload':descriptor,'worldSeed':value['seed'],'scenario':'spectator-flight','spectatorLifecycle':{
+            'clientFlight':{'passed':True},'observations':[{}]*60,'serverFinalPose':pose}}
+        w.validate_capture(manifest,server,client)
+        client['spectatorFlight']=dict(client['spectatorFlight'],distanceX=960)
+        with self.assertRaisesRegex(RuntimeError,'wall duration, speed'):w.validate_capture(manifest,server,client)
 
     def test_missing_phase_and_route_override_fail_before_native_priming(self):
         import argparse

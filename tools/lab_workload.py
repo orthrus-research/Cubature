@@ -66,7 +66,7 @@ def validate(value):
         flight=value.get('spectatorFlight')
         keys(flight,['durationSeconds','blocksPerSecond','settleSeconds'],['durationSeconds','blocksPerSecond','settleSeconds'])
         integer(flight['durationSeconds'],60,60,'durationSeconds')
-        integer(flight['blocksPerSecond'],16,16,'blocksPerSecond')
+        integer(flight['blocksPerSecond'],4,40,'blocksPerSecond')
         integer(flight['settleSeconds'],10,60,'settleSeconds')
     if 'storage-two-worlds' in names:
         order = value['scenarios']['write']
@@ -167,7 +167,8 @@ def validate_capture(manifest, server, client):
         authoritative=server.get('spectatorLifecycle',{}).get('clientFlight') or {}
         if not flight.get('passed') or not authoritative.get('passed') or not flight.get('moving') or flight.get('inRoutePositionOverrides') != 0:
             raise RuntimeError('Real client spectator flight did not pass')
-        if not 60000000000 <= flight.get('movementElapsedNanos',0) <= 61000000000 or abs(flight.get('distanceX',0)-960)>16 or len(flight.get('observations',[]))<55:
+        plan=expected['value']['spectatorFlight'];distance=plan['durationSeconds']*plan['blocksPerSecond']
+        if not 60000000000 <= flight.get('movementElapsedNanos',0) <= 61000000000 or abs(flight.get('distanceX',0)-distance)>16 or len(flight.get('observations',[]))<55:
             raise RuntimeError('Spectator flight missed wall duration, speed or trace coverage')
         final=flight.get('finalPose',[])
         if len(final)!=5 or abs(final[1]-expected['value']['camera'][1])>.5 or abs(final[2]-expected['value']['camera'][2])>.5:
