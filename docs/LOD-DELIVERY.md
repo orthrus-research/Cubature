@@ -398,6 +398,16 @@ items free the native view as much as the preview.
    1,625 on-CPU samples against 2,382, as with previews off (1,675). Per
    footprint in the survey, CPU per column fell from 106.6 to 85.7 us at
    1-block cells and from 259.8 to 200.4 at 2-block cells.
+
+   **Native view** (PREFETCH lifecycle on one Cubature build, with and
+   without step 2): the spawn full view took 21.6 to 23.6 s in five of six
+   runs (31.8 s in the sixth) against 24.7 and 29.2 s without it, and saved
+   blocks away from spawn are identical. Every settle that spans three ChunkGc
+   passes rests at the same 20,538 cubes with either build. The 20 s settle the
+   lifecycle workload had could end above it: ChunkGc starts a pass every
+   10 s, so the end count follows where that clock stood as the settle began,
+   which moves with everything before it. The workload settles 30 s since
+   (Riven's `cube-flight-lifecycle-v2`).
 7. **Later.** `StrictMath` takes 10 to 20% of sampler time. Replacing it
    changes terrain, so it needs a new terrain version and its own decision.
 
@@ -602,13 +612,6 @@ Land route on the workstation, traced, two runs per condition:
   tiles are cheaper?
 - **Biome locks.** `SurfaceTranscription` takes a biome's lock for each
   surface routine; it may limit scaling toward 24 cores.
-- **Save backlog after step 2.** With step 2's cheaper tiles, the PREFETCH
-  lifecycle flight ends with the whole view dirty and 13,500 to 14,900 cubes
-  awaiting autosave discovery, against 4,200 to 8,700 in the four pins before,
-  at the same 56,000 loads. Unloading then pauses 6 to 7 s during the 20 s
-  settle (1 to 4 s before), so both runs end it about 3,200 cubes above the
-  20,538-cube floor; every scenario still passes. Does the busier preview pool
-  take the save path's share, and should the governor count the save backlog?
 
 ## Changes from the first draft
 
