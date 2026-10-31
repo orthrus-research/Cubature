@@ -361,9 +361,21 @@ items free the native view as much as the preview.
    column at 876,544 columns over six seeds, and the carve is needed (340
    columns differ without it). Land route, two runs: preview sampling p90
    1,103 and 1,114 ms against 1,225 to 1,480, p50 unchanged.
-4. **The crowding cascade.** Measure what is left after item 3. Crowding needs
-   the earlier layers' valid trunks, which today means their full site
-   builds.
+4. **The crowding cascade** (done). After item 3, site builds took 21.5% of
+   preview time: clearance surface queries 15.8%, nested crowding builds 5.7%,
+   trunk ground tests 0.2%. Riven now tests a site's trunk ground before
+   crowding it (a site is valid only if every test passes, so the order sets
+   the cost, never the outcome), and clearance asks
+   `NativeColumns.surfaceAbove`, which carves a column only when its uncarved
+   runs rise above the height (carving never raises a top; `SurfaceQueryCheck`
+   proves it at every column). The preview survey shows every raster
+   identical across both; CPU per column fell from 85.7 to 47.9 us at 1-block
+   cells and from 200.4 to 87.1 us at 2-block cells. Land route, two runs:
+   preview sampling p90 563 and 565 ms against 718 and 635, 759 and 751
+   tiles against 697 and 720, flight tick p95 43.2 ms. Changing the crowding
+   rule itself (crowding by candidates rather than valid sites) would remove
+   the cascade but changes which trees grow, so it would need a terrain
+   version.
 5. **No boulder lookups at coarse cells** (done). `GroundCover.preview`
    skips `Boulders.at` from 4-block cells, where boulders are not drawn;
    coarse cells over an undrawn boulder take their neighbours' cover.
