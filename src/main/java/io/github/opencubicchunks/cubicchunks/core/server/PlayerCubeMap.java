@@ -180,6 +180,8 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
 
     private int horizontalViewDistance;
     private volatile boolean nativeBehind;
+    private static final int[] NO_VIEWS = new int[0];
+    private volatile int[] nativeViews = NO_VIEWS;
     private int verticalViewDistance;
 
     /**
@@ -525,11 +527,29 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
             if (canGenerateChunkPredicate.apply(player.playerEntity)) generating.add(player.playerEntity);
         int face = 2 * horizontalViewDistance + 1;
         nativeBehind = cubesToGenerate.size() + cubesToSendToClients.size() > face * face;
+        if (nativeBehind) {
+            int[] views = new int[players.size() * 4];
+            int i = 0;
+            for (PlayerWrapper player : players.valueCollection()) {
+                int y = player.getManagedCubePosY();
+                views[i++] = (int) Math.floor(player.playerEntity.managedPosX);
+                views[i++] = (int) Math.floor(player.playerEntity.managedPosZ);
+                views[i++] = (y - verticalViewDistance) * 16;
+                views[i++] = (y + verticalViewDistance + 1) * 16;
+            }
+            nativeViews = views;
+        } else {
+            nativeViews = NO_VIEWS;
+        }
         cubeCache.prepareRegions(generating, horizontalViewDistance, nativeBehind);
     }
 
     @Override public boolean nativeBehind() {
         return nativeBehind;
+    }
+
+    @Override public int[] nativeViews() {
+        return nativeViews;
     }
 
     /** PREFETCH: each player's ahead preparation, starting with a different player each tick. */

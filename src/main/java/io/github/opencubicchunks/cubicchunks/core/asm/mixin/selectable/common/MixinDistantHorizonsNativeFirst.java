@@ -20,7 +20,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
  * Cubature decides when DH's world generation queue may start a cubic preview tile; DH still picks which. While
- * Cubature's preview generator holds new tiles (its world's native view is behind, at a join or a teleport), the queue
+ * Cubature's preview generator holds new tiles (its world's native view is behind, at a join or a teleport, and would
+ * show a player's ground), the queue
  * finds the generator busy, so no tile starts and those running finish. With Cubature's preview pool, the pool's
  * permits replace DH's thread count: at most the permits plus one tile are in progress, the one waiting for the next
  * free permit, so DH's choice stays current. DH's queueing loop asks again each tick and after each tile.

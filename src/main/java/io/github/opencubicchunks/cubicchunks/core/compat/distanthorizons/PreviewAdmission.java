@@ -6,7 +6,7 @@ package io.github.opencubicchunks.cubicchunks.core.compat.distanthorizons;
  * while the pool admits no more.
  */
 public interface PreviewAdmission {
-    /** Whether no new tile may start: the world's native view is behind. */
+    /** Whether no new tile may start: the world's native view is behind and would show a player's ground. */
     boolean holdsNewTiles();
 
     /** Whether Cubature's preview pool samples the tiles, so its permits decide admission instead of DH's thread count. */

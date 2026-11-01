@@ -284,6 +284,14 @@ Figures are p95, in blocks:
   closed most of the join gap, so on the workstation the gate mostly guarantees
   the order; flight is unchanged (median tick 22 to 27 ms with previews, 9 to
   10 ms without), which step 3 addresses.
+- **Views that cannot show their ground.** The gate holds DH's tiles only
+  while some player's native view would show the ground at its column: the
+  surface there, from the preview sampler, inside the view with air above it
+  (`NativeGround`, the client feed's own test). A cubic view is a box; from
+  Y 320 at the 8 km world's join point it spans Y 128-528 over ground at
+  Y 77-121, so it shows only air, and holding the tiles left a pit for about
+  16 s (the coarse sections over it were answered 15 s after the join).
+  Regional preparation still waits for every view.
 - **Covered sections.** Waiting preview tasks for sections fully covered by
   sent native columns are cancelled, through `removeRetrievalRequestIf` on
   DH's world generation queue. Cubature's native snapshots supply DH there.

@@ -33,7 +33,7 @@ import net.minecraft.world.biome.Biome;
 
 /**
  * DH picks the tiles and owns pooled data, persistence and network delivery. Cubature decides when tiles start
- * (PreviewAdmission): none while the world's native view is behind, and with the server's preview pool, as many as its
+ * (PreviewAdmission): none while the world's native view is behind and would show a player's ground, and with the server's preview pool, as many as its
  * governor's permits; the pool samples them in place of DH's world generation executor.
  */
 final class CubicTerrainPreviewGenerator implements IDhApiWorldGenerator, PreviewAdmission {
@@ -65,12 +65,31 @@ final class CubicTerrainPreviewGenerator implements IDhApiWorldGenerator, Previe
     @Override public boolean pooled() { return pool!=null; }
     @Override public boolean admits(int inProgress) { return pool==null || pool.admits(inProgress); }
 
-    /** Native view first: the native view of this generator's world is behind (CubeDemand.nativeBehind). */
+    /**
+     * Native view first: the native view of this generator's world is behind (CubeDemand.nativeBehind) and would show
+     * a player's ground. A view that cannot, one whose cubes all lie above or below the surface at its player's column,
+     * shows nothing there but LOD, so it does not hold the tiles that would show that ground.
+     */
     @Override public boolean holdsNewTiles() {
         Object world=level.getWrappedMcObject();
         if (!(world instanceof WorldServer)) return false;
         PlayerChunkMap map=((WorldServer)world).getPlayerChunkMap();
-        return map instanceof CubeDemand && ((CubeDemand)map).nativeBehind();
+        if (!(map instanceof CubeDemand)) return false;
+        CubeDemand demand=(CubeDemand)map;
+        return demand.nativeBehind() && (provider==null || NativeGround.holds(demand.nativeViews(),this::surface));
+    }
+
+    private long surfaceColumn=Long.MIN_VALUE;
+    private int surfaceY;
+
+    /** The top non-air block of a column, from the preview sampler; the last column is kept, since a player waiting at a join stays in one. */
+    private synchronized int surface(int x,int z) {
+        long key=(long)x<<32|(z&0xffffffffL);
+        if (key!=surfaceColumn) {
+            surfaceY=NativeGround.topBlock(provider.createTerrainPreviewSampler(),x,z,minY);
+            surfaceColumn=key;
+        }
+        return surfaceY;
     }
 
     @Override public CompletableFuture<Void> generateLod(int minChunkX,int minChunkZ,int lodX,int lodZ,byte detail,

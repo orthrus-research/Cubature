@@ -25,4 +25,10 @@ public interface CubeDemand {
      * Horizons preview tile starts. Updated each tick; other threads may read it.
      */
     boolean nativeBehind();
+
+    /**
+     * While the native view is behind, each player's view, four ints a player: its block x and z, and the view's
+     * bottom block Y and exclusive top. Otherwise empty. Updated each tick; other threads may read it.
+     */
+    int[] nativeViews();
 }

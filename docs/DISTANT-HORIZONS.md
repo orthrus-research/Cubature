@@ -74,7 +74,10 @@ where they run and, in a cubic world, in what order they are asked for:
   `(2 x view + 1)^2` cubes, waits to generate or be sent (a join or a
   teleport), `MixinDistantHorizonsNativeFirst` makes DH find the generator
   busy, so no preview tile starts; tiles already running finish, and DH resumes
-  its own order as the native view catches up.
+  its own order as the native view catches up. This applies only while some
+  player's view would show the ground at its column (the surface from the
+  preview sampler inside the view, with air above it): a view entirely above
+  or below the ground shows nothing that tiles would replace.
 - **The preview pool.** The server's `PreviewPool` (`previewThreads`, by
   default a quarter of the processors, 1 to 8) samples tiles in place of DH's
   world generation executor, so DH's server health pause no longer stops them.
