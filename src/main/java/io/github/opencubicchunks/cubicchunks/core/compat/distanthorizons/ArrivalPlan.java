@@ -20,8 +20,10 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>A cubic native view is a box: it stops a vertical view distance above and below the camera. Where the ground lies
  * outside it (high over lowland, on a peak over a valley) the native view stands over a column without showing its
  * surface, and DH, which draws no LOD there, would leave a pit. So a section the native view covers now is held only
- * when the native view shows the surface of every column of it (the test the client feed applies), and sections it
- * will cover are held only while 95% of its loaded columns show their surface.
+ * when the native view shows the surface of every column of it (the test the client feed applies). One that it does
+ * not is a pit: nothing else will ever draw there, so while the server can afford it (the 1-block ring's test) it
+ * ranks with the on-time sections, and being nearest goes first. The hold on sections the native view will cover is
+ * unchanged: judged against the share of columns that show their ground it starved coverage in fast flight.
  *
  * <p>The on-time detail follows the coarse sections' own arrivals while the player moves. When more than a tenth of
  * them arrive after the player has come close enough to want finer detail there, it steps one level coarser; when none
@@ -184,8 +186,9 @@ public final class ArrivalPlan {
 
     /**
      * The sort key for a section: lower goes first, {@link #HOLD} holds it back. Sections at or coarser than the
-     * on-time detail come first, then finer ones inside DH's 1-block ring while the server can afford them, then the
-     * other finer ones; within each, the sooner the player reaches the section the earlier.
+     * on-time detail come first, with pits the server can afford, then finer ones inside DH's 1-block ring while the
+     * server can afford them, then the other finer ones; within each, the sooner the player reaches the section the
+     * earlier.
      */
     public long key(int detail, int minX, int minZ, int width) {
         State s = state;
@@ -193,14 +196,16 @@ public final class ArrivalPlan {
         double cover = coverSeconds(s, minX, minZ, width);
         boolean moving = s.speed() >= MOVING;
         // DH draws no LOD where native terrain stands; moving with the native view behind, its corners may need one.
-        if (cover == 0 && (s.nativeKeepingUp || !moving) && nativeShows(minX, minZ, width)) return HOLD;
-        if (moving && s.nativeKeepingUp && groundShare >= NATIVE_KEEPING_UP
-                && cover <= Math.min(HORIZON_SECONDS, service[clamp(detail)])) return HOLD;
+        boolean pit = cover == 0 && !nativeShows(minX, minZ, width);
+        if (cover == 0 && (s.nativeKeepingUp || !moving) && !pit) return HOLD;
+        if (moving && s.nativeKeepingUp && cover > 0 && cover <= Math.min(HORIZON_SECONDS, service[clamp(detail)]))
+            return HOLD;
         double dx = minX + width / 2.0 - s.x, dz = minZ + width / 2.0 - s.z, length = Math.hypot(dx, dz);
         double approach = moving && length > 0 ? (dx * s.vx + dz * s.vz) / length : 0;
         double reach = reach(s, minX, minZ, width);
         long millis = (long) Math.min(1L << 40, reach / Math.max(approach, MIN_APPROACH) * 1000);
-        long rank = detail >= floor ? 0 : reach < unit * base && ringAffordable(s) ? 1 : 2;
+        boolean affordable = ringAffordable(s);
+        long rank = detail >= floor || pit && affordable ? 0 : reach < unit * base && affordable ? 1 : 2;
         return rank << 41 | millis;
     }
 

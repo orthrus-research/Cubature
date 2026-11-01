@@ -50,11 +50,22 @@ public class TestArrivalPlan {
         assertEquals("A section of columns that show their ground stays held", ArrivalPlan.HOLD, plan.key(6, 64, 0, 64));
     }
 
-    @Test public void highOverGroundTheNativeViewMissesNothingAheadIsHeld() {
-        ArrivalPlan plan = flying(34, 1);
-        assertEquals(ArrivalPlan.HOLD, plan.key(6, 300, 0, 64));
-        plan.nativeGround(Collections.emptySet(), 0.5);
-        assertNotEquals("Covered in about 4.9 s, but its ground may not show", ArrivalPlan.HOLD, plan.key(6, 300, 0, 64));
+    @Test public void standingOverAPitItGoesFirstWithCoverage() {
+        ArrivalPlan plan = flying(0, 1);
+        plan.nativeGround(Collections.singleton(ArrivalPlan.chunkKey(1, 1)), 0.9);
+        long pit = plan.key(6, 0, 0, 64), coarseFar = plan.key(10, 3000, 0, 1024);
+        assertTrue(ArrivalPlan.coarse(pit));
+        assertTrue("Nearest first", pit < coarseFar);
+    }
+
+    @Test public void inElytraFlightAPitIsAskedForBehindCoverage() {
+        ArrivalPlan plan = answering(34, 2);
+        plan.nativeGround(Collections.singleton(ArrivalPlan.chunkKey(1, 1)), 0.2);
+        long pit = plan.key(6, 0, 0, 64);
+        assertNotEquals(ArrivalPlan.HOLD, pit);
+        assertFalse(ArrivalPlan.coarse(pit));
+        assertFalse(ArrivalPlan.nearRing(pit));
+        assertEquals("Sections it will cover stay held whatever the ground", ArrivalPlan.HOLD, plan.key(6, 300, 0, 64));
     }
 
     @Test public void aLaggingNativeViewHoldsNothingWhileMoving() {
