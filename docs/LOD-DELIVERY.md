@@ -620,6 +620,31 @@ server there (435 cubes not ready with no distant generation, tick p50
 the native view about 510 cubes more than DH's near ones (an open question
 below). The on-time detail settled at 16-block cells in both flights.
 
+**Settled detail** (2026-10-31; fresh worlds inside the 8 km pregenerated
+square, east along z -1500 from x -1800, Riven 9a1cebf and one lab jar,
+Cubature f7320158 against 90715a3c, which adds rest recovery after travel,
+coverage first at a join or teleport and the affordable 1-block ring). The
+measure is the share of each distance band whose finest real data (native
+terrain or native-fed, else the server tiles that answered) is at the
+detail DH's MEDIUM quality wants there; a section without its own data
+shows a coarser parent's copied down. At the end of a 30 s settle:
+
+| Band | 16 b/s before | 16 b/s after | 34 b/s before (2 runs) | 34 b/s after (2 runs) |
+|---|---|---|---|---|
+| 200-384 blocks (1-block wanted) | 22% | 90% | 22%, 22% | 91%, 91% |
+| 384-768 (2-block) | 11% | 95% | 11%, 11% | 93%, 93% |
+| 768-1,536 (4-block) | 29% | 82% | 38%, 38% | 94%, 84% |
+| 1,536-3,072 (8-block) | 45% | 74% | 72%, 69% | 70%, 73% |
+| 3,072-4,096 (16-block, in far fog) | 100% | 100% | 100%, 100% | 41%, 72% |
+
+At the flight's end the two builds are within run-to-run spread (34 b/s,
+3,072-4,096 blocks without data: 65% and 80% before, 85% and 51% after).
+Standing still the server answered 11 to 34 tiles a second nearest first
+(the nearest tiles reuse the regional plans the native view just built)
+against 0 to 4 for the far 16-block tiles a coarse on-time detail kept
+first, which build cold ones. The trade: after a fast flight the far fog
+band fills after the near rings instead of before them.
+
 ### 6. DH's own pool and integrated servers
 
 - **Fresh instances:** set DH's `numberOfThreads` from `P`.
