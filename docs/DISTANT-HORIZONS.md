@@ -105,6 +105,16 @@ where they run and, in a cubic world, in what order they are asked for:
 Pooled sources are retained only until their generation future completes;
 closing cancels work.
 
+A dedicated server closes DH's world at `FMLServerStoppingEvent`, before it
+disconnects its players. DH builds each received message on the Netty thread,
+and a trackable message asserts that a DH world is loaded, so a client's
+full-data requests arriving in that window failed to decode and Forge cut the
+connection ("A fatal error has occurred"; `Message can't be created if no
+world is loaded` in the server log). `MixinDistantHorizonsNoWorldMessages`
+leaves a message received with no DH world undecoded; DH's handler skips it,
+as its server and client APIs ignore messages without a world. It logs the
+first drop and every 64th (`CC/DH dropped a Distant Horizons message`).
+
 Minecraft 1.12.2's DH startup forces `INTERNAL_SERVER` and hides its built-in
 rough-generation plans. CC keeps that global fallback intact. Its world packet
 adds an optional capability byte, absent on older servers. Only a capable cubic

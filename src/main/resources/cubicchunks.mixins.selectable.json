@@ -23,6 +23,7 @@
         "common.MixinDistantHorizonsNativeFirst",
         "common.MixinDistantHorizonsServeInOrder",
         "common.MixinDistantHorizonsMaterials",
+        "common.MixinDistantHorizonsNoWorldMessages",
         "common.MixinChunkCache",
         "common.MixinPathNavigate",
         "common.MixinTileEntityBeaconBetterFps",

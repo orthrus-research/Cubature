@@ -44,6 +44,17 @@ and accompanying GPL-3.0 texts are packaged under
 `META-INF/licenses/distanthorizons/`. This explicit exception takes precedence
 over the MIT default below; Riven's NRR license does not cover it.
 
+## Distant Horizons no-world message patch
+
+`MixinDistantHorizonsNoWorldMessages.java`, copyright (c) 2026 Orthrus
+Research, is licensed under LGPL-3.0-only. This source-level runtime
+integration targets DH 3.3.3's 1.12.2 `ForgePluginPacketSender$MessageWrapper`:
+it leaves a message received with no DH world loaded undecoded, and retains
+DH's message registry, decoding and handler code. The LGPL-3.0 and
+accompanying GPL-3.0 texts are packaged under
+`META-INF/licenses/distanthorizons/`. This explicit exception takes precedence
+over the MIT default below; Riven's NRR license does not cover it.
+
 ## Async chunk loading
 The asynchronous chunk loading executor code in `io.github.opencubicchunks.cubicchunks.core.server.chunkio.async.forge` is based on parts of
 [MinecraftForge](https://github.com/MinecraftForge/MinecraftForge) and licensed under the
