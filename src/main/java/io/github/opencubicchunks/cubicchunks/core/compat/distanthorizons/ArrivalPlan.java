@@ -17,9 +17,13 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p>The on-time detail follows the coarse sections' own arrivals while the player moves. When more than a tenth of
  * them arrive after the player has come close enough to want finer detail there, it steps one level coarser; when none
- * are late and coarse requests are under half of those sent, it steps one level finer. Detail levels are DH section
- * detail levels: 6 is 1-block cells, 8 is 4-block cells. The server serves a cubic world's requests in the order they
- * arrive (MixinDistantHorizonsServeInOrder), so this order reaches its preview generator.
+ * are late and coarse requests are under half of those sent, it steps one level finer. Once the player has been still
+ * for a second it is 1-block, so every section ranks nearest first, as DH would order them, and the detail flight gave
+ * up comes back where the player looks; moving again restores the in-flight detail. Sections inside DH's 1-block ring
+ * always rank on time, so the terrain nearest the native view is not left to coarse placeholders behind every coarse
+ * section of the radius. Detail levels are DH section detail levels: 6 is 1-block cells, 8 is 4-block cells. The
+ * server serves a cubic world's requests in the order they arrive (MixinDistantHorizonsServeInOrder), so this order
+ * reaches its preview generator.
  *
  * <p>The client keeps in flight only what the server answers in about 3 s (its answers a second, smoothed over about
  * five, times three), never fewer than 8 and never more than DH's limit, so its choice is at most a few seconds old
@@ -32,6 +36,7 @@ public final class ArrivalPlan {
     static final double MIN_APPROACH = 4, MOVING = 2, NATIVE_KEEPING_UP = 0.95, HORIZON_SECONDS = 10, START_SECONDS = 5;
     static final int LATE_WINDOW = 20, MIN_ARRIVALS = 10, MAX_TRACKED = 8192;
     static final long COARSER_AFTER = 5_000_000_000L, FINER_AFTER = 15_000_000_000L, VELOCITY_NANOS = 500_000_000L;
+    static final long REST_NANOS = 1_000_000_000L;
     static final int INFLIGHT_MIN = 8;
     static final double QUEUE_SECONDS = 3;
 
@@ -47,6 +52,10 @@ public final class ArrivalPlan {
 
     private volatile State state;
     private volatile int floor = START;
+    /** The on-time detail to restore when a resting player moves again. */
+    private int flightFloor = START;
+    private boolean resting;
+    private long stillSince;
     private volatile double unit = 192, base = 2;
     /** Seconds from queueing a request to its data, per detail level; replaced whole on each arrival. */
     private volatile double[] service = filled(START_SECONDS);
@@ -97,11 +106,32 @@ public final class ArrivalPlan {
             rateSecond += 1_000_000_000L;
         }
         state = new State(px, pz, vx, vz, halfWidth, nativeLoadedShare >= NATIVE_KEEPING_UP);
+        rest(nanos, Math.hypot(vx, vz) < MOVING);
+    }
+
+    /** Still for a second: 1-block on time, nearest first. Moving again: the in-flight detail. */
+    private void rest(long nanos, boolean still) {
+        if (!still) {
+            stillSince = 0;
+            if (resting) {
+                resting = false;
+                floor = flightFloor;
+                reset(nanos);
+            }
+        } else if (stillSince == 0) {
+            stillSince = nanos;
+        } else if (!resting && nanos - stillSince >= REST_NANOS) {
+            resting = true;
+            flightFloor = floor;
+            floor = FINEST;
+            reset(nanos);
+        }
     }
 
     /**
      * The sort key for a section: lower goes first, {@link #HOLD} holds it back. Sections at or coarser than the
-     * on-time detail come before finer ones; within each, the sooner the player reaches the section the earlier.
+     * on-time detail, and any inside DH's 1-block ring, come before finer ones; within each, the sooner the player
+     * reaches the section the earlier.
      */
     public long key(int detail, int minX, int minZ, int width) {
         State s = state;
@@ -113,11 +143,13 @@ public final class ArrivalPlan {
         if (moving && s.nativeKeepingUp && cover <= Math.min(HORIZON_SECONDS, service[clamp(detail)])) return HOLD;
         double dx = minX + width / 2.0 - s.x, dz = minZ + width / 2.0 - s.z, length = Math.hypot(dx, dz);
         double approach = moving && length > 0 ? (dx * s.vx + dz * s.vz) / length : 0;
-        long millis = (long) Math.min(1L << 40, reach(s, minX, minZ, width) / Math.max(approach, MIN_APPROACH) * 1000);
-        return (detail >= floor ? 0 : 1L << 41) | millis;
+        double reach = reach(s, minX, minZ, width);
+        long millis = (long) Math.min(1L << 40, reach / Math.max(approach, MIN_APPROACH) * 1000);
+        boolean onTime = detail >= floor || reach < unit * base;
+        return (onTime ? 0 : 1L << 41) | millis;
     }
 
-    /** Whether a key ranks with the coarse sections, those at or coarser than the on-time detail. */
+    /** Whether a key ranks on time: at or coarser than the on-time detail, or inside the 1-block ring. */
     public static boolean coarse(long key) { return key != HOLD && (key & (1L << 41)) == 0; }
 
     /** Chebyshev blocks from the player to the nearest point of a section; 0 inside it. */

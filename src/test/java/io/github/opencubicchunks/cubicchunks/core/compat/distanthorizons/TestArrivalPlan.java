@@ -71,6 +71,30 @@ public class TestArrivalPlan {
         assertEquals(8, plan.floor());
     }
 
+    @Test public void aStillPlayerGetsNearestFirstAndFlyingAgainRestoresTheFlightDetail() {
+        ArrivalPlan plan = flying(34, 1);
+        long now = 100 * SECOND;
+        for (int i = 0; i < 10; i++) plan.arrived(i, now + i, 8, 500, 0, 256);
+        assertEquals("Late in flight: 8-block", 9, plan.floor());
+        // Stopped at x = 0: the smoothed speed falls under 2 blocks/s in about 1.3 s, then a second of rest.
+        for (int i = 1; i <= 60; i++) plan.observe(now + i * TICK, 0, 0, HALF, 1);
+        assertEquals("At rest: 1-block", ArrivalPlan.FINEST, plan.floor());
+        long nearFine = plan.key(6, 300, 0, 64), farCoarse = plan.key(10, 2500, 0, 1024);
+        assertTrue(ArrivalPlan.coarse(nearFine));
+        assertTrue("Nearest first", nearFine < farCoarse);
+        long later = now + 60 * TICK;
+        for (int i = 1; i <= 20; i++) plan.observe(later + i * TICK, 34 * i * TICK / 1e9, 0, HALF, 1);
+        assertEquals("Flying again: the in-flight detail", 9, plan.floor());
+    }
+
+    @Test public void theOneBlockRingRanksOnTimeInFlight() {
+        ArrivalPlan plan = flying(34, 1);
+        assertEquals(ArrivalPlan.START, plan.floor());
+        // DH's MEDIUM quality wants 1-block cells up to 192 * 2 = 384 blocks out.
+        assertTrue("Beside the path, 260 blocks out", ArrivalPlan.coarse(plan.key(6, 64, 260, 64)));
+        assertFalse("500 blocks out", ArrivalPlan.coarse(plan.key(6, 64, 500, 64)));
+    }
+
     @Test public void serviceTimeRunsFromQueueingToTheAnswer() {
         ArrivalPlan plan = flying(34, 1);
         plan.queued(7, 100 * SECOND);

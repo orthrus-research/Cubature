@@ -535,10 +535,12 @@ second, rejection fails the section).
 
 **The arrival plan** (`ArrivalPlan`, client Mixins on DH's quad tree and
 request queue, `distantHorizonsArrivalPlan`):
-- **Order:** sections at or coarser than the on-time detail go first; within
-  each group, the sooner the player reaches a section (distance over speed
-  toward it, at least 4 blocks/s) the earlier. Standing still this is nearest
-  first.
+- **Order:** sections at or coarser than the on-time detail go first, and so
+  does any section inside DH's 1-block ring (`distanceUnitInBlocks` × 16 ×
+  `quadraticBase`: 384 blocks at MEDIUM), so the terrain just past the native
+  view is not left to coarse placeholders; within each group, the sooner the
+  player reaches a section (distance over speed toward it, at least 4
+  blocks/s) the earlier. Standing still this is nearest first.
 - **Hold:** a section the native view's square holds now, or will hold before
   its data could arrive (the time from queueing to an answer at its detail,
   learned as requests return, at most 10 s ahead), is held back: the tree
@@ -551,7 +553,12 @@ request queue, `distantHorizonsArrivalPlan`):
   where finer detail is wanted there steps it coarser (at most every 5 s);
   none late and coarse requests under half of those sent steps it finer
   (at most every 15 s). It starts at 4-block cells and stays within 1- to
-  16-block cells.
+  16-block cells. After a second standing still (under 2 blocks/s) it is
+  1-block, so every section goes nearest first and the detail flight gave up
+  returns; moving again restores the in-flight detail. Without this it kept
+  the 16-block cells of a flight after landing, and the sections DH wants at
+  1- and 2-block cells near the player waited behind every 16-block section
+  of the radius, showing their parents' 16-block data copied down.
 - **In flight:** only what the server answers in about 3 s (answers a second
   times three), at least 8, at most DH's limit, so a choice is seconds old
   when its tile starts rather than tens of seconds.
