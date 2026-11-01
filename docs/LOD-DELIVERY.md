@@ -555,7 +555,18 @@ request queue, `distantHorizonsArrivalPlan`):
   leaves it missing and the queue cancels it if unsent. DH's tree offers it
   again every pass, so a wrong prediction only delays a request. Predictions
   apply only while 95% of the native view's columns are loaded; while the
-  player moves with the native view behind, nothing ahead is held.
+  player moves with the native view behind, nothing ahead is held. A cubic
+  native view is a box (the vertical view distance above and below the
+  camera), so it can stand over a column without showing its ground: high
+  over lowland, or on a peak over a valley. A section it covers now is held
+  only when every column of it shows its surface inside the received cubes
+  (`CubicChunkSnapshot.showsSurface`, the client feed's own test, from the
+  height map the server sends), and sections it will cover only while 95%
+  of its loaded columns do. Before this the plan held every covered section
+  and the client feed refused those columns, so the ground there had neither
+  native terrain nor LOD: a pit walled by the LOD columns around it
+  (2026-10-31, joining at Y 320 over ground at Y 77 to 121, the native view
+  reaching down to Y 128).
 - **On-time detail:** follows the coarse sections' arrivals while moving.
   More than a tenth arriving after the player has come within the ring
   where finer detail is wanted there steps it coarser (at most every 5 s);

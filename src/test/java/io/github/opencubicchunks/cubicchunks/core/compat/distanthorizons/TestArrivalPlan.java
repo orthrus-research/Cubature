@@ -5,6 +5,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 
+import java.util.Collections;
 import org.junit.Test;
 
 public class TestArrivalPlan {
@@ -38,6 +39,22 @@ public class TestArrivalPlan {
         assertEquals("Covered in about 4.9 s, before its data (5 s)", ArrivalPlan.HOLD, plan.key(6, 300, 0, 64));
         assertNotEquals("Covered in about 10.9 s, after", ArrivalPlan.HOLD, plan.key(6, 500, 0, 64));
         assertNotEquals("Beside the path", ArrivalPlan.HOLD, plan.key(6, 64, 260, 64));
+    }
+
+    @Test public void aCoveredSectionWhoseGroundTheNativeViewMissesIsAskedFor() {
+        ArrivalPlan plan = flying(0, 1);
+        assertEquals("Covered, its ground shown", ArrivalPlan.HOLD, plan.key(6, 0, 0, 64));
+        // The ground under chunk (1, 1) lies below the native view's lowest cube.
+        plan.nativeGround(Collections.singleton(ArrivalPlan.chunkKey(1, 1)), 0.9);
+        assertNotEquals("Its section is asked for", ArrivalPlan.HOLD, plan.key(6, 0, 0, 64));
+        assertEquals("A section of columns that show their ground stays held", ArrivalPlan.HOLD, plan.key(6, 64, 0, 64));
+    }
+
+    @Test public void highOverGroundTheNativeViewMissesNothingAheadIsHeld() {
+        ArrivalPlan plan = flying(34, 1);
+        assertEquals(ArrivalPlan.HOLD, plan.key(6, 300, 0, 64));
+        plan.nativeGround(Collections.emptySet(), 0.5);
+        assertNotEquals("Covered in about 4.9 s, but its ground may not show", ArrivalPlan.HOLD, plan.key(6, 300, 0, 64));
     }
 
     @Test public void aLaggingNativeViewHoldsNothingWhileMoving() {

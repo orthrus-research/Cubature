@@ -76,7 +76,7 @@ public final class CubicChunkSnapshot extends ChunkWrapper {
             d.biomes[index]=biome;
         }
         // Require the known surface plus air above it. An underground-only slice is not a surface LOD.
-        if(highestOpaque>=d.maxY || lowestOpaque<(long)first*16 || highestOpaque+1L>(long)(last+1)*16-1) return null;
+        if(!sliceShowsSurface(lowestOpaque,highestOpaque,first,last,d.maxY)) return null;
         d.sections=new Section[last-first+1]; d.firstCube=first;
         d.lowestReceivedY=Math.max(d.minY,first*16); d.highestReceivedY=Math.min(d.maxY,(last+1)*16);
         d.hasSky=column.getWorld().provider.hasSkyLight();
@@ -119,6 +119,32 @@ public final class CubicChunkSnapshot extends ChunkWrapper {
         }
         d.hash=31*(31*hash+Arrays.hashCode(biomeIds))+Arrays.hashCode(d.opacityTop);
         return new CubicChunkSnapshot(column,level,d);
+    }
+
+    /** Whether the received cubes firstCube..lastCube hold every top block of a column, with air above it. */
+    static boolean sliceShowsSurface(int lowestTop, int highestTop, int firstCube, int lastCube, int maxY) {
+        return highestTop<maxY && lowestTop>=(long)firstCube*16 && highestTop+1L<=(long)(lastCube+1)*16-1;
+    }
+
+    /**
+     * Whether a column's received cubes show its surface, as a surface LOD needs: true when every top block (from the
+     * height map the server sends) lies in the contiguous received slice with air above it, false when the surface is
+     * below or above the slice (a camera far above or below the ground), null while the slice is empty or has a gap.
+     */
+    @Nullable public static Boolean showsSurface(Chunk column) {
+        ICubicWorld world=(ICubicWorld)column.getWorld();
+        IColumn cubes=(IColumn)column;
+        int minY=world.getMinHeight(),maxY=world.getMaxHeight(),first=Integer.MAX_VALUE,last=Integer.MIN_VALUE;
+        for (ICube cube:cubes.getLoadedCubes())
+            if (cube.getY()*16L>=minY && cube.getY()*16L<maxY) { first=Math.min(first,cube.getY()); last=Math.max(last,cube.getY()); }
+        if (first>last) return null;
+        for(int cy=first;cy<=last;cy++)if(cubes.getLoadedCube(cy)==null)return null;
+        int lowest=Integer.MAX_VALUE,highest=Integer.MIN_VALUE;
+        for(int z=0;z<16;z++)for(int x=0;x<16;x++) {
+            int top=cubes.getOpacityIndex().getTopBlockY(x,z);
+            lowest=Math.min(lowest,top);highest=Math.max(highest,top);
+        }
+        return sliceShowsSurface(lowest,highest,first,last,maxY);
     }
 
     @Override public CubicChunkSnapshot copy() { return new CubicChunkSnapshot(getChunk(),level,data); }

@@ -91,8 +91,8 @@ where they run and, in a cubic world, in what order they are asked for:
   than an on-time detail first (it follows how coarse sections arrive in
   flight and is 1-block once the player stands still after travel), then finer sections
   inside DH's 1-block ring while the server can afford them, holds
-  back sections the native view covers or will cover before their data could
-  arrive, keeps in flight only what the server answers in about 3 s, and lets
+  back sections the native view covers (where it shows their ground) or will
+  cover before their data could arrive, keeps in flight only what the server answers in about 3 s, and lets
   DH's quad tree find newly wanted sections while its queue is full
   (`MixinDistantHorizonsArrivalTree`, `MixinDistantHorizonsArrivalRequests`).
   The server starts the tile whose request arrived first

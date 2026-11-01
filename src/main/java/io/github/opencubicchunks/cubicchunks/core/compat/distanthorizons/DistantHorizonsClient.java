@@ -13,11 +13,13 @@ import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -142,17 +144,28 @@ public final class DistantHorizonsClient {
         if(!CubicChunksConfig.distantHorizonsArrivalPlan || player==null){planning=false;return;}
         int view=Minecraft.getMinecraft().gameSettings.renderDistanceChunks;
         if(ticks%10==0) {
-            int cx=(int)Math.floor(player.posX)>>4,cz=(int)Math.floor(player.posZ)>>4,loaded=0;
-            for(int x=cx-view;x<=cx+view;x++)for(int z=cz-view;z<=cz+view;z++)if(world.getChunkProvider().getLoadedChunk(x,z)!=null)loaded++;
+            int cx=(int)Math.floor(player.posX)>>4,cz=(int)Math.floor(player.posZ)>>4,loaded=0,judged=0,shown=0;
+            Set<Long> unshown=new HashSet<>();
+            for(int x=cx-view;x<=cx+view;x++)for(int z=cz-view;z<=cz+view;z++) {
+                Chunk column=world.getChunkProvider().getLoadedChunk(x,z);
+                if(column==null)continue;
+                loaded++;
+                // A column whose surface lies outside its received cubes shows no ground: let DH's LOD stand there.
+                Boolean surface=CubicChunkSnapshot.showsSurface(column);
+                if(surface==null)continue;
+                judged++;
+                if(surface)shown++;else unshown.add(ArrivalPlan.chunkKey(x,z));
+            }
             nativeShare=loaded/(double)((2*view+1)*(2*view+1));
+            PLAN.nativeGround(unshown,judged==0?1:shown/(double)judged);
             EDhApiHorizontalQuality quality=Config.Client.Advanced.Graphics.Quality.horizontalQuality.get();
             PLAN.rings(quality.distanceUnitInBlocks*16.0,quality.quadraticBase);
         }
         PLAN.observe(System.nanoTime(),player.posX,player.posZ,view*16+8,nativeShare);
         planning=true;
         if(ticks%200==0)
-            CubicChunks.LOGGER.info("CC/DH arrival plan: on-time detail {}-block, speed {} b/s, native view {}% loaded, in flight {} ({} answers/s), held {}, cancelled {}, service s 1/2/4/8/16-block {}/{}/{}/{}/{}",
-                1<<(PLAN.floor()-ArrivalPlan.FINEST),Math.round(PLAN.speed()),Math.round(nativeShare*100),PLAN.inflight(40),
+            CubicChunks.LOGGER.info("CC/DH arrival plan: on-time detail {}-block, speed {} b/s, native view {}% loaded ({}% show their ground), in flight {} ({} answers/s), held {}, cancelled {}, service s 1/2/4/8/16-block {}/{}/{}/{}/{}",
+                1<<(PLAN.floor()-ArrivalPlan.FINEST),Math.round(PLAN.speed()),Math.round(nativeShare*100),Math.round(PLAN.groundShare()*100),PLAN.inflight(40),
                 String.format("%.1f",PLAN.answerRate()),held.get(),cancelled.get(),
                 Math.round(PLAN.serviceSeconds(6)),Math.round(PLAN.serviceSeconds(7)),Math.round(PLAN.serviceSeconds(8)),
                 Math.round(PLAN.serviceSeconds(9)),Math.round(PLAN.serviceSeconds(10)));

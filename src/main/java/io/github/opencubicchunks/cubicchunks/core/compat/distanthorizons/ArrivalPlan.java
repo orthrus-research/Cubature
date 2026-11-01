@@ -5,6 +5,8 @@
 package io.github.opencubicchunks.cubicchunks.core.compat.distanthorizons;
 
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -14,6 +16,12 @@ import java.util.concurrent.ConcurrentHashMap;
  * the on-time detail go before finer ones, and holds back a section the native view covers now, or will cover before
  * its data could arrive. Holding back only delays a request: a section the prediction got wrong is asked for as soon
  * as it no longer qualifies, and nothing here changes what any section contains.
+ *
+ * <p>A cubic native view is a box: it stops a vertical view distance above and below the camera. Where the ground lies
+ * outside it (high over lowland, on a peak over a valley) the native view stands over a column without showing its
+ * surface, and DH, which draws no LOD there, would leave a pit. So a section the native view covers now is held only
+ * when the native view shows the surface of every column of it (the test the client feed applies), and sections it
+ * will cover are held only while 95% of its loaded columns show their surface.
  *
  * <p>The on-time detail follows the coarse sections' own arrivals while the player moves. When more than a tenth of
  * them arrive after the player has come close enough to want finer detail there, it steps one level coarser; when none
@@ -67,6 +75,9 @@ public final class ArrivalPlan {
     private boolean travelled;
     private long stillSince;
     private volatile double unit = 192, base = 2;
+    /** Loaded native-view columns whose surface lies outside their received cubes (chunk keys), and the share that show it. */
+    private volatile Set<Long> unshown = Collections.emptySet();
+    private volatile double groundShare = 1;
     /** Seconds from queueing a request to its data, per detail level; replaced whole on each arrival. */
     private volatile double[] service = filled(START_SECONDS);
     private final ConcurrentHashMap<Long, Long> queued = new ConcurrentHashMap<>();
@@ -87,6 +98,24 @@ public final class ArrivalPlan {
 
     /** DH's detail falloff: detail k (0 = 1-block) is wanted from {@code unit * base^k} blocks out. */
     public void rings(double unit, double base) { this.unit = unit; this.base = base; }
+
+    /** The native view's columns that do not show their surface, and the share of judged columns that do. */
+    public void nativeGround(Set<Long> unshownChunks, double shownShare) { unshown = unshownChunks; groundShare = shownShare; }
+
+    public double groundShare() { return groundShare; }
+
+    /** A chunk column's key, as {@code ChunkPos.asLong} makes it. */
+    public static long chunkKey(int x, int z) { return x & 0xffffffffL | (z & 0xffffffffL) << 32; }
+
+    /** Whether the native view shows the surface of every column of a section. */
+    boolean nativeShows(int minX, int minZ, int width) {
+        Set<Long> u = unshown;
+        if (u.isEmpty()) return true;
+        for (int cx = minX >> 4; cx <= (minX + width - 1) >> 4; cx++)
+            for (int cz = minZ >> 4; cz <= (minZ + width - 1) >> 4; cz++)
+                if (u.contains(chunkKey(cx, cz))) return false;
+        return true;
+    }
 
     public int floor() { return floor; }
     public double speed() { State s = state; return s == null ? 0 : s.speed(); }
@@ -164,8 +193,9 @@ public final class ArrivalPlan {
         double cover = coverSeconds(s, minX, minZ, width);
         boolean moving = s.speed() >= MOVING;
         // DH draws no LOD where native terrain stands; moving with the native view behind, its corners may need one.
-        if (cover == 0 && (s.nativeKeepingUp || !moving)) return HOLD;
-        if (moving && s.nativeKeepingUp && cover <= Math.min(HORIZON_SECONDS, service[clamp(detail)])) return HOLD;
+        if (cover == 0 && (s.nativeKeepingUp || !moving) && nativeShows(minX, minZ, width)) return HOLD;
+        if (moving && s.nativeKeepingUp && groundShare >= NATIVE_KEEPING_UP
+                && cover <= Math.min(HORIZON_SECONDS, service[clamp(detail)])) return HOLD;
         double dx = minX + width / 2.0 - s.x, dz = minZ + width / 2.0 - s.z, length = Math.hypot(dx, dz);
         double approach = moving && length > 0 ? (dx * s.vx + dz * s.vz) / length : 0;
         double reach = reach(s, minX, minZ, width);
