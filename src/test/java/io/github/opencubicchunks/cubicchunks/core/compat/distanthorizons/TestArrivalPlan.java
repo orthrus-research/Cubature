@@ -87,6 +87,18 @@ public class TestArrivalPlan {
         assertEquals("Flying again: the in-flight detail", 9, plan.floor());
     }
 
+    @Test public void atAJoinOrAfterATeleportCoverageStaysFirst() {
+        ArrivalPlan joined = flying(0, 1);
+        assertEquals("Standing at the join", ArrivalPlan.START, joined.floor());
+        ArrivalPlan plan = flying(34, 1);
+        long now = 100 * SECOND;
+        for (int i = 1; i <= 60; i++) plan.observe(now + i * TICK, 0, 0, HALF, 1);
+        assertEquals("At rest after travel", ArrivalPlan.FINEST, plan.floor());
+        long later = now + 60 * TICK;
+        for (int i = 1; i <= 60; i++) plan.observe(later + i * TICK, 5000, 5000, HALF, 1);
+        assertEquals("Teleported: the in-flight detail, kept while standing", ArrivalPlan.START, plan.floor());
+    }
+
     /** A plan whose player has moved +x at {@code speed} for 30 s while the server answered {@code perSecond} a second. */
     private static ArrivalPlan answering(double speed, int perSecond) {
         ArrivalPlan plan = new ArrivalPlan();

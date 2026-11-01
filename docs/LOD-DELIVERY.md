@@ -561,9 +561,15 @@ request queue, `distantHorizonsArrivalPlan`):
   where finer detail is wanted there steps it coarser (at most every 5 s);
   none late and coarse requests under half of those sent steps it finer
   (at most every 15 s). It starts at 4-block cells and stays within 1- to
-  16-block cells. After a second standing still (under 2 blocks/s) it is
-  1-block, so every section goes nearest first and the detail flight gave up
-  returns; moving again restores the in-flight detail. Without this it kept
+  16-block cells. After a second standing still (under 2 blocks/s) following
+  travel it is 1-block, so every section goes nearest first and the detail
+  travel gave up returns; moving again restores the in-flight detail. At a
+  join, or after a teleport (a jump over 64 blocks), coverage stays first
+  until the player travels: DH fills its request queue there once and serves
+  it through the next flight, and a nearest-first join queue spent a fresh
+  34 blocks/s flight on 1- and 2-block tiles around the start (2026-10-31:
+  88-100% of the 1.5-4 km bands without data at its end, against 16-65%
+  with a coverage-first join). Without rest recovery it kept
   the 16-block cells of a flight after landing, and the sections DH wants at
   1- and 2-block cells near the player waited behind every 16-block section
   of the radius, showing their parents' 16-block data copied down.

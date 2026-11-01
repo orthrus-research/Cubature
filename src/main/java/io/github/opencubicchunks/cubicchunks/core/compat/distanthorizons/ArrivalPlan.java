@@ -17,9 +17,11 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p>The on-time detail follows the coarse sections' own arrivals while the player moves. When more than a tenth of
  * them arrive after the player has come close enough to want finer detail there, it steps one level coarser; when none
- * are late and coarse requests are under half of those sent, it steps one level finer. Once the player has been still
- * for a second it is 1-block, so every section ranks nearest first, as DH would order them, and the detail flight gave
- * up comes back where the player looks; moving again restores the in-flight detail. While the server can afford it,
+ * are late and coarse requests are under half of those sent, it steps one level finer. Once a player who has travelled
+ * has been still for a second it is 1-block, so every section ranks nearest first, as DH would order them, and the
+ * detail travel gave up comes back where the player looks; moving again restores the in-flight detail. At a join or
+ * after a teleport there is no coverage to refine yet, and DH fills its request queue there once, so coverage stays
+ * first until the player travels. While the server can afford it,
  * finer sections inside DH's 1-block ring come next after the on-time ones, before every other finer section, so the
  * terrain nearest the native view fills first. Moving, the ring sweeps up new 1-block sections at its diameter times
  * the speed over a section's area each second; it ranks ahead only while that fits in half of the server's answers,
@@ -61,6 +63,8 @@ public final class ArrivalPlan {
     /** The on-time detail to restore when a resting player moves again. */
     private int flightFloor = START;
     private boolean resting;
+    /** Whether the player has travelled since the join or the last teleport. */
+    private boolean travelled;
     private long stillSince;
     private volatile double unit = 192, base = 2;
     /** Seconds from queueing a request to its data, per detail level; replaced whole on each arrival. */
@@ -101,7 +105,7 @@ public final class ArrivalPlan {
     public synchronized void observe(long nanos, double px, double pz, double halfWidth, double nativeLoadedShare) {
         if (observed && nanos > lastNanos) {
             double dt = (nanos - lastNanos) / 1e9, a = Math.min(1, (nanos - lastNanos) / (double) VELOCITY_NANOS);
-            if (Math.hypot(px - lastPx, pz - lastPz) > 64) { vx = 0; vz = 0; }
+            if (Math.hypot(px - lastPx, pz - lastPz) > 64) { vx = 0; vz = 0; arrive(nanos); }
             else { vx += ((px - lastPx) / dt - vx) * a; vz += ((pz - lastPz) / dt - vz) * a; }
         }
         observed = true; lastNanos = nanos; lastPx = px; lastPz = pz;
@@ -115,10 +119,14 @@ public final class ArrivalPlan {
         rest(nanos, Math.hypot(vx, vz) < MOVING);
     }
 
-    /** Still for a second: 1-block on time, nearest first. Moving again: the in-flight detail. */
+    /**
+     * Still for a second after travel: 1-block on time, nearest first. Moving again: the in-flight detail. At a join or
+     * after a teleport there is no coverage yet to refine, so the plan keeps coverage first until the player travels.
+     */
     private void rest(long nanos, boolean still) {
         if (!still) {
             stillSince = 0;
+            travelled = true;
             if (resting) {
                 resting = false;
                 floor = flightFloor;
@@ -126,10 +134,21 @@ public final class ArrivalPlan {
             }
         } else if (stillSince == 0) {
             stillSince = nanos;
-        } else if (!resting && nanos - stillSince >= REST_NANOS) {
+        } else if (!resting && travelled && nanos - stillSince >= REST_NANOS) {
             resting = true;
             flightFloor = floor;
             floor = FINEST;
+            reset(nanos);
+        }
+    }
+
+    /** A teleport lands in a new area: coverage first again, from the in-flight detail. */
+    private void arrive(long nanos) {
+        travelled = false;
+        stillSince = 0;
+        if (resting) {
+            resting = false;
+            floor = flightFloor;
             reset(nanos);
         }
     }
