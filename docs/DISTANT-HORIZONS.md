@@ -89,7 +89,7 @@ where they run and, in a cubic world, in what order they are asked for:
 - **The arrival plan** (LOD-DELIVERY step 5, `distantHorizonsArrivalPlan`).
   The client asks for sections by when the player reaches them, at or coarser
   than an on-time detail first (it follows how coarse sections arrive in
-  flight and is 1-block once the player stands still), together with those
+  flight and is 1-block once the player stands still), then finer sections
   inside DH's 1-block ring, holds
   back sections the native view covers or will cover before their data could
   arrive, keeps in flight only what the server answers in about 3 s, and lets

@@ -19,9 +19,11 @@ import java.util.concurrent.ConcurrentHashMap;
  * them arrive after the player has come close enough to want finer detail there, it steps one level coarser; when none
  * are late and coarse requests are under half of those sent, it steps one level finer. Once the player has been still
  * for a second it is 1-block, so every section ranks nearest first, as DH would order them, and the detail flight gave
- * up comes back where the player looks; moving again restores the in-flight detail. Sections inside DH's 1-block ring
- * always rank on time, so the terrain nearest the native view is not left to coarse placeholders behind every coarse
- * section of the radius. Detail levels are DH section detail levels: 6 is 1-block cells, 8 is 4-block cells. The
+ * up comes back where the player looks; moving again restores the in-flight detail. Finer sections inside DH's 1-block
+ * ring come next after the on-time ones, before every other finer section, so once coverage is answered the terrain
+ * nearest the native view fills first; in fast flight coverage keeps the server (finer tiles beside the path arrive
+ * after the player has passed them). Detail levels are DH section detail levels: 6 is 1-block cells, 8 is 4-block
+ * cells. The
  * server serves a cubic world's requests in the order they arrive (MixinDistantHorizonsServeInOrder), so this order
  * reaches its preview generator.
  *
@@ -130,8 +132,8 @@ public final class ArrivalPlan {
 
     /**
      * The sort key for a section: lower goes first, {@link #HOLD} holds it back. Sections at or coarser than the
-     * on-time detail, and any inside DH's 1-block ring, come before finer ones; within each, the sooner the player
-     * reaches the section the earlier.
+     * on-time detail come first, then finer ones inside DH's 1-block ring, then the other finer ones; within each, the
+     * sooner the player reaches the section the earlier.
      */
     public long key(int detail, int minX, int minZ, int width) {
         State s = state;
@@ -145,12 +147,15 @@ public final class ArrivalPlan {
         double approach = moving && length > 0 ? (dx * s.vx + dz * s.vz) / length : 0;
         double reach = reach(s, minX, minZ, width);
         long millis = (long) Math.min(1L << 40, reach / Math.max(approach, MIN_APPROACH) * 1000);
-        boolean onTime = detail >= floor || reach < unit * base;
-        return (onTime ? 0 : 1L << 41) | millis;
+        long rank = detail >= floor ? 0 : reach < unit * base ? 1 : 2;
+        return rank << 41 | millis;
     }
 
-    /** Whether a key ranks on time: at or coarser than the on-time detail, or inside the 1-block ring. */
-    public static boolean coarse(long key) { return key != HOLD && (key & (1L << 41)) == 0; }
+    /** Whether a key ranks with the coarse sections, those at or coarser than the on-time detail. */
+    public static boolean coarse(long key) { return key != HOLD && key >>> 41 == 0; }
+
+    /** Whether a key ranks with the finer sections inside DH's 1-block ring. */
+    public static boolean nearRing(long key) { return key != HOLD && key >>> 41 == 1; }
 
     /** Chebyshev blocks from the player to the nearest point of a section; 0 inside it. */
     static double reach(State s, int minX, int minZ, int width) {

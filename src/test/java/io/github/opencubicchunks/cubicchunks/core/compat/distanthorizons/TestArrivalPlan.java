@@ -87,12 +87,16 @@ public class TestArrivalPlan {
         assertEquals("Flying again: the in-flight detail", 9, plan.floor());
     }
 
-    @Test public void theOneBlockRingRanksOnTimeInFlight() {
+    @Test public void inFlightTheOneBlockRingComesAfterCoverageAndBeforeOtherFineSections() {
         ArrivalPlan plan = flying(34, 1);
         assertEquals(ArrivalPlan.START, plan.floor());
         // DH's MEDIUM quality wants 1-block cells up to 192 * 2 = 384 blocks out.
-        assertTrue("Beside the path, 260 blocks out", ArrivalPlan.coarse(plan.key(6, 64, 260, 64)));
-        assertFalse("500 blocks out", ArrivalPlan.coarse(plan.key(6, 64, 500, 64)));
+        long near = plan.key(6, 64, 260, 64), coarseFar = plan.key(10, 3000, 0, 1024), fineAhead = plan.key(7, 900, 0, 128);
+        assertTrue("Beside the path, 260 blocks out", ArrivalPlan.nearRing(near));
+        assertFalse(ArrivalPlan.coarse(near));
+        assertFalse("500 blocks out", ArrivalPlan.nearRing(plan.key(6, 64, 500, 64)));
+        assertTrue("Coverage first", coarseFar < near);
+        assertTrue("Then the ring, before finer sections ahead", near < fineAhead);
     }
 
     @Test public void serviceTimeRunsFromQueueingToTheAnswer() {

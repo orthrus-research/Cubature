@@ -535,12 +535,15 @@ second, rejection fails the section).
 
 **The arrival plan** (`ArrivalPlan`, client Mixins on DH's quad tree and
 request queue, `distantHorizonsArrivalPlan`):
-- **Order:** sections at or coarser than the on-time detail go first, and so
-  does any section inside DH's 1-block ring (`distanceUnitInBlocks` × 16 ×
-  `quadraticBase`: 384 blocks at MEDIUM), so the terrain just past the native
-  view is not left to coarse placeholders; within each group, the sooner the
-  player reaches a section (distance over speed toward it, at least 4
-  blocks/s) the earlier. Standing still this is nearest first.
+- **Order:** sections at or coarser than the on-time detail go first, then
+  finer sections inside DH's 1-block ring (`distanceUnitInBlocks` × 16 ×
+  `quadraticBase`: 384 blocks at MEDIUM), then the other finer sections;
+  within each group, the sooner the player reaches a section (distance over
+  speed toward it, at least 4 blocks/s) the earlier. Standing still this is
+  nearest first. The ring stays behind coverage: given equal rank in flight
+  (2026-10-31, fresh 34 blocks/s), nearly every answer was a 1- or 2-block
+  tile beside the path, arriving 65 to 82 s after it was wanted, and the
+  horizon was left empty.
 - **Hold:** a section the native view's square holds now, or will hold before
   its data could arrive (the time from queueing to an answer at its detail,
   learned as requests return, at most 10 s ahead), is held back: the tree
