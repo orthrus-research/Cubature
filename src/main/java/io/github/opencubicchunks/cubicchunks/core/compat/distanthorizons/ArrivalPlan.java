@@ -19,11 +19,12 @@ import java.util.concurrent.ConcurrentHashMap;
  * them arrive after the player has come close enough to want finer detail there, it steps one level coarser; when none
  * are late and coarse requests are under half of those sent, it steps one level finer. Once the player has been still
  * for a second it is 1-block, so every section ranks nearest first, as DH would order them, and the detail flight gave
- * up comes back where the player looks; moving again restores the in-flight detail. Finer sections inside DH's 1-block
- * ring come next after the on-time ones, before every other finer section, so once coverage is answered the terrain
- * nearest the native view fills first; in fast flight coverage keeps the server (finer tiles beside the path arrive
- * after the player has passed them). Detail levels are DH section detail levels: 6 is 1-block cells, 8 is 4-block
- * cells. The
+ * up comes back where the player looks; moving again restores the in-flight detail. While the server can afford it,
+ * finer sections inside DH's 1-block ring come next after the on-time ones, before every other finer section, so the
+ * terrain nearest the native view fills first. Moving, the ring sweeps up new 1-block sections at its diameter times
+ * the speed over a section's area each second; it ranks ahead only while that fits in half of the server's answers,
+ * so walking it does and in elytra flight it does not (beside a fast path its tiles arrive after the player has passed
+ * and coverage starves). Detail levels are DH section detail levels: 6 is 1-block cells, 8 is 4-block cells. The
  * server serves a cubic world's requests in the order they arrive (MixinDistantHorizonsServeInOrder), so this order
  * reaches its preview generator.
  *
@@ -39,6 +40,9 @@ public final class ArrivalPlan {
     static final int LATE_WINDOW = 20, MIN_ARRIVALS = 10, MAX_TRACKED = 8192;
     static final long COARSER_AFTER = 5_000_000_000L, FINER_AFTER = 15_000_000_000L, VELOCITY_NANOS = 500_000_000L;
     static final long REST_NANOS = 1_000_000_000L;
+    /** A 1-block section's width in blocks, and the share of the server's answers the 1-block ring may take moving. */
+    static final int SECTION_BLOCKS = 64;
+    static final double RING_SHARE = 0.5;
     static final int INFLIGHT_MIN = 8;
     static final double QUEUE_SECONDS = 3;
 
@@ -132,8 +136,8 @@ public final class ArrivalPlan {
 
     /**
      * The sort key for a section: lower goes first, {@link #HOLD} holds it back. Sections at or coarser than the
-     * on-time detail come first, then finer ones inside DH's 1-block ring, then the other finer ones; within each, the
-     * sooner the player reaches the section the earlier.
+     * on-time detail come first, then finer ones inside DH's 1-block ring while the server can afford them, then the
+     * other finer ones; within each, the sooner the player reaches the section the earlier.
      */
     public long key(int detail, int minX, int minZ, int width) {
         State s = state;
@@ -147,8 +151,14 @@ public final class ArrivalPlan {
         double approach = moving && length > 0 ? (dx * s.vx + dz * s.vz) / length : 0;
         double reach = reach(s, minX, minZ, width);
         long millis = (long) Math.min(1L << 40, reach / Math.max(approach, MIN_APPROACH) * 1000);
-        long rank = detail >= floor ? 0 : reach < unit * base ? 1 : 2;
+        long rank = detail >= floor ? 0 : reach < unit * base && ringAffordable(s) ? 1 : 2;
         return rank << 41 | millis;
+    }
+
+    /** Whether the 1-block sections the ring sweeps up each second fit in half of the server's answers. */
+    boolean ringAffordable(State s) {
+        double sweep = 2 * unit * base * s.speed() / ((double) SECTION_BLOCKS * SECTION_BLOCKS);
+        return sweep <= answerRate * RING_SHARE;
     }
 
     /** Whether a key ranks with the coarse sections, those at or coarser than the on-time detail. */

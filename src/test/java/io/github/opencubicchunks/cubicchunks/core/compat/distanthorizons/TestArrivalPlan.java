@@ -87,16 +87,36 @@ public class TestArrivalPlan {
         assertEquals("Flying again: the in-flight detail", 9, plan.floor());
     }
 
-    @Test public void inFlightTheOneBlockRingComesAfterCoverageAndBeforeOtherFineSections() {
-        ArrivalPlan plan = flying(34, 1);
-        assertEquals(ArrivalPlan.START, plan.floor());
+    /** A plan whose player has moved +x at {@code speed} for 30 s while the server answered {@code perSecond} a second. */
+    private static ArrivalPlan answering(double speed, int perSecond) {
+        ArrivalPlan plan = new ArrivalPlan();
+        long t = 100 * SECOND;
+        for (int tick = -600; tick <= 0; tick++) {
+            if (tick % 20 == 0)
+                for (int i = 0; i < perSecond; i++) plan.arrived(tick * 100L + i, t + tick * TICK, 6, 5000, 5000, 64);
+            plan.observe(t + tick * TICK, speed * tick * TICK / 1e9, 0, HALF, 1);
+        }
+        return plan;
+    }
+
+    @Test public void walkingTheOneBlockRingComesAfterCoverageAndBeforeOtherFineSections() {
+        // Walking at 4 blocks/s the ring sweeps up 768 * 4 / 4096 = 0.75 sections a second: within half of 2 answers.
+        ArrivalPlan plan = answering(4, 2);
+        assertEquals(2, plan.answerRate(), 0.1);
         // DH's MEDIUM quality wants 1-block cells up to 192 * 2 = 384 blocks out.
         long near = plan.key(6, 64, 260, 64), coarseFar = plan.key(10, 3000, 0, 1024), fineAhead = plan.key(7, 900, 0, 128);
         assertTrue("Beside the path, 260 blocks out", ArrivalPlan.nearRing(near));
-        assertFalse(ArrivalPlan.coarse(near));
         assertFalse("500 blocks out", ArrivalPlan.nearRing(plan.key(6, 64, 500, 64)));
         assertTrue("Coverage first", coarseFar < near);
         assertTrue("Then the ring, before finer sections ahead", near < fineAhead);
+    }
+
+    @Test public void inElytraFlightTheRingWaitsWithTheOtherFineSections() {
+        // At 34 blocks/s the ring sweeps up about 6.4 sections a second, more than 2 answers could serve.
+        ArrivalPlan plan = answering(34, 2);
+        long near = plan.key(6, 64, 260, 64);
+        assertFalse(ArrivalPlan.nearRing(near));
+        assertFalse(ArrivalPlan.coarse(near));
     }
 
     @Test public void serviceTimeRunsFromQueueingToTheAnswer() {
