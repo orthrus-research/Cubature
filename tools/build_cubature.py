@@ -12,6 +12,7 @@ Examples (from the Cubature checkout or anywhere):
 """
 
 from lab_files import sha
+from riven_workspace import riven_workspace
 import argparse
 import json
 import os
@@ -82,7 +83,7 @@ def main():
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("--workspace", type=Path, default=FORK.parents[1], help="Riven root")
+    parser.add_argument("--workspace", type=Path, default=riven_workspace(), help="Riven root")
     parser.add_argument("--skip-tests", action="store_true", help="assemble without tests")
     parser.add_argument("--no-lab", action="store_true", help="skip the lab observer")
     parser.add_argument("--freeze", metavar="LABEL", help="copy artifacts to .local/frozen/LABEL")
@@ -94,6 +95,7 @@ def main():
     local = workspace_settings(workspace)
     environment = os.environ.copy()
     environment["JAVA_HOME"] = str(Path(local["java25"]).parent.parent)
+    environment["RIVEN_WORKSPACE"] = str(workspace)  # cleanroom/build.gradle reads dev/pins there
     java26_home = Path(local["java26"]).parent.parent
     installations = f"-Porg.gradle.java.installations.paths={java26_home}"
     if args.no_daemon:

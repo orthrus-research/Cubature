@@ -52,10 +52,13 @@ configurations {
     modCompileOnly
     compileOnly.extendsFrom(modCompileOnly)
 }
-// Distant Horizons and Demonica are compile-only inputs, never bundled. Inside Riven's workspace they come from its
-// dev/pins; elsewhere tools/fetch_build_inputs.py downloads and verifies them into cleanroom/build-inputs.
+// Distant Horizons and Demonica are compile-only inputs, never bundled. With a Riven workspace (RIVEN_WORKSPACE, else
+// the sibling ../Riven) they come from its dev/pins; elsewhere tools/fetch_build_inputs.py downloads and verifies them
+// into cleanroom/build-inputs.
+def rivenPins = new File(providers.environmentVariable('RIVEN_WORKSPACE')
+        .getOrElse(file('../../Riven').path), 'dev/pins')
 def buildInputs = file(providers.gradleProperty('cubicBuildInputs')
-        .getOrElse(file('../../pins').isDirectory() ? '../../pins' : 'build-inputs'))
+        .getOrElse(rivenPins.isDirectory() ? rivenPins.path : 'build-inputs'))
 // Celeritas ships inside Demonica's release jar; the cubic-section integration compiles against those exact classes.
 def extractCeleritas = tasks.register('extractCeleritas', Copy) {
     from(zipTree(new File(buildInputs, 'Demonica-0.9.0.jar'))) { include 'zz-demonica-bundled-celeritas-*.jar' }

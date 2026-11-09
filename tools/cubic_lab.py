@@ -22,6 +22,7 @@ from lab_process import (PLAYER, argv, await_line, capture_process_endpoint, ret
                          write_process_receipt)
 from lab_profiles import validate_jvm_capture, validate_view_distance_capture
 import lab_workload
+from riven_workspace import riven_workspace
 
 # Input hashes a pregeneration compares before and after its native work.
 PREGENERATION_INPUTS = ('mods', 'controllerSources', 'generationInputsSha256')
@@ -325,7 +326,7 @@ def main():
     parser.add_argument('command', choices=['prime', 'export', 'run', 'storage-crash', 'server', 'client'])
     parser.add_argument('--crash-id', help='New bounded identity for an isolated native process-crash fixture.')
     parser.add_argument('--crash-boundary', choices=['payloadForce','headerForce','overflow-rename','after-barrier'])
-    parser.add_argument('--riven-workspace', type=Path, default=FORK.parents[1])
+    parser.add_argument('--riven-workspace', type=Path, default=riven_workspace())
     parser.add_argument('--name', required=True)
     parser.add_argument('--phase', choices=['write', 'read'], default='write')
     parser.add_argument('--scenarios', help='Comma-separated scenario override; prerequisites still apply')

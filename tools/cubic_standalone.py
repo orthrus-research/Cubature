@@ -16,6 +16,7 @@ import lab_files
 import lab_instance
 import lab_process
 import lab_profiles
+from riven_workspace import riven_workspace
 
 
 def prepare(args):
@@ -141,7 +142,7 @@ def play(args):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('command', choices=['prepare', 'play', 'command'])
-    parser.add_argument('--workspace', type=Path, default=lab_instance.FORK.parents[1])
+    parser.add_argument('--workspace', type=Path, default=riven_workspace())
     parser.add_argument('--name', required=True)
     parser.add_argument('--runtime-lab', type=Path)
     parser.add_argument('--cubic-jar', type=Path)
