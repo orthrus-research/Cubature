@@ -192,8 +192,15 @@ modded values without one (GregTech's ore `stone_type`, whose hash code mixes
 in an identity hash) are stable across JVMs and starts. Every other value keeps
 its `toString`, so strings that were already stable stay byte for byte the
 same. DH 3.3.3 matches a stored string against this same method's output for
-each of the block's states when it deserializes. It is a required match, carries LGPL-3.0-only terms, and its source is in the sources
-JAR.
+each of the block's states when it deserializes. It is a required match,
+carries LGPL-3.0-only terms, and its source is in the sources JAR.
+
+On November 5, 2026, the background storage writer began gathering saves for
+`storageGatherMillis` (250 ms by default; 0 writes at once) before a round
+writes them, so each region's two durability forces cover a fuller batch; saves
+made during a round wait for the next window. Explicit flushes, close and
+tick-driven writes do not wait. A crash or killed process loses up to one
+window of saves plus the round in progress; a clean shutdown writes them.
 
 Both supported builds include `NOTICE.md`, this file, the upstream MIT text,
 the full LGPL-2.1 text and component notices in binary and matching sources

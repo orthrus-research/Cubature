@@ -158,6 +158,15 @@ public class CubicChunksConfig {
     @Config.Comment("Maximum column entries in one storage write batch.")
     public static int storageBatchColumns = 16;
 
+    @Config.RangeInt(min = 0, max = 5000)
+    @Config.RequiresWorldRestart
+    @Config.Comment("Milliseconds the storage writer gathers saved columns and cubes before a round writes them, so "
+            + "each batch's two durability forces per region cover more entries; saves made during a round wait for "
+            + "the next. 0 writes at once. Explicit flushes and shutdown never wait. Keep a window's saves well under "
+            + "autosavePendingThreshold. Up to this many milliseconds of saves, plus the round being written, are held "
+            + "only in memory: a clean shutdown writes them, but a crash or killed process loses them.")
+    public static int storageGatherMillis = 250;
+
     @Config.RangeInt(min = 0, max = 1000000)
     @Config.Comment("Chunk garbage collector update interval. Lower value will increase CPU usage, but can reduce memory usage.")
     @Config.LangKey("cubicchunks.config.chunk_gc_interval")

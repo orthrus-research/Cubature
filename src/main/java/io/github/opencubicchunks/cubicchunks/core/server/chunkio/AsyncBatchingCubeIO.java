@@ -72,7 +72,7 @@ public class AsyncBatchingCubeIO implements ICubeIO {
         this.world = Objects.requireNonNull(world, "world");
         this.storage = Objects.requireNonNull(storage, "storage");
         this.writes = new PendingCubeWrites(storage, CubicChunksConfig.storageBatchColumns,
-                CubicChunksConfig.storageBatchCubes, error ->
+                CubicChunksConfig.storageBatchCubes, CubicChunksConfig.storageGatherMillis, error ->
                 CubicChunks.LOGGER.error("Cube storage write failed; snapshots retained. Explicit flush will retry.", error));
         this.pendingColumns = writes.columns;
         this.pendingCubes = writes.cubes;
