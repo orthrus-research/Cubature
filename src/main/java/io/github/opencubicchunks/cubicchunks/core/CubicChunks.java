@@ -192,6 +192,9 @@ public class CubicChunks {
     @EventHandler
     public void onServerStopped(FMLServerStoppedEvent event) {
         ServerDeliveryMode.clear();
+        if (Loader.isModLoaded("distanthorizons")) {
+            io.github.opencubicchunks.cubicchunks.core.compat.distanthorizons.DistantHorizonsServer.serverStopped();
+        }
     }
 
     @SubscribeEvent

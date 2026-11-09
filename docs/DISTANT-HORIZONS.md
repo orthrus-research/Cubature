@@ -81,14 +81,15 @@ where they run and, in a cubic world, in what order they are asked for:
 - **The preview pool.** The server's `PreviewPool` (`previewThreads`, by
   default a quarter of the processors, 1 to 8) samples tiles in place of DH's
   world generation executor, so DH's server health pause no longer stops them.
-  Its governor sets how many run at once from the server's ticks: once a
-  second, a p95 of the last 20 ticks at 45 ms or more halves the permits, and
-  with tiles waiting, two settled seconds with a p95 of the last 40 under 40
-  ms add one; never fewer than one. Admission lets the permits plus one tile be
-  in progress, so DH's choice stays current, and a tile over the permits after
-  a cut waits between its rows. The server log carries a line a minute with
-  the permits' range. `previewThreads=0` keeps DH's executor and its health
-  pause.
+  Its threads live as long as the pool, so a generator's per-thread caches stay
+  warm between bursts of tiles. Its governor sets how many run at once from
+  the server's ticks: once a second, a p95 of the last 20 ticks at 45 ms or
+  more halves the permits, and with tiles waiting, two settled seconds with a
+  p95 of the last 40 under 40 ms add one; never fewer than one. Admission lets
+  the permits plus one tile be in progress, so DH's choice stays current, and
+  a tile over the permits after a cut waits between its rows. The server log
+  carries a line a minute with the permits' range. `previewThreads=0` keeps
+  DH's executor and its health pause.
 - **The arrival plan** (LOD-DELIVERY step 5, `distantHorizonsArrivalPlan`).
   The client asks for sections by when the player reaches them, at or coarser
   than an on-time detail first (it follows how coarse sections arrive in

@@ -38,9 +38,11 @@ import net.minecraftforge.fml.common.gameevent.TickEvent;
 public final class DistantHorizonsServer extends DhApiLevelLoadEvent {
     private final Map<World,Map<Chunk,Long>> dirty=new IdentityHashMap<>();
     @Nullable private PreviewPool pool;
-    private int generators;
+    private int generators,epoch;
+    @Nullable private static volatile DistantHorizonsServer instance;
     public static void init() {
         DistantHorizonsServer bridge=new DistantHorizonsServer();
+        instance=bridge;
         DhApi.events.bind(DhApiLevelLoadEvent.class,bridge);
         DistantHorizonsCompat.installServer(bridge::changed);
         DistantHorizonsCompat.installServerFeed(DistantHorizonsServer::feedNow,()->WorldChunkUpdateManager.INSTANCE.getTotalQueuedCount());
@@ -52,11 +54,24 @@ public final class DistantHorizonsServer extends DhApiLevelLoadEvent {
         WorldServer world=(WorldServer)raw;
         ICubeGenerator generator=((ICubicWorldServer)world).getCubeGenerator();
         ICubicTerrainPreview provider=generator instanceof ICubicTerrainPreview?(ICubicTerrainPreview)generator:null;
-        PreviewPool shared=openPool();
-        DhApiResult<Void> result=DhApi.worldGenOverrides.registerWorldGeneratorOverride(event.value.levelWrapper,
-                new CubicTerrainPreviewGenerator(provider,(ILevelWrapper)event.value.levelWrapper,shared,this::generatorClosed));
+        Opened opened=openPool();
+        CubicTerrainPreviewGenerator preview;
+        try {
+            preview=new CubicTerrainPreviewGenerator(provider,(ILevelWrapper)event.value.levelWrapper,opened.pool,()->generatorClosed(opened.epoch));
+        } catch (RuntimeException|Error e) {
+            generatorClosed(opened.epoch);
+            throw e;
+        }
+        // From here the generator's own close releases its count, once, whether DH or this method closes it first.
+        DhApiResult<Void> result;
+        try {
+            result=DhApi.worldGenOverrides.registerWorldGeneratorOverride(event.value.levelWrapper,preview);
+        } catch (RuntimeException|Error e) {
+            preview.close();
+            throw e;
+        }
         if (!result.success) {
-            generatorClosed();
+            preview.close();
             throw new IllegalStateException("Unable to register cubic DH generator: "+result.message);
         }
         CubicChunks.LOGGER.info("CC/DH server generator bound: dimension={} provider={} height=[{},{}).",
@@ -64,15 +79,33 @@ public final class DistantHorizonsServer extends DhApiLevelLoadEvent {
                 ((ICubicWorld)world).getMinHeight(),((ICubicWorld)world).getMaxHeight());
     }
     /** The server's preview pool, opened with the first generator; DH binds levels on the server thread. */
-    @Nullable private synchronized PreviewPool openPool() {
-        if (generators++==0) pool=PreviewPool.open();
-        return pool;
+    private synchronized Opened openPool() {
+        if (generators==0) pool=PreviewPool.open();
+        generators++;
+        return new Opened(pool,epoch);
     }
-    /** Closes the pool with the last generator, when DH unloads its level. */
-    private synchronized void generatorClosed() {
-        if (--generators>0 || pool==null) return;
+    /** The pool a generator shares and the server epoch it was counted in, read under one lock. */
+    private static final class Opened {
+        @Nullable final PreviewPool pool;
+        final int epoch;
+        Opened(@Nullable PreviewPool pool,int epoch) { this.pool=pool;this.epoch=epoch; }
+    }
+    /** Closes the pool with the last generator, when DH unloads its level; a generator of a stopped server counts no more. */
+    private synchronized void generatorClosed(int opened) {
+        if (opened!=epoch || generators<=0 || --generators>0 || pool==null) return;
         pool.close();
         pool=null;
+    }
+    /** At server stop: closes the pool even if DH has not closed every generator, and forgets them. */
+    public static void serverStopped() {
+        DistantHorizonsServer bridge=instance;
+        if (bridge==null) return;
+        synchronized (bridge) {
+            bridge.epoch++;
+            bridge.generators=0;
+            if (bridge.pool!=null) bridge.pool.close();
+            bridge.pool=null;
+        }
     }
     @SubscribeEvent public void serverTick(TickEvent.ServerTickEvent event) {
         PreviewPool current=pool;

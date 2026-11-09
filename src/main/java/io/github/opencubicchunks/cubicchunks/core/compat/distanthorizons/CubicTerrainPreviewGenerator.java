@@ -57,7 +57,7 @@ final class CubicTerrainPreviewGenerator implements IDhApiWorldGenerator, Previe
     @Override public byte getLargestDataDetailLevel() { return 12; }
     @Override public EDhApiWorldGeneratorReturnType getReturnType() { return EDhApiWorldGeneratorReturnType.API_DATA_SOURCES; }
     @Override public void preGeneratorTaskStart() {}
-    @Override public void close() {
+    @Override public synchronized void close() {
         if (closed) return;
         closed=true;onClose.run();
     }

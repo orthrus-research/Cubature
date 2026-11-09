@@ -30,13 +30,14 @@ public final class PreviewPool implements Executor {
 
     private PreviewPool(int size) {
         AtomicInteger count = new AtomicInteger();
-        threads = new ThreadPoolExecutor(size, size, 30, TimeUnit.SECONDS, new LinkedBlockingQueue<>(), task -> {
+        // The threads stay for the pool's life: a generator's per-thread scratch and caches stay warm between bursts
+        // of tiles (a 30 s idle timeout made 225 threads for 8 in a 78-minute session). They are idle daemons.
+        threads = new ThreadPoolExecutor(size, size, 0, TimeUnit.SECONDS, new LinkedBlockingQueue<>(), task -> {
             Thread thread = new Thread(task, "Cubature preview " + count.incrementAndGet());
             thread.setDaemon(true);
             thread.setPriority(Thread.NORM_PRIORITY - 1);
             return thread;
         });
-        threads.allowCoreThreadTimeOut(true);
         governor = new PreviewGovernor(size);
         permits = new LivePermits(governor.permits());
     }
