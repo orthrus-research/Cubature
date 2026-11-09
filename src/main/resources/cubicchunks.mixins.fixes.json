@@ -26,7 +26,6 @@
         "common.MixinEntityMinecart_KillFix",
         "common.MixinEntitySnowman_MeltBiome",
         "common.MixinItemChorusFruit",
-        "common.MixinItemMap",
         "common.MixinNetHandlerPlayServer",
         "common.MixinPacketBufferBlockPosWrite",
         "common.MixinPathNavigateGround",

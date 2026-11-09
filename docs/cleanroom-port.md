@@ -72,11 +72,13 @@ measures hash and bucket distributions for fixed coordinate sets. It does
 not measure lookup latency, native generation, disk I/O, server throughput
 or frame rate.
 
-## Missing map mixin
+## Map items
 
-An upstream mixin configuration lists `common.MixinItemMap`, whose source is absent from
-CubicChunks. The entry is kept, so loading logs a missing-mixin warning; held-map behavior is
-unqualified.
+Upstream's `cubicchunks.mixins.fixes.json` listed `common.MixinItemMap` from its "Update
+buildSrc" commit (2025-02-21) on, but no commit of CubicChunks ever held that class, so every
+start logged a non-fatal error for the missing mixin on both sides; startup continued. The
+entry was removed on 2026-11-05. Held maps in cubic worlds remain unqualified: no fix for them
+exists to port.
 
 ## Native validation
 

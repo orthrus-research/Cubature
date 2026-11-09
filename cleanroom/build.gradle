@@ -195,7 +195,6 @@ tasks.register('verifyRemappedJar') {
                 }
             }
             def json = new groovy.json.JsonSlurper()
-            def externalBridge = 'io.github.opencubicchunks.cubicchunks.core.asm.mixin.fixes.common.MixinItemMap'
             def configs = entries.findAll { it.name.startsWith('cubicchunks.mixins.') && it.name.endsWith('.json') && !it.name.contains('refmap') }
             assert configs.size() == 6: 'Expected all six upstream Mixin configurations'
             configs.each { entry ->
@@ -204,8 +203,7 @@ tasks.register('verifyRemappedJar') {
                 ['mixins', 'client', 'server'].each { side ->
                     (config[side] ?: []).each { name ->
                         def mixinClass = "${config.package}.${name}"
-                        // This existing integration is supplied by Riven; it is not part of CubicChunks.
-                        assert mixinClass == externalBridge || names.contains(mixinClass.replace('.', '/') + '.class'): "Missing Mixin ${mixinClass}"
+                        assert names.contains(mixinClass.replace('.', '/') + '.class'): "Missing Mixin ${mixinClass}"
                     }
                 }
             }
@@ -215,7 +213,7 @@ tasks.register('verifyRemappedJar') {
             new org.objectweb.asm.ClassReader(archive.getInputStream(archive.getEntry('io/github/opencubicchunks/cubicchunks/api/world/IColumn.class'))).accept(api, 0)
             assert api.methods.any { it.name == 'getHeightValue' && it.desc == '(II)I' }: 'Remapping changed the public IColumn API'
             assert !api.methods.any { it.name == 'func_76611_b' }: 'Vanilla name leaked into IColumn API'
-            logger.lifecycle("Verified ${artifact.name}: ${ownClasses.size()} mod/API classes, Java ${expectedMajor - 44}, six Mixin configs, ${refmap.mappings.size()} refmap classes; Riven supplies the external map bridge.")
+            logger.lifecycle("Verified ${artifact.name}: ${ownClasses.size()} mod/API classes, Java ${expectedMajor - 44}, six Mixin configs, ${refmap.mappings.size()} refmap classes.")
         }
     }
 }
