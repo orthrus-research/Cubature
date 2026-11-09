@@ -101,6 +101,17 @@ where they run and, in a cubic world, in what order they are asked for:
   The server starts the tile whose request arrived first
   (`MixinDistantHorizonsServeInOrder`). Held requests are only delayed; no
   section's content changes.
+- **Property names.** DH writes a block state's property values with their
+  `toString` into the serial strings it stores and sends. A modded value with
+  no `toString` of its own (GregTech's ore `stone_type`) prints its class name
+  and hash code, and StoneType's hash code mixes in an identity hash, so it
+  never matches in another JVM and clients and later starts fell back to the
+  block's default state (`Unable to find BlockState for Block`). Cubature writes
+  the name from its property for every value whose class inherits Object's
+  `toString` (`MixinDistantHorizonsPropertyNames`, `DistantPropertyNames`) and
+  keeps every other value's `toString`, so strings that were already stable stay
+  byte for byte the same. DH deserializes by comparing a stored string with this
+  same method's output for each of the block's states, so both sides agree.
 
 Pooled sources are retained only until their generation future completes;
 closing cancels work.

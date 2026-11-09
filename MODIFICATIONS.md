@@ -185,6 +185,16 @@ DH's world assertion on the Netty thread and cut the connection. DH's handler
 already skips a wrapper without a message. It is a required match, carries
 LGPL-3.0-only terms, and its source is in the sources JAR.
 
+On November 5, 2026, `MixinDistantHorizonsPropertyNames` made DH 3.3.3's
+`BlockStateWrapper` serialize a property value by its name from its property
+where its class inherits Object's `toString` (class name and hash code), so
+modded values without one (GregTech's ore `stone_type`, whose hash code mixes
+in an identity hash) are stable across JVMs and starts. Every other value keeps
+its `toString`, so strings that were already stable stay byte for byte the
+same. DH 3.3.3 matches a stored string against this same method's output for
+each of the block's states when it deserializes. It is a required match, carries LGPL-3.0-only terms, and its source is in the sources
+JAR.
+
 Both supported builds include `NOTICE.md`, this file, the upstream MIT text,
 the full LGPL-2.1 text and component notices in binary and matching sources
 JARs. The sources JAR includes the mod and API Java sources. It is not by
