@@ -24,22 +24,35 @@ public final class CubicLab {
     static LabJob active;
     static LabPregenerator pregenerator;
     private static final Map<String, LabJob> completed = new LinkedHashMap<>();
+    private static final LabStartupTicks startupTicks = new LabStartupTicks();
     private long tickStarted;
     @Mod.EventHandler public void preInit(FMLPreInitializationEvent event) {
         Network.initialize(); MinecraftForge.EVENT_BUS.register(this); proxy.initialize();
         LabStorageContent.initialize();MinecraftForge.EVENT_BUS.register(new LabStorageContent());
         LabHooks.installDiagnostics();
         TickDiagnostics.setObserver(sample -> {
+            startupTicks.record(sample);
             LabJob job = active;
             if (job != null && job.started != 0) job.tickCosts.record(sample);
         });
         LabLodTrace.mark("trace-start");
     }
+    @Mod.EventHandler public void aboutToStart(FMLServerAboutToStartEvent event) {
+        startupTicks.open(event.getServer().getFile("cubiclab-startup").toPath());
+    }
     @Mod.EventHandler public void serverStarting(FMLServerStartingEvent event) { event.registerServerCommand(new LabCommand()); }
     @Mod.EventHandler public void stopping(FMLServerStoppingEvent event) {
-        if(pregenerator!=null){try{pregenerator.cancel();}catch(java.io.IOException e){throw new IllegalStateException(e);}pregenerator=null;}
-        if (active != null) { active.failure = "Server stopped during test"; active.finish(); active = null; }
-        LabJob.release(); LabHooks.serverPackets = null; completed.clear();
+        Throwable shutdownFailure = null;
+        try {
+            if(pregenerator!=null){try{pregenerator.cancel();}catch(java.io.IOException e){throw new IllegalStateException(e);}pregenerator=null;}
+            if (active != null) { active.failure = "Server stopped during test"; active.finish(); active = null; }
+            LabJob.release(); LabHooks.serverPackets = null; completed.clear();
+        } catch (RuntimeException | Error failure) {
+            shutdownFailure = failure;
+            throw failure;
+        } finally {
+            startupTicks.finish(shutdownFailure);
+        }
     }
     @SubscribeEvent public void tick(TickEvent.ServerTickEvent event) {
         if (event.phase == TickEvent.Phase.START) { tickStarted = System.nanoTime(); return; }

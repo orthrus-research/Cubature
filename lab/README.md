@@ -58,3 +58,11 @@ publishing them for the lab, and a change to them must keep the lab building
 (`tools/build_cubature.py` builds both).
 
 Results describe the measured machine and runtime; they are diagnostics, not performance claims.
+
+The lab also records the first wall-clock minute after the dedicated server's actual `Done`
+message, independently of when a client joins or a scenario starts. Only ticks whose start lies
+inside that minute count; a tick crossing its end keeps its entire duration. Clean shutdown writes
+`cubiclab-startup/<epoch>/startup.json` and its phase-vector CSV in the server directory. The
+report is valid only when exactly one ready message was observed synchronously on the server
+thread, the minute completed, and no samples were dropped. Shutdown exports the retained data;
+the observer does no file work inside a measured tick.
