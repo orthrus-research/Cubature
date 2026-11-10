@@ -10,6 +10,9 @@ On November 9, 2026, always-on exclusive server-tick phase counters, a bounded
 history and minute summaries were added; the lab records their vectors, cube
 installation costs and no-storage counts without changing delivery admission.
 
+The lab fetcher publishes verified dependencies through short, unique temporary basenames beside
+their destinations, so cached and downloaded libraries fit legacy Windows path limits.
+
 Fork changes by Orthrus Research, October 12-19, 2026, include Cleanroom
 and Java compatibility, asynchronous loading ownership, persistence and
 lighting fixes, delivery pacing, and optional Distant Horizons integration.

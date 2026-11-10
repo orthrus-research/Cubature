@@ -29,7 +29,7 @@ def fetch(url, target, expected, algorithm='sha1', candidates=()):
     target.parent.mkdir(parents=True, exist_ok=True)
     for candidate in candidates:
         if candidate.is_file() and sha(candidate, algorithm) == expected:
-            temporary = target.with_name(target.name + '.' + uuid.uuid4().hex + '.partial')
+            temporary = target.with_name(uuid.uuid4().hex + '.partial')
             shutil.copy2(candidate, temporary)
             temporary.replace(target)
             return target
@@ -38,7 +38,7 @@ def fetch(url, target, expected, algorithm='sha1', candidates=()):
         data = response.read()
     if hashlib.new(algorithm, data).hexdigest() != expected:
         raise RuntimeError('Checksum mismatch: ' + url)
-    temporary = target.with_name(target.name + '.' + uuid.uuid4().hex + '.partial')
+    temporary = target.with_name(uuid.uuid4().hex + '.partial')
     temporary.write_bytes(data)
     temporary.replace(target)
     return target

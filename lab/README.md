@@ -21,6 +21,10 @@ Build Cubature first (`../cleanroom`), then the lab against that artifact, from 
 runs scenarios and bulk pregeneration in them. Riven prepares instances with its
 `tools/runtime.py prepare` and drives captures through its `tools/riven_observe.py` (see Riven's
 [observability guide](https://github.com/orthrus-research/Riven/blob/main/docs/OBSERVABILITY.md)).
+Dependency downloads and cached copies use checksum-verified content and unique temporary files
+beside their destinations. Temporary basenames stay short even when a library's filename is long,
+so preparation also works within legacy Windows path limits.
+
 The Python tools and their tests need the packages in `tools/requirements.txt`:
 
 ```sh
