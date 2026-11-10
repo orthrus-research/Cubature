@@ -68,7 +68,8 @@ def prepare(args):
     player_uuid = str(uuid.UUID(bytes=hashlib.md5(('OfflinePlayer:' + lab_process.PLAYER).encode()).digest(), version=3))
     lab_files.write_json(server / 'ops.json', [{'uuid': player_uuid, 'name': lab_process.PLAYER, 'level': 4,
                                          'bypassesPlayerLimit': False}])
-    lab_profiles.configure_jvm(server)
+    profile = lab_profiles.jvm_profile(os.environ.get(lab_profiles.VARIANT_ENVIRONMENT, 'zgc'))
+    lab_profiles.configure_jvm(server, profile)
     runtime = lab_instance.prepare_client(server, client, files['prism'], root, donor['java'], donor['release'])
     # Freeze installer output and client libraries; no Riven configs, scripts or lab mod are copied.
     server_files = {str(p.relative_to(server)): lab_files.sha(p) for p in (server / 'libraries').rglob('*') if p.is_file()}
@@ -77,7 +78,7 @@ def prepare(args):
         raise RuntimeError('Installer output differs from reviewed universal artifact')
     manifest = {key: donor[key] for key in ['release', 'runtimeVersion', 'java', 'javaRuntime']}
     manifest.update(name=args.name, server=str(server), client=str(client), port=args.port, seed=args.seed,
-        jvmProfile=lab_profiles.jvm_profile(), clientRuntime=runtime, viewDistance=lab_profiles.view_distance_profile(),
+        jvmProfile=profile, clientRuntime=runtime, viewDistance=lab_profiles.view_distance_profile(),
         serverRuntimeHashes=server_files, cubicJar={'source': str(args.cubic_jar.resolve()), 'sha256': lab_files.sha(args.cubic_jar)},
         purpose='Interactive CC-only: vanilla compatibility terrain, creative/peaceful, no instrumentation mod',
         height={'minY': -128, 'maxYExclusive': 384}, modFiles=['cubicchunks.jar'])

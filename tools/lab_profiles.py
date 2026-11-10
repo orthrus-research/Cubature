@@ -9,7 +9,9 @@ DELIVERY_MODES = ('BASELINE', 'MAINTENANCE', 'SAVE', 'PREFETCH')
 JVM_ARGUMENTS = ['-Xms1G', '-Xmx8G', '-XX:+UseZGC']
 
 
-JVM_VARIANTS = ['zgc', 'zgc-fixed', 'zgc-pretouch', 'g1', 'g1-fixed', 'g1-pretouch']
+JVM_VARIANTS = ['zgc', 'zgc-fixed', 'zgc-pretouch', 'g1', 'g1-fixed', 'g1-pretouch', 'g1-diag']
+# Environment variable that selects a variant for a newly prepared standalone instance.
+VARIANT_ENVIRONMENT = 'CUBATURE_LAB_JVM'
 
 
 def jvm_profile(variant='zgc'):
@@ -20,6 +22,8 @@ def jvm_profile(variant='zgc'):
     # Keep the established default manifest/argfile representation stable.
     if variant == 'zgc': arguments = list(JVM_ARGUMENTS)
     if variant.endswith('-pretouch'): arguments.append('-XX:+AlwaysPreTouch')
+    # G1 with a GC log beside each process: heap after every collection, for memory budgets.
+    if variant == 'g1-diag': arguments.append('-Xlog:gc*,gc+heap=debug:file=gc.log:time,uptime,level,tags')
     return {'initialHeapMiB': initial, 'maxHeapMiB': 8192, 'collector': collector, 'arguments': arguments}
 
 
