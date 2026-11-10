@@ -20,6 +20,11 @@ thread without a worker task or primer, marked modified as a generated cube is; 
 already running for it is retired, and its late result is dropped.
 The client's Distant Horizons native capture loop counts, per pass, its visits, debounced and
 already-updating columns, copies, submissions and exit reason, in its existing periodic log.
+Cubes to generate, send and add players to are ordered visible-first: the 5 x 5 x 5 cubes around
+each player, then cubes inside their column's surface band (or with no known band), then cubes
+between a player's level and the band, then the rest, each class by distance. A hidden cube that
+has waited 200 ticks may move ahead of the surface class, one per queue every 20 ticks. Bands
+come from the generator's optional classification; without them the order is distance order.
 
 The lab fetcher publishes verified dependencies through short, unique temporary basenames beside
 their destinations, so cached and downloaded libraries fit legacy Windows path limits.

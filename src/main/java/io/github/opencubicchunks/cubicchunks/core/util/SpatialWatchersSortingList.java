@@ -47,10 +47,15 @@ abstract class SpatialWatchersSortingList<T extends BucketSorterEntry> implement
 
     @SuppressWarnings("unchecked")
     SpatialWatchersSortingList(int id, Supplier<Collection<EntityPlayer>> players, int dimensions) {
+        this(id, players, dimensions, (int) (CubicChunks.MAX_RENDER_DISTANCE * Math.sqrt(dimensions)) + 1);
+    }
+
+    @SuppressWarnings("unchecked")
+    SpatialWatchersSortingList(int id, Supplier<Collection<EntityPlayer>> players, int dimensions, int bucketCount) {
         this.intrusiveCollectionId = id;
         this.playersSupplier = players;
         this.dimensions = dimensions;
-        buckets = new ObjectArrayList[(int) (CubicChunks.MAX_RENDER_DISTANCE * Math.sqrt(dimensions)) + 1];
+        buckets = new ObjectArrayList[bucketCount];
         for (int i = 0; i < buckets.length; i++) buckets[i] = new ObjectArrayList<>();
         updatePlayerPositions();
     }

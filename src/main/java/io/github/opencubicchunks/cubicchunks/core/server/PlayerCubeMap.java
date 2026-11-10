@@ -31,6 +31,7 @@ import io.github.opencubicchunks.cubicchunks.core.server.delivery.GenerationBudg
 import static io.github.opencubicchunks.cubicchunks.api.util.Coords.blockToCube;
 import static io.github.opencubicchunks.cubicchunks.api.util.Coords.blockToLocal;
 import io.github.opencubicchunks.cubicchunks.core.util.WatchersSortingList2D;
+import io.github.opencubicchunks.cubicchunks.core.util.VisibleWatchersSortingList3D;
 import io.github.opencubicchunks.cubicchunks.core.util.WatchersSortingList3D;
 import static net.minecraft.util.math.MathHelper.clamp;
 
@@ -136,8 +137,11 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
      * A queue of cubes to add a player to, this limits the amount of cubes sent to a player per tick to the set limit
      * even when joining an area with already existing cube watchers
      */
-    private final WatchersSortingList3D<CubeWatcher> watchersToAddPlayersTo = new WatchersSortingList3D<>(0, () ->
-            players.valueCollection().stream().map(p -> p.playerEntity).collect(Collectors.toList()));
+    /** Column surface bands that rank the three player queues visible-first. */
+    private final SurfaceBands surfaceBands = new SurfaceBands(() -> cubeCache() == null ? null : cubeCache().getCubeGenerator());
+
+    private final VisibleWatchersSortingList3D<CubeWatcher> watchersToAddPlayersTo = new VisibleWatchersSortingList3D<>(0, () ->
+            players.valueCollection().stream().map(p -> p.playerEntity).collect(Collectors.toList()), surfaceBands);
 
     /**
      * Contains all CubeWatchers that need to be sent to clients,
@@ -146,8 +150,8 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
      * Note that this is not the same as cubesToGenerate list.
      * Cube can be loaded while not being fully generated yet (not in the last GeneratorStageRegistry stage).
      */
-    private final WatchersSortingList3D<CubeWatcher> cubesToSendToClients = new WatchersSortingList3D<>(1, () ->
-            players.valueCollection().stream().map(p -> p.playerEntity).collect(Collectors.toList()));
+    private final VisibleWatchersSortingList3D<CubeWatcher> cubesToSendToClients = new VisibleWatchersSortingList3D<>(1, () ->
+            players.valueCollection().stream().map(p -> p.playerEntity).collect(Collectors.toList()), surfaceBands);
 
     /**
      * Contains all CubeWatchers that still need to be loaded/generated.
@@ -155,8 +159,8 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
      * Technically it can generate it, using the world's IGeneratorPipeline,
      * but spectator players can't generate chunks if spectatorsGenerateChunks gamerule is set.
      */
-    private final WatchersSortingList3D<CubeWatcher> cubesToGenerate = new WatchersSortingList3D<>(2, () ->
-            players.valueCollection().stream().map(p -> p.playerEntity).collect(Collectors.toList()));
+    private final VisibleWatchersSortingList3D<CubeWatcher> cubesToGenerate = new VisibleWatchersSortingList3D<>(2, () ->
+            players.valueCollection().stream().map(p -> p.playerEntity).collect(Collectors.toList()), surfaceBands);
 
     /**
      * Contains all ColumnWatchers that need to be sent to clients,
@@ -316,6 +320,7 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
         tickableCubeTracker.tick();
 
         getWorldServer().profiler.endStartSection("sortToGenerate");
+        surfaceBands.tick();
         this.cubesToGenerate.tick();
         this.columnsToGenerate.tick();
 
@@ -1012,6 +1017,7 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
         ChunkPos pos = entry.getPos();
         entry.updateChunkInhabitedTime();
         this.columnWatchers.remove(pos.x, pos.z);
+        surfaceBands.forget(pos.x, pos.z);
         this.columnsToGenerate.remove(entry);
         this.columnsToSendToClients.remove(entry);
         this.columnWatchersToUpdate.remove(entry);

@@ -33,9 +33,15 @@ import java.util.function.Supplier;
 
 /** 3D watcher priorities with shared intrusive bucket management. */
 public class WatchersSortingList3D<T extends BucketSorterEntry & XYZAddressable> extends SpatialWatchersSortingList<T> {
-    private static final int BUCKET_COUNT = (int) (CubicChunks.MAX_RENDER_DISTANCE * Math.sqrt(3)) + 1;
+    /** Distance buckets: the approximate distance to the nearest player, capped at the last one. */
+    static final int BUCKET_COUNT = (int) (CubicChunks.MAX_RENDER_DISTANCE * Math.sqrt(3)) + 1;
     public WatchersSortingList3D(int intrusiveCollectionId, Supplier<Collection<EntityPlayer>> playersSupplier) {
         super(intrusiveCollectionId, playersSupplier, 3);
+    }
+
+    /** For subclasses that rank elements across more than the distance buckets. */
+    WatchersSortingList3D(int intrusiveCollectionId, Supplier<Collection<EntityPlayer>> playersSupplier, int bucketCount) {
+        super(intrusiveCollectionId, playersSupplier, 3, bucketCount);
     }
 
     @Override public void add(T element) {
@@ -67,7 +73,12 @@ public class WatchersSortingList3D<T extends BucketSorterEntry & XYZAddressable>
         }
     }
 
-    private int computeBucketIdx(T element) {
+    /** The element's bucket; by default its distance bucket. */
+    int computeBucketIdx(T element) {
+        return distanceBucket(element);
+    }
+
+    final int distanceBucket(T element) {
         if (playerPositions.length == 0) {
             return BUCKET_COUNT - 1;
         }
