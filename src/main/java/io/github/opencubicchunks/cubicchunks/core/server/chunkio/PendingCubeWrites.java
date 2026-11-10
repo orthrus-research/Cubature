@@ -47,6 +47,8 @@ final class PendingCubeWrites {
     // Entries written so far, read without the lock by a drain round to know when its share is done. The
     // non-atomic += is safe: only writeBatch updates it, and always under the writer lock.
     private volatile long written;
+    // Set by flush for its duration, under the writer lock, so its batches take whole regions.
+    private boolean wholeRegions;
 
     /** Runs drain rounds after the gather window. Tests drive it by hand. */
     interface Scheduler {
@@ -184,14 +186,23 @@ final class PendingCubeWrites {
         }
     }
 
-    /** Caller must exclude publishers. One failed retry returns an error, never a retry loop. */
+    /**
+     * Caller must exclude publishers. One failed retry returns an error, never a retry loop. A flush writes each
+     * region's whole backlog as one batch, so a region file takes one data force and one header force per flush
+     * instead of two per bounded batch; the backend's data-before-header order is unchanged.
+     */
     void flush() throws IOException {
         lockInterruptibly();
         try {
             failure = null;
-            while (hasPending()) {
-                checkInterrupted();
-                writeBatch();
+            wholeRegions = true;
+            try {
+                while (hasPending()) {
+                    checkInterrupted();
+                    writeBatch();
+                }
+            } finally {
+                wholeRegions = false;
             }
             checkInterrupted();
             storage.flush();
@@ -228,12 +239,13 @@ final class PendingCubeWrites {
         if (Thread.currentThread().isInterrupted()) throw new InterruptedIOException("Interrupted draining cube storage writes");
     }
 
+    /** One region's pending entries of each kind: all of them during a flush, else at most the batch limits. */
     private void writeBatch() throws IOException {
         Map<ChunkPos, NBTTagCompound> columnBatch;
         Map<CubePos, NBTTagCompound> cubeBatch;
         synchronized (this) {
-            columnBatch = columnOrder.take(columns, columnLimit);
-            cubeBatch = cubeOrder.take(cubes, cubeLimit);
+            columnBatch = columnOrder.take(columns, wholeRegions ? Integer.MAX_VALUE : columnLimit);
+            cubeBatch = cubeOrder.take(cubes, wholeRegions ? Integer.MAX_VALUE : cubeLimit);
         }
         boolean success = false;
         try {

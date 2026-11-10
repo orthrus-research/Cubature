@@ -333,6 +333,28 @@ public class TestPendingCubeWrites {
         }
     }
 
+    @Test public void aFlushWritesEachRegionWholeWhileRoundsStayBounded() throws Exception {
+        Store storage = new Store(); PendingCubeWrites queue = queue(storage, 4, 4);
+        for (int cell = 0; cell < 10; cell++) for (int region = 0; region < 2; region++) {
+            queue.putColumn(new ChunkPos(region * 32 + cell, -3), tag(cell));
+            queue.putCube(new CubePos(region * 16 + cell, -8, -1), tag(cell));
+        }
+        assertTrue(queue.writeNext());
+        assertEquals(4, storage.lastColumns); assertEquals(4, storage.lastCubes);
+        storage.duringWrite = batch -> {
+            HashSet<Integer> columns = new HashSet<>(), cubes = new HashSet<>();
+            batch.columns.keySet().forEach(pos -> columns.add(pos.x >> 5));
+            batch.cubes.keySet().forEach(pos -> cubes.add(pos.getX() >> 4));
+            assertTrue(columns.size() <= 1); assertTrue(cubes.size() <= 1);
+        };
+        int before = storage.attempts;
+        queue.flush();
+        // Two regions of each kind remain (the round wrote 4 of one): one batch per region pair.
+        assertEquals(2, storage.attempts - before);
+        assertEquals(20, storage.columns.size()); assertEquals(20, storage.cubes.size());
+        assertFalse(queue.hasPending()); assertEquals(1, storage.flushes);
+    }
+
     static class Store implements ICubicStorage {
         final Map<ChunkPos, NBTTagCompound> columns = new HashMap<>();
         final Map<CubePos, NBTTagCompound> cubes = new HashMap<>();

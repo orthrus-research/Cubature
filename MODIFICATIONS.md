@@ -27,6 +27,9 @@ has waited 200 ticks may move ahead of the surface class, one per queue every 20
 come from the generator's optional classification; without them the order is distance order.
 Regional preparation in a world players respawn in ranks regions around its spawn point while no
 player is present, so the time before the first join prepares what that join needs.
+An explicit flush or close writes each region's whole backlog as one storage batch, so a region
+file takes one data force and one header force per flush instead of two per 64-entry batch; the
+background writer keeps its bounded batches.
 
 The lab fetcher publishes verified dependencies through short, unique temporary basenames beside
 their destinations, so cached and downloaded libraries fit legacy Windows path limits.
