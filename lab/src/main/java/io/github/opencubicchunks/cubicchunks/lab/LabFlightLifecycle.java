@@ -11,7 +11,7 @@ import net.minecraft.world.GameType;
 import java.util.*;
 
 /** Observation and explicit post-route save/eviction; no terrain or ticket mutations. */
-final class LabSpectatorLifecycle {
+final class LabFlightLifecycle {
     final LabFlightPlan plan;
     final List<Map<String,Object>> observations=new ArrayList<>();
     JsonObject clientResult;
@@ -20,18 +20,20 @@ final class LabSpectatorLifecycle {
     long flightStarted, lastObservation, finishedAt, saveNanos, purgeNanos, flushNanos;
     int beforeSave,beforePurge,afterPurge, pendingAfterFlush;
     double[] serverFinalPose;
-    LabSpectatorLifecycle(LabJob job){plan=new LabFlightPlan(job.benchmark.data);}
+    LabFlightLifecycle(LabJob job){plan=new LabFlightPlan(job.benchmark.data);}
     private EntityPlayerMP player(LabJob job) {
         if(job.peers.size()!=1)throw new IllegalStateException("Lifecycle requires exactly one real client");
         EntityPlayerMP p=job.server.getPlayerList().getPlayerByUUID(job.peers.iterator().next());
-        if(p==null||!p.isSpectator()||p.interactionManager.getGameType()!=GameType.SPECTATOR)throw new IllegalStateException("Spectator disconnected or changed mode");return p;
+        if(p==null)throw new IllegalStateException("Flight participant disconnected");
+        if(p.interactionManager.getGameType()!=GameType.CREATIVE||!p.capabilities.isFlying)throw new IllegalStateException("Flight participant left creative flight");
+        return p;
     }
     boolean tick(LabJob job)throws java.io.IOException {
         EntityPlayerMP p=player(job);long now=System.nanoTime();
         if(!controlSent){JsonObject control=CubicLab.control("flight-begin",job.id,job.scenario);
-            control.addProperty("moving",job.scenario.equals("spectator-flight"));Network.CHANNEL.sendTo(new Network.ClientMessage(control),p);controlSent=true;}
+            control.addProperty("moving",job.scenario.equals("creative-flight"));Network.CHANNEL.sendTo(new Network.ClientMessage(control),p);controlSent=true;}
         if(now-lastObservation>=1000000000L){lastObservation=now;observe(job,p,now);}
-        if(job.scenario.equals("spectator-flight")) {
+        if(job.scenario.equals("creative-flight")) {
             if(clientResult==null)return false;
             if(!clientResult.get("passed").getAsBoolean())throw new IllegalStateException("Client flight failed: "+clientResult);
             serverFinalPose=new double[]{p.posX,p.posY,p.posZ,p.rotationYaw,p.rotationPitch};

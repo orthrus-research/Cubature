@@ -11,8 +11,8 @@ final class LabFlightPlan {
     final double speed;
     final long durationNanos;
     LabFlightPlan(JsonObject workload) {
-        if (workload == null || !workload.has("spectatorFlight")) throw new IllegalArgumentException("Missing spectator flight");
-        JsonObject value = workload.getAsJsonObject("spectatorFlight");
+        if (workload == null || !workload.has("flight")) throw new IllegalArgumentException("Missing flight");
+        JsonObject value = workload.getAsJsonObject("flight");
         seconds = value.get("durationSeconds").getAsInt();
         settleSeconds = value.get("settleSeconds").getAsInt();
         speed = value.get("blocksPerSecond").getAsDouble();

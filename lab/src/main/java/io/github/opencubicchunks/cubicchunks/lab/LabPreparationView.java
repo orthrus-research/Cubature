@@ -24,7 +24,7 @@ final class LabPreparationView {
     private final Set<UUID> arrived = new HashSet<>();
     private long arrivedNanos, readyNanos, deliveredNanos,renderReadyNanos,previousDataIncompleteNanos;
     private long previousIncompleteNanos;
-    private int serverReady, serverSent;
+    private int serverReady, serverSent, flyingRestored;
     LabPreparationView(LabJob job) {
         geometry=job.fullView;
         teleportTick=job.elapsedTicks;
@@ -32,7 +32,11 @@ final class LabPreparationView {
         for(int x=geometry.minX;x<=geometry.maxX;x++)for(int y=geometry.minY;y<=geometry.maxY;y++)for(int z=geometry.minZ;z<=geometry.maxZ;z++)
             positions[index++]=new CubePos(x,y,z);
         for (EntityPlayerMP player : job.server.getPlayerList().getPlayers()) if(job.peers.contains(player.getUniqueID())) {
-            player.setGameType(GameType.SPECTATOR);
+            // A creative player flying in place: the server ticks, spawns and tracks around it as it
+            // would around any player, which a spectator would exempt it from.
+            player.setGameType(GameType.CREATIVE);
+            player.capabilities.isFlying=true;
+            player.sendPlayerAbilities();
             player.connection.setPlayerLocation(geometry.x,geometry.y,geometry.z,geometry.yaw,geometry.pitch);
             clients.put(player.getUniqueID(),0);
             rendererReady.put(player.getUniqueID(),false);
@@ -72,6 +76,9 @@ final class LabPreparationView {
         for(UUID id:clients.keySet()) {
             EntityPlayerMP p=job.server.getPlayerList().getPlayerByUUID(id);
             if(p==null)throw new IllegalStateException("Full-view participant disconnected");
+            // A creative client stops flying when it lands, as it can at spawn while its teleport is
+            // held. Restoring flight every tick keeps it airborne when the teleport arrives.
+            if(!p.capabilities.isFlying){p.capabilities.isFlying=true;p.sendPlayerAbilities();flyingRestored++;}
             boolean there=Math.abs(p.posX-geometry.x)<=.3 && Math.abs(p.posY-geometry.y)<=.3 && Math.abs(p.posZ-geometry.z)<=.3
                     &&Math.abs(net.minecraft.util.math.MathHelper.wrapDegrees(p.rotationYaw-geometry.yaw))<=2&&Math.abs(p.rotationPitch-geometry.pitch)<=2;
             if(there)arrived.add(id);
@@ -116,7 +123,7 @@ final class LabPreparationView {
         return false;
     }
     Map<String,Object> summary() {
-        Map<String,Object> data=new LinkedHashMap<>();data.put("expected",15625);data.put("serverReady",serverReady);data.put("serverSent",serverSent);
+        Map<String,Object> data=new LinkedHashMap<>();data.put("expected",15625);data.put("serverReady",serverReady);data.put("serverSent",serverSent);data.put("flyingRestored",flyingRestored);
         data.put("geometry",geometry.json());data.put("previousIncompleteObservationNanos",previousIncompleteNanos);
         data.put("clients",clients);data.put("arrivedNanos",arrivedNanos);data.put("readyNanos",readyNanos);data.put("deliveredNanos",deliveredNanos);data.put("samples",samples);
         data.put("previousDataIncompleteObservationNanos",previousDataIncompleteNanos);data.put("renderReadyRequired",requireRenderReady);

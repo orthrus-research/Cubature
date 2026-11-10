@@ -8,8 +8,8 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.util.MovementInput;
 import java.util.*;
 
-/** Scripted spectator velocity through vanilla movement packets; never overrides position. */
-final class ClientSpectatorFlight {
+/** Scripted creative-flight velocity through vanilla movement packets; never overrides position. */
+final class ClientFlight {
     final LabFlightPlan plan;
     final String id, scenario;
     final boolean moving;
@@ -19,7 +19,7 @@ final class ClientSpectatorFlight {
     int movementTicks;
     boolean done, passed;
     String failure;
-    ClientSpectatorFlight(JsonObject control, LabBenchmarkWorkload workload, boolean moving) {
+    ClientFlight(JsonObject control, LabBenchmarkWorkload workload, boolean moving) {
         plan = new LabFlightPlan(workload.data); id = control.get("runId").getAsString();
         scenario = control.get("scenario").getAsString(); this.moving = moving;
     }
@@ -33,7 +33,7 @@ final class ClientSpectatorFlight {
             JsonObject report=CubicLab.control("flight-started",id,scenario);
             Network.CHANNEL.sendToServer(new Network.ServerMessage(report));
         }
-        if (!mc.player.isSpectator()) { finish(mc,false,"Client left spectator mode",now);return; }
+        if (!mc.playerController.isInCreativeMode() || !mc.player.capabilities.isFlying) { finish(mc,false,"Client left creative flight",now);return; }
         if (plan.finished(started,now)) {
             finish(mc,plan.validOutcome(now-started,mc.player.posX-startX)
                 && Math.abs(mc.player.posY-startY)<.5 && Math.abs(mc.player.posZ-startZ)<.5,null,now);return;
@@ -79,6 +79,6 @@ final class ClientSpectatorFlight {
         out.put("distanceX",started==0?0:mc.player.posX-startX);out.put("startX",startX);out.put("startY",startY);out.put("startZ",startZ);
         out.put("finalPose",new double[]{mc.player.posX,mc.player.posY,mc.player.posZ,mc.player.rotationYaw,mc.player.rotationPitch});
         out.put("observations",observations);out.put("inRoutePositionOverrides",0);
-        out.put("scope","Client scripted X velocity, native spectator physics and ordinary player movement packets; 60-second client wall-clock endpoint. Residency is sampled once per second, not mesh or presentation readiness.");return out;
+        out.put("scope","Client scripted X velocity, native creative flight physics with collisions and ordinary player movement packets; 60-second client wall-clock endpoint. Residency is sampled once per second, not mesh or presentation readiness.");return out;
     }
 }

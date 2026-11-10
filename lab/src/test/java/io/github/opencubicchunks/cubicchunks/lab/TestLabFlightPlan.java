@@ -4,7 +4,7 @@ import org.junit.Test;
 import static org.junit.Assert.*;
 public class TestLabFlightPlan {
     private LabFlightPlan plan(){return plan(16);}
-    private LabFlightPlan plan(double speed){return new LabFlightPlan(new JsonParser().parse("{\"spectatorFlight\":{\"durationSeconds\":60,\"blocksPerSecond\":"+speed+",\"settleSeconds\":20}}").getAsJsonObject());}
+    private LabFlightPlan plan(double speed){return new LabFlightPlan(new JsonParser().parse("{\"flight\":{\"durationSeconds\":60,\"blocksPerSecond\":"+speed+",\"settleSeconds\":20}}").getAsJsonObject());}
     @Test public void deadlineUsesWallTimeRatherThanNumberOfServerTicks(){
         LabFlightPlan p=plan();assertFalse(p.finished(100,60000000099L));assertTrue(p.finished(100,60000000100L));assertEquals(.8,p.velocityPerClientTick(),0);
         assertTrue(p.finished(Long.MAX_VALUE-10,Long.MIN_VALUE+60000000000L));

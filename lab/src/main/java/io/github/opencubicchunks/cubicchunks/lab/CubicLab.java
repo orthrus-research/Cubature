@@ -117,10 +117,10 @@ public final class CubicLab {
         String op = json.get("op").getAsString();
         if (op.equals("preparation-view") && job == active && job.preparationView != null)
             job.preparationView.client(player, json.get("loaded").getAsInt(),json);
-        if(job==active&&job.spectatorLifecycle!=null){
-            if(op.equals("flight-view"))job.spectatorLifecycle.clientResident=json.get("resident").getAsInt();
-            if(op.equals("flight-started"))job.spectatorLifecycle.flightStarted=System.nanoTime()-job.started;
-            if(op.equals("flight-finished"))job.spectatorLifecycle.clientResult=json;
+        if(job==active&&job.flightLifecycle!=null){
+            if(op.equals("flight-view"))job.flightLifecycle.clientResident=json.get("resident").getAsInt();
+            if(op.equals("flight-started"))job.flightLifecycle.flightStarted=System.nanoTime()-job.started;
+            if(op.equals("flight-finished"))job.flightLifecycle.clientResult=json;
         }
         if (op.equals("ready") && job == active) job.ready.add(player.getUniqueID());
         if (op.equals("report")) {

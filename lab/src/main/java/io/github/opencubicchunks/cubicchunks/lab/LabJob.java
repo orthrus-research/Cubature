@@ -62,7 +62,7 @@ final class LabJob {
     LabTwoWorlds twoWorlds;
     LabFirstLight firstLightFixture;
     LabPreparationView preparationView;
-    LabSpectatorLifecycle spectatorLifecycle;
+    LabFlightLifecycle flightLifecycle;
     io.github.opencubicchunks.cubicchunks.core.server.LabGenerationProbe generationFixture;
     io.github.opencubicchunks.cubicchunks.core.server.LabMapChurnProbe mapChurnFixture;
     io.github.opencubicchunks.cubicchunks.core.server.chunkio.LabStorageFailureProbe storageFailureFixture;
@@ -71,7 +71,7 @@ final class LabJob {
 
     LabJob(MinecraftServer server, String scenario) {
         if (!Arrays.asList("idle", "generate", "resident", "save", "load-sync", "load-async", "horizontal", "vertical", "lighting-snapshot", "lighting-save-order", "scheduled-ticks", "save-burst", "autosave", "storage-failure", "storage-strategies", "map-churn", "generation-contracts", "first-light").contains(scenario))
-            if(!scenario.equals("route")&&!scenario.equals("full-view")&&!scenario.equals("maintenance-contracts")&&!Arrays.asList("spectator-flight","lifecycle-settle","lifecycle-save-purge","save-command","save-clean","autosave-natural","storage-fault-matrix","storage-content-write","storage-content-read","storage-two-worlds").contains(scenario))throw new IllegalArgumentException("Unknown lab scenario");
+            if(!scenario.equals("route")&&!scenario.equals("full-view")&&!scenario.equals("maintenance-contracts")&&!Arrays.asList("creative-flight","lifecycle-settle","lifecycle-save-purge","save-command","save-clean","autosave-natural","storage-fault-matrix","storage-content-write","storage-content-read","storage-two-worlds").contains(scenario))throw new IllegalArgumentException("Unknown lab scenario");
         this.server = server; this.scenario = scenario; world = server.getWorld(0);
         if(benchmark.identity!=null&&world.getSeed()!=benchmark.seed)throw new IllegalArgumentException("Native world seed differs from benchmark workload");
         if(scenario.equals("route")&&benchmark.routeTicks==0)throw new IllegalArgumentException("Route requires a prepared workload with explicit waypoints");
@@ -140,9 +140,9 @@ final class LabJob {
         if (started == 0) { LabStorageTrace.start(); LabDeliveryTrace.begin(); LabLodTrace.mark("lab-start");captureStartLoadedCubes=provider.getLoadedCubeCount();started = System.nanoTime(); startUtc = Instant.now().toString(); gcStart = LabData.gc(); threadCosts = new LabThreadCosts(); LabHooks.serverPackets = packets; }
         elapsedTicks++;
         switch (scenario) {
-            case "spectator-flight":case "lifecycle-settle":case "lifecycle-save-purge":
-                if(spectatorLifecycle==null)spectatorLifecycle=new LabSpectatorLifecycle(this);
-                done=spectatorLifecycle.tick(this);break;
+            case "creative-flight":case "lifecycle-settle":case "lifecycle-save-purge":
+                if(flightLifecycle==null)flightLifecycle=new LabFlightLifecycle(this);
+                done=flightLifecycle.tick(this);break;
             case "storage-two-worlds":
                 if (twoWorlds == null) twoWorlds = new LabTwoWorlds();
                 try { done = twoWorlds.tick(this); } catch (Exception error) { throw new java.io.IOException("Two-world fixture failed", error); }
@@ -365,7 +365,7 @@ final class LabJob {
         data.put("stageTimings", stages.summary());
         Map<String,Object> storageTrace=LabStorageTrace.finish();if(storageTrace!=null)data.put("storageDiagnostics",storageTrace);
         if(saveContracts!=null)data.put("saveContractChecks",saveContracts.summary());
-        if(spectatorLifecycle!=null)data.put("spectatorLifecycle",spectatorLifecycle.summary());
+        if(flightLifecycle!=null)data.put("flightLifecycle",flightLifecycle.summary());
         if(storageFaultMatrix!=null)data.put("storageFaultMatrix",storageFaultMatrix);
         if(storageContent!=null)data.put("storageContent",storageContent);
         if(twoWorlds!=null)data.put("storageTwoWorlds",twoWorlds.summary());

@@ -11,7 +11,7 @@ SCENARIOS = {'idle', 'generate', 'resident', 'save', 'load-sync', 'load-async', 
     'storage-failure', 'storage-strategies', 'map-churn', 'generation-contracts', 'first-light',
     'full-view', 'maintenance-contracts', 'save-command', 'save-clean', 'autosave-natural', 'storage-fault-matrix',
     'storage-content-write', 'storage-content-read', 'storage-two-worlds',
-    'spectator-flight', 'lifecycle-settle', 'lifecycle-save-purge'}
+    'creative-flight', 'lifecycle-settle', 'lifecycle-save-purge'}
 
 
 def scenario_valid(name):
@@ -41,7 +41,7 @@ def pose(value):
 
 def validate(value):
     keys(value, ['schema', 'id', 'description', 'tags', 'seed', 'camera', 'scenarios', 'warmupTicks',
-        'idleTicks', 'residentTicks', 'timeoutSeconds', 'fixture', 'route', 'spectatorFlight', 'waitForOverlays'], ['schema', 'id', 'seed', 'camera', 'scenarios'])
+        'idleTicks', 'residentTicks', 'timeoutSeconds', 'fixture', 'route', 'flight', 'waitForOverlays'], ['schema', 'id', 'seed', 'camera', 'scenarios'])
     if type(value.get('waitForOverlays',True)) is not bool: raise ValueError('waitForOverlays must be a boolean')
     integer(value['schema'], 1, 1, 'schema')
     if not isinstance(value['id'], str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]{0,47}', value['id']):
@@ -58,12 +58,12 @@ def validate(value):
         if not isinstance(names, list) or len(names) > 64 or (phase == 'write' and not names) or any(not scenario_valid(n) for n in names) or len(set(names)) != len(names):
             raise ValueError('Invalid or duplicate scenario list')
     names = [n for rows in value['scenarios'].values() for n in rows]
-    lifecycle = ['full-view','spectator-flight','lifecycle-settle','lifecycle-save-purge']
+    lifecycle = ['full-view','creative-flight','lifecycle-settle','lifecycle-save-purge']
     if any(n in names for n in lifecycle[1:]):
         order = value['scenarios']['write']
         if any(n not in order for n in lifecycle) or sorted(order.index(n) for n in lifecycle) != [order.index(n) for n in lifecycle]:
-            raise ValueError('Spectator lifecycle requires full-view, flight, settle and save-purge in write order')
-        flight=value.get('spectatorFlight')
+            raise ValueError('Flight lifecycle requires full-view, flight, settle and save-purge in write order')
+        flight=value.get('flight')
         keys(flight,['durationSeconds','blocksPerSecond','settleSeconds'],['durationSeconds','blocksPerSecond','settleSeconds'])
         integer(flight['durationSeconds'],60,60,'durationSeconds')
         integer(flight['blocksPerSecond'],4,40,'blocksPerSecond')
@@ -162,23 +162,23 @@ def validate_capture(manifest, server, client):
         raise RuntimeError('Native workload identity or world seed differs from preparation')
     if client.get('overlayObservationAvailable') is not True or client.get('overlayWaitRequired') != expected['value'].get('waitForOverlays',True) or client.get('framesWithOverlay',0) or client.get('overlayProbeFailure'):
         raise RuntimeError('Known title/arrival overlay covered measurement or its observer was unavailable')
-    if server.get('scenario') == 'spectator-flight':
-        flight=client.get('spectatorFlight',{})
-        authoritative=server.get('spectatorLifecycle',{}).get('clientFlight') or {}
+    if server.get('scenario') == 'creative-flight':
+        flight=client.get('flight',{})
+        authoritative=server.get('flightLifecycle',{}).get('clientFlight') or {}
         if not flight.get('passed') or not authoritative.get('passed') or not flight.get('moving') or flight.get('inRoutePositionOverrides') != 0:
-            raise RuntimeError('Real client spectator flight did not pass')
-        plan=expected['value']['spectatorFlight'];distance=plan['durationSeconds']*plan['blocksPerSecond']
+            raise RuntimeError('Real client creative flight did not pass')
+        plan=expected['value']['flight'];distance=plan['durationSeconds']*plan['blocksPerSecond']
         if not 60000000000 <= flight.get('movementElapsedNanos',0) <= 61000000000 or abs(flight.get('distanceX',0)-distance)>16 or len(flight.get('observations',[]))<55:
-            raise RuntimeError('Spectator flight missed wall duration, speed or trace coverage')
+            raise RuntimeError('Creative flight missed wall duration, speed or trace coverage')
         final=flight.get('finalPose',[])
         if len(final)!=5 or abs(final[1]-expected['value']['camera'][1])>.5 or abs(final[2]-expected['value']['camera'][2])>.5:
-            raise RuntimeError('Spectator flight drifted vertically or laterally')
-        lifecycle=server.get('spectatorLifecycle',{})
+            raise RuntimeError('Creative flight drifted vertically or laterally')
+        lifecycle=server.get('flightLifecycle',{})
         server_final=lifecycle.get('serverFinalPose',[])
         if len(lifecycle.get('observations',[]))<55 or len(server_final)!=5 or any(abs(a-b)>2 for a,b in zip(final[:3],server_final[:3])):
             raise RuntimeError('Authoritative server flight trace/end position missing or inconsistent')
     if server.get('scenario') == 'lifecycle-save-purge':
-        lifecycle=server.get('spectatorLifecycle',{})
+        lifecycle=server.get('flightLifecycle',{})
         if lifecycle.get('pendingAfterFlush') != 0 or lifecycle.get('explicitPurgeNanos',0)<=0:
             raise RuntimeError('Post-flight save, purge and drained flush receipt missing')
     if server.get('scenario') == 'route':

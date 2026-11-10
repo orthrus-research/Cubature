@@ -30,7 +30,7 @@ public final class ClientProxy extends CommonProxy {
             JsonObject data = new JsonParser().parse(message).getAsJsonObject();
             String op = data.get("op").getAsString();
             if (op.equals("start")) {pending=data;pendingBenchmark=LabBenchmarkWorkload.configured();pendingBenchmark.verifyPeer(data);pendingAt=System.nanoTime();pendingOverlayTicks=0;}
-            if(op.equals("flight-begin")&&active!=null&&active.id.equals(data.get("runId").getAsString()))active.flight=new ClientSpectatorFlight(data,active.benchmark,data.get("moving").getAsBoolean());
+            if(op.equals("flight-begin")&&active!=null&&active.id.equals(data.get("runId").getAsString()))active.flight=new ClientFlight(data,active.benchmark,data.get("moving").getAsBoolean());
             if (op.equals("stop") && active != null && active.id.equals(data.get("runId").getAsString())) finish();
             if (op.equals("quit")) Minecraft.getMinecraft().shutdown();
         });
@@ -48,7 +48,7 @@ public final class ClientProxy extends CommonProxy {
         }
         if (event.phase == TickEvent.Phase.END && pending != null && mc.world != null && mc.player != null && mc.currentScreen == null) {
             if(pendingBenchmark.waitForOverlays&&overlays.failure==null&&overlays.active){pendingOverlayTicks++;return;}
-            if(pending.get("scenario").getAsString().equals("spectator-flight"))ScreenShotHelper.saveScreenshot(mc.gameDir,"cubiclab-"+pending.get("runId").getAsString()+"-start.png",mc.displayWidth,mc.displayHeight,mc.getFramebuffer());
+            if(pending.get("scenario").getAsString().equals("creative-flight"))ScreenShotHelper.saveScreenshot(mc.gameDir,"cubiclab-"+pending.get("runId").getAsString()+"-start.png",mc.displayWidth,mc.displayHeight,mc.getFramebuffer());
             active = new Capture(pending,pendingBenchmark,pendingOverlayTicks,System.nanoTime()-pendingAt); pending = null; LabHooks.clientPackets = active.packets;
             LabRenderDiagnostics.beginCapture(active.id);
             LabDeliveryTrace.begin();
@@ -132,7 +132,7 @@ public final class ClientProxy extends CommonProxy {
         if(capture.fullView!=null)result.put("fullView",capture.fullView.summary());
         result.put("measurementMode", LabData.measurementMode());
         result.put("nativePresentationTimingMeasured",false);
-        if(capture.flight!=null)result.put("spectatorFlight",capture.flight.summary(mc));
+        if(capture.flight!=null)result.put("flight",capture.flight.summary(mc));
         result.put("verticalViewDistance", io.github.opencubicchunks.cubicchunks.core.CubicChunksConfig.verticalCubeLoadDistance);
         result.put("frameCap", mc.gameSettings.limitFramerate); result.put("vsync", mc.gameSettings.enableVsync);
         result.put("fancyGraphics", mc.gameSettings.fancyGraphics); result.put("fullscreen", mc.gameSettings.fullScreen);
@@ -158,7 +158,7 @@ public final class ClientProxy extends CommonProxy {
         final LabHooks.PacketCounters packets = new LabHooks.PacketCounters();
         final Map<Integer, Long> loadedByY = new TreeMap<>();
         long tickStarted, renderStarted, lastFrame, loads, unloads, guiFrames, outsideHeightLoads;
-        ClientSpectatorFlight flight;
+        ClientFlight flight;
         final LabMovingCoverage coverage=new LabMovingCoverage();
         final LabClientView fullView;
         final LabBenchmarkWorkload benchmark;
