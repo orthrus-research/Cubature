@@ -164,6 +164,155 @@ public class TestGeneratorBuildPool {
         assertTrue(generator.offered.isEmpty());
     }
 
+    @Test public void abandonmentLeavesAnAdoptedPoolUntilWorldClose() {
+        CubicChunksConfig.generatorBuildThreads = 1;
+        Object world = new Object();
+        PoolGenerator generator = new PoolGenerator();
+        GeneratorBuildPool holder = worlds.open(server, world, generator, "test");
+        worlds.abandon(world);
+        worlds.abandon(world);
+        assertSame(holder, worlds.get(server, world, "test"));
+        assertFalse(holder.pool().isShutdown());
+        assertEquals(1, generator.offered.size());
+        worlds.close(world);
+        assertTrue(holder.pool().isShutdown());
+        assertEquals(2, generator.offered.size());
+    }
+
+    @Test public void abandonmentRetiresAnUnadoptedPoolOnce() {
+        CubicChunksConfig.generatorBuildThreads = 1;
+        Object world = new Object();
+        GeneratorBuildPool holder = worlds.get(server, world, "test");
+        worlds.abandon(world);
+        worlds.abandon(world);
+        assertTrue(holder.pool().isShutdown());
+        assertThrows(IllegalStateException.class, () -> worlds.get(server, world, "test"));
+        PoolGenerator generator = new PoolGenerator();
+        assertThrows(IllegalStateException.class, () -> worlds.open(server, world, generator, "test"));
+        assertTrue(generator.offered.isEmpty());
+    }
+
+    @Test public void abandonmentBeforeARequestPreventsPoolCreation() {
+        Object world = new Object();
+        worlds.abandon(world);
+        worlds.abandon(world);
+        assertThrows(IllegalStateException.class, () -> worlds.get(server, world, "test"));
+    }
+
+    @Test public void zeroTargetAbandonmentStillFollowsAdoption() {
+        CubicChunksConfig.generatorBuildThreads = 0;
+        Object adoptedWorld = new Object(), unadoptedWorld = new Object();
+        PoolGenerator generator = new PoolGenerator();
+        GeneratorBuildPool adopted = worlds.open(server, adoptedWorld, generator, "adopted");
+        worlds.get(server, unadoptedWorld, "unadopted");
+        worlds.abandon(adoptedWorld);
+        worlds.abandon(unadoptedWorld);
+        assertSame(adopted, worlds.get(server, adoptedWorld, "adopted"));
+        assertNull(adopted.pool());
+        assertEquals(1, generator.offered.size());
+        assertThrows(IllegalStateException.class, () -> worlds.get(server, unadoptedWorld, "unadopted"));
+        worlds.close(adoptedWorld);
+        assertEquals(2, generator.offered.size());
+    }
+
+    @Test public void aFailedOfferClosesAfterAbandonmentDuringTheCallback() {
+        CubicChunksConfig.generatorBuildThreads = 1;
+        Object world = new Object();
+        GeneratorBuildPool holder = worlds.get(server, world, "test");
+        IllegalStateException failure = new IllegalStateException("offer");
+        PoolGenerator generator = new PoolGenerator() {
+            @Override public void useBuildPool(ForkJoinPool pool) {
+                super.useBuildPool(pool);
+                if (pool != null) {
+                    worlds.abandon(world);
+                    throw failure;
+                }
+            }
+        };
+        assertSame(failure, assertThrows(IllegalStateException.class, () -> worlds.open(server, world, generator, "test")));
+        assertTrue(holder.pool().isShutdown());
+        assertEquals(2, generator.offered.size());
+        assertThrows(IllegalStateException.class, () -> worlds.get(server, world, "test"));
+    }
+
+    @Test public void abandonmentWaitsForAdoptionWithoutHoldingTheRegistryLock() throws Exception {
+        CubicChunksConfig.generatorBuildThreads = 1;
+        Object world = new Object();
+        CountDownLatch offerStarted = new CountDownLatch(1), release = new CountDownLatch(1), requested = new CountDownLatch(1);
+        AtomicReference<Throwable> failed = new AtomicReference<>();
+        PoolGenerator generator = new PoolGenerator() {
+            @Override public void useBuildPool(ForkJoinPool pool) {
+                super.useBuildPool(pool);
+                assertFalse(Thread.holdsLock(worlds));
+                if (pool != null) {
+                    offerStarted.countDown();
+                    try { assertTrue(release.await(10, TimeUnit.SECONDS)); }
+                    catch (InterruptedException interrupted) { throw new AssertionError(interrupted); }
+                }
+            }
+        };
+        Thread adopting = new Thread(() -> {
+            try { worlds.open(server, world, generator, "test"); }
+            catch (Throwable failure) { failed.compareAndSet(null, failure); }
+        });
+        Thread abandoning = new Thread(() -> {
+            try { worlds.abandon(world); }
+            catch (Throwable failure) { failed.compareAndSet(null, failure); }
+        });
+        Thread requesting = new Thread(() -> {
+            try { worlds.get(server, new Object(), "other"); requested.countDown(); }
+            catch (Throwable failure) { failed.compareAndSet(null, failure); }
+        });
+        adopting.start();
+        try {
+            assertTrue(offerStarted.await(10, TimeUnit.SECONDS));
+            abandoning.start();
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+            while (abandoning.getState() != Thread.State.BLOCKED && System.nanoTime() < deadline) Thread.sleep(1);
+            assertEquals(Thread.State.BLOCKED, abandoning.getState());
+            requesting.start();
+            assertTrue("Abandonment must not hold the registry while waiting on adoption", requested.await(2, TimeUnit.SECONDS));
+        } finally {
+            release.countDown();
+            adopting.join(10000);
+            abandoning.join(10000);
+            requesting.join(10000);
+        }
+        assertFalse(adopting.isAlive());
+        assertFalse(abandoning.isAlive());
+        assertFalse(requesting.isAlive());
+        assertNull(failed.get());
+        GeneratorBuildPool holder = worlds.get(server, world, "test");
+        assertFalse(holder.pool().isShutdown());
+        assertEquals(1, generator.offered.size());
+    }
+
+    @Test public void abandonmentRejectsAnAdopterThatAlreadyFetchedTheHolder() throws Exception {
+        CubicChunksConfig.generatorBuildThreads = 1;
+        Object world = new Object();
+        GeneratorBuildPool holder = worlds.get(server, world, "test");
+        PoolGenerator generator = new PoolGenerator();
+        AtomicReference<Throwable> failed = new AtomicReference<>();
+        Thread adopting = new Thread(() -> {
+            try { worlds.open(server, world, generator, "test"); }
+            catch (Throwable failure) { failed.set(failure); }
+        });
+        try {
+            synchronized (holder) {
+                adopting.start();
+                long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+                while (adopting.getState() != Thread.State.BLOCKED && System.nanoTime() < deadline) Thread.sleep(1);
+                assertEquals(Thread.State.BLOCKED, adopting.getState());
+                worlds.abandon(world);
+            }
+        } finally { adopting.join(10000); }
+        assertFalse(adopting.isAlive());
+        assertTrue(failed.get() instanceof IllegalStateException);
+        assertTrue(generator.offered.isEmpty());
+        assertTrue(holder.pool().isShutdown());
+        assertThrows(IllegalStateException.class, () -> worlds.get(server, world, "test"));
+    }
+
     @Test public void aSecondGeneratorCannotReplaceTheOwner() {
         CubicChunksConfig.generatorBuildThreads = 1;
         Object world = new Object();
@@ -264,7 +413,7 @@ public class TestGeneratorBuildPool {
         assertNotNull(worlds.get(nextServer, newWorld, "new").pool());
     }
 
-    @Test public void closeRacingAdoptionWithdrawsThePoolOnce() throws Exception {
+    @Test public void closeAndAbandonRacingAdoptionWithdrawThePoolOnce() throws Exception {
         CubicChunksConfig.generatorBuildThreads = 1;
         Object world = new Object();
         GeneratorBuildPool early = worlds.get(server, world, "test");
@@ -288,15 +437,22 @@ public class TestGeneratorBuildPool {
             try { worlds.close(world); }
             catch (Throwable failure) { failed.set(failure); }
         });
+        Thread abandoning = new Thread(() -> {
+            try { worlds.abandon(world); }
+            catch (Throwable failure) { failed.compareAndSet(null, failure); }
+        });
         adopting.start();
         try {
             assertTrue(offerStarted.await(10, TimeUnit.SECONDS));
             closing.start();
+            abandoning.start();
         } finally { release.countDown(); }
         adopting.join(10000);
         closing.join(10000);
+        abandoning.join(10000);
         assertFalse(adopting.isAlive());
         assertFalse(closing.isAlive());
+        assertFalse(abandoning.isAlive());
         assertNull(failed.get());
         assertEquals(2, generator.offered.size());
         assertNull(generator.offered.get(1));

@@ -92,7 +92,7 @@ public class CommonEventHandler {
 
     @SubscribeEvent
     public void onBuildPoolAbandoned(WorldBuildPool.Abandoned event) {
-        GeneratorBuildPool.close(event.getWorld());
+        GeneratorBuildPool.abandon(event.getWorld());
     }
 
     @SubscribeEvent // this event is fired early enough to replace world with cubic chunks without any issues

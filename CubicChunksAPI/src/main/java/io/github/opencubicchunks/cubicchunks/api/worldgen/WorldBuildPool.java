@@ -58,7 +58,10 @@ public final class WorldBuildPool {
         return event.pool;
     }
 
-    /** Notifies the host that construction failed before the cube provider could adopt the pool. */
+    /**
+     * Notifies the host that early construction failed. A pool not yet adopted by the cube provider is retired;
+     * an adopted pool stays available to its generator until normal world shutdown. Repeated notifications are safe.
+     */
     public static void abandon(World world) {
         if (!world.isRemote && world instanceof WorldServer) MinecraftForge.EVENT_BUS.post(new Abandoned(world));
     }
@@ -76,7 +79,7 @@ public final class WorldBuildPool {
         public void offer(@Nullable ForkJoinPool pool) { this.pool = pool; }
     }
 
-    /** Failed-construction notification on {@link MinecraftForge#EVENT_BUS}. */
+    /** Failed-construction notification on {@link MinecraftForge#EVENT_BUS}; ignored after pool adoption. */
     public static final class Abandoned extends Event {
         private final World world;
 

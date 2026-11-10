@@ -43,6 +43,8 @@ The world type can request that same pool before constructing its biome provider
 unadopted pool through `WorldBuildPool.abandon`. Cubature closes requested pools on failed or skipped
 world initialization, world unload and server stop, and rejects requests from closed worlds or a
 retired server. Adoption and withdrawal happen once, including when a generator callback fails.
+Abandonment retires only unadopted pools; after adoption, a failed early request leaves the live
+generator's pool in place until world/provider shutdown or server stop.
 World types can also request a host-owned directory for discardable derived data before their biome
 provider exists. The save-level path is a sibling named `<save>.cubature-cache`; it does not depend on
 provider initialization and resolving it opens or creates no cache files. Clients and worlds without

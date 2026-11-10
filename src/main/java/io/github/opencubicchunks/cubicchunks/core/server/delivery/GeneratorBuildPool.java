@@ -51,6 +51,9 @@ public final class GeneratorBuildPool {
     /** Closes a requested pool even if world construction never reached the cube provider. */
     public static void close(World world) { WORLDS.close(world); }
 
+    /** Failed early construction retires only a pool the cube provider has not adopted. */
+    public static void abandon(World world) { WORLDS.abandon(world); }
+
     /** A new server may create pools; closed worlds from the previous server stay closed. */
     public static void serverStarting(MinecraftServer server) { WORLDS.start(server); }
 
@@ -117,6 +120,11 @@ public final class GeneratorBuildPool {
         }
     }
 
+    /** Shares adoption's lock so a failed early request cannot withdraw a live generator's pool. */
+    private synchronized void abandonUnadopted() {
+        if (generator == null) close();
+    }
+
     /** Identity keys prevent two dimensions or replacement worlds from sharing a holder. */
     static final class Registry<W> {
         private final IdentityHashMap<W, GeneratorBuildPool> active = new IdentityHashMap<>();
@@ -147,6 +155,29 @@ public final class GeneratorBuildPool {
                 throw failure;
             }
             return holder;
+        }
+
+        void abandon(W world) {
+            GeneratorBuildPool holder;
+            synchronized (this) {
+                holder = active.get(world);
+                if (holder == null) {
+                    if (!wasClosed(world)) closed.add(new WeakReference<>(world));
+                    return;
+                }
+            }
+            try {
+                holder.abandonUnadopted();
+            } finally {
+                if (holder.closed) {
+                    synchronized (this) {
+                        if (active.get(world) == holder) {
+                            active.remove(world);
+                            if (!wasClosed(world)) closed.add(new WeakReference<>(world));
+                        }
+                    }
+                }
+            }
         }
 
         void close(W world) {
