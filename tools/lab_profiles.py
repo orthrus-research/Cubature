@@ -10,7 +10,7 @@ JVM_ARGUMENTS = ['-Xms1G', '-Xmx8G', '-XX:+UseZGC']
 
 
 JVM_VARIANTS = ['zgc', 'zgc-fixed', 'zgc-pretouch', 'g1', 'g1-fixed', 'g1-pretouch', 'g1-diag',
-                'g1-p50', 'g1-egc', 'g1-ship8', 'g1-ship12']
+                'g1-p50', 'g1-egc', 'g1-ship8', 'g1-ship12', 'g1-ship8-nmt']
 G1_LOG = '-Xlog:gc*,gc+heap=debug:file=gc.log:time,uptime,level,tags'
 # G1 shipping candidates, each with the GC log: the shipping flags on the 8 GiB floor and on 12 GiB.
 SHIPPING_G1 = ['-XX:G1HeapRegionSize=4m', '-XX:MaxGCPauseMillis=50', '-XX:+ExplicitGCInvokesConcurrent']
@@ -19,6 +19,9 @@ G1_EXPERIMENTS = {
     'g1-egc': ['-XX:+ExplicitGCInvokesConcurrent'],
     'g1-ship8': SHIPPING_G1,
     'g1-ship12': SHIPPING_G1,
+    # The shipping profile with native memory tracking, which costs a little CPU; captures then
+    # record each process's NMT summary after every scenario.
+    'g1-ship8-nmt': SHIPPING_G1 + ['-XX:NativeMemoryTracking=summary'],
 }
 HEAP_MIB = {'g1-ship12': 12288}
 # Environment variable that selects a variant for a newly prepared standalone instance.
@@ -40,6 +43,10 @@ def jvm_profile(variant=DEFAULT_VARIANT):
     if variant == 'g1-diag' or variant in G1_EXPERIMENTS: arguments.append(G1_LOG)
     arguments.extend(G1_EXPERIMENTS.get(variant, []))
     return {'initialHeapMiB': initial, 'maxHeapMiB': maximum, 'collector': collector, 'arguments': arguments}
+
+
+def tracks_native_memory(manifest):
+    return any(a.startswith('-XX:NativeMemoryTracking=') for a in manifest.get('jvmProfile', {}).get('arguments', []))
 
 
 def configure_jvm(server, profile=None):

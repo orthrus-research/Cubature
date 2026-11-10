@@ -20,7 +20,7 @@ from lab_input_snapshot import retain_prelaunch_inputs
 from lab_instance import FORK, export_client, load_lab, prime, record_inputs
 from lab_process import (PLAYER, argv, await_line, capture_process_endpoint, retain_process_lifecycles, send, spawn,
                          write_process_receipt)
-from lab_profiles import validate_jvm_capture, validate_view_distance_capture
+from lab_profiles import tracks_native_memory, validate_jvm_capture, validate_view_distance_capture
 import lab_workload
 from riven_workspace import riven_workspace
 
@@ -53,6 +53,17 @@ def native_measurement_lease(root, name):
             stream.seek(0)
             if os.name == 'nt': msvcrt.locking(stream.fileno(), msvcrt.LK_UNLCK, 1)
             else: fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
+
+
+def native_memory_summaries(manifest, evidence, scenario, processes):
+    """Each process's native memory tracking summary, in MiB, once a scenario has reported."""
+    tool = Path(manifest['java']).with_name('jcmd.exe' if os.name == 'nt' else 'jcmd')
+    for side, process in processes.items():
+        try:
+            with (evidence / f'{scenario}-{side}-native-memory.txt').open('w', encoding='utf-8') as log:
+                subprocess.run([str(tool), str(process.pid), 'VM.native_memory', 'summary', 'scale=MB'],
+                               stdout=log, stderr=subprocess.STDOUT, timeout=30, check=False)
+        except (OSError, subprocess.TimeoutExpired): pass
 
 
 def selected_scenarios(args, manifest):
@@ -162,6 +173,8 @@ def run(args, *, load=None, prime_lab=None, select=None, record=None, retain=Non
                             subprocess.run([str(diagnostic_tool),str(client.pid),*arguments],stdout=diagnostic_log,stderr=subprocess.STDOUT,timeout=20,check=False)
                     except (OSError,subprocess.TimeoutExpired):pass
                 raise
+            if tracks_native_memory(manifest):
+                native_memory_summaries(manifest, evidence, scenario, {'server': server, 'client': client})
             server_data = json.loads((server_dir / 'cubiclab-results' / run_id / 'server.json').read_text())
             client_data = json.loads((client_dir / 'cubiclab-results' / run_id / 'client.json').read_text())
             validate_view_distance_capture(manifest, server_data, client_data)

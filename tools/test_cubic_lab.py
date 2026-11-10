@@ -163,6 +163,23 @@ class LabControlTest(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'fresh instance'):
             profiles.validate_jvm_inputs({})
 
+    def test_native_memory_profile_records_each_process_summary_after_a_scenario(self):
+        self.assertEqual([v for v in profiles.JVM_VARIANTS if profiles.tracks_native_memory({'jvmProfile': profiles.jvm_profile(v)})],
+                         ['g1-ship8-nmt'])
+        with tempfile.TemporaryDirectory() as temporary:
+            evidence = Path(temporary)
+            calls = []
+            def run(command, stdout, **_):
+                calls.append(command); stdout.write('Native Memory Tracking:\n')
+            processes = {'server': mock.Mock(pid=11), 'client': mock.Mock(pid=22)}
+            with mock.patch.object(lab.subprocess, 'run', side_effect=run):
+                lab.native_memory_summaries({'java': str(evidence / 'java.exe')}, evidence, 'full-view', processes)
+            self.assertEqual([c[1:] for c in calls], [['11', 'VM.native_memory', 'summary', 'scale=MB'],
+                                                      ['22', 'VM.native_memory', 'summary', 'scale=MB']])
+            self.assertTrue(all(Path(c[0]).name.startswith('jcmd') for c in calls))
+            self.assertEqual(sorted(p.name for p in evidence.glob('*-native-memory.txt')),
+                             ['full-view-client-native-memory.txt', 'full-view-server-native-memory.txt'])
+
     def test_native_capture_requires_effective_heap_and_collector_on_both_sides(self):
         # The default profile is the shipping G1 profile on the 8 GiB floor.
         self.assertEqual(profiles.jvm_profile()['collector'], 'G1')
