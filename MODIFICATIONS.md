@@ -18,6 +18,8 @@ changed nothing, and the column's dirtying, staging removal and surface notifica
 A missing cube that a generator classifies EMPTY is installed as an all-air cube on the server
 thread without a worker task or primer, marked modified as a generated cube is; a worker task
 already running for it is retired, and its late result is dropped.
+The client's Distant Horizons native capture loop counts, per pass, its visits, debounced and
+already-updating columns, copies, submissions and exit reason, in its existing periodic log.
 
 The lab fetcher publishes verified dependencies through short, unique temporary basenames beside
 their destinations, so cached and downloaded libraries fit legacy Windows path limits.

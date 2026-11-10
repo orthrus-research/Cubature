@@ -45,6 +45,7 @@ public final class DistantHorizonsClient {
     private static final Map<String,Field> FIELDS=new ConcurrentHashMap<>();
     private double nativeShare=1;
     private final Map<Chunk,Long> dirty=new LinkedHashMap<>();
+    private final NativeCaptureStats captureStats=new NativeCaptureStats();
     private WorldClient world;
     private long ticks, captures, notifications, captureNanos;
     private int lastLogged=-1;
@@ -60,12 +61,12 @@ public final class DistantHorizonsClient {
         }
         WorldClient current=Minecraft.getMinecraft().world;
         if(column.getWorld()!=current || !((ICubicWorld)current).isCubicWorld())return;
-        if(world!=current) { dirty.clear();world=current;ticks=0;captures=0;notifications=0;captureNanos=0;lastLogged=-1;cubicRendering(true); }
+        if(world!=current) { dirty.clear();captureStats.reset();world=current;ticks=0;captures=0;notifications=0;captureNanos=0;lastLogged=-1;cubicRendering(true); }
         notifications++;dirty.put(column,ticks);
     }
     @SubscribeEvent public void unloaded(WorldEvent.Unload event) {
         DistantHorizonsCompat.setRemotePreview(event.getWorld(),false);
-        if(event.getWorld()==world) {dirty.clear();world=null;planning=false;cubicRendering(false);}
+        if(event.getWorld()==world) {dirty.clear();captureStats.reset();world=null;planning=false;cubicRendering(false);}
     }
 
     /** Sorts DH's missing sections by the arrival plan, leaving out those it holds; false to keep DH's order. */
@@ -191,23 +192,41 @@ public final class DistantHorizonsClient {
         ILevelWrapper level=ProxyUtil.getLevelWrapper(world);
         if(level==null || level.getDhLevel()==null)return;
         long begin=System.nanoTime();int count=0;
+        captureStats.begin(dirty.size());
         Iterator<Map.Entry<Chunk,Long>> it=dirty.entrySet().iterator();
-        while(it.hasNext() && count<2 && System.nanoTime()-begin<2_000_000L) {
-            Map.Entry<Chunk,Long> entry=it.next();Chunk column=entry.getKey();
-            if(world.getChunkProvider().getLoadedChunk(column.x,column.z)!=column){it.remove();continue;}
-            if(ticks-entry.getValue()<3 || SharedApi.isChunkAtChunkPosAlreadyUpdating(level,column.x,column.z))continue;
-            long start=System.nanoTime();
-            CubicChunkSnapshot snapshot=CubicChunkSnapshot.capture(column,level);
-            captureNanos+=System.nanoTime()-start;
-            if(snapshot==null)continue;
-            SharedApi.INSTANCE.applyChunkUpdate(snapshot,level,true);
-            captures++;count++;it.remove();
+        boolean completed=false;
+        try {
+            while(it.hasNext() && count<2 && System.nanoTime()-begin<2_000_000L) {
+                Map.Entry<Chunk,Long> entry=it.next();Chunk column=entry.getKey();captureStats.visited();
+                if(world.getChunkProvider().getLoadedChunk(column.x,column.z)!=column){it.remove();captureStats.unloaded();continue;}
+                if(ticks-entry.getValue()<3){captureStats.debounced();continue;}
+                if(SharedApi.isChunkAtChunkPosAlreadyUpdating(level,column.x,column.z)){captureStats.updating();continue;}
+                captureStats.attempted();
+                long start=System.nanoTime();
+                CubicChunkSnapshot snapshot=CubicChunkSnapshot.capture(column,level);
+                long copied=System.nanoTime();
+                captureNanos+=copied-start;
+                captureStats.copied(copied-start,snapshot==null);
+                if(snapshot==null)continue;
+                captureStats.submitting();
+                long applyStart=System.nanoTime();
+                try {
+                    SharedApi.INSTANCE.applyChunkUpdate(snapshot,level,true);
+                } finally {
+                    captureStats.applied(System.nanoTime()-applyStart);
+                }
+                captureStats.submitted();
+                captures++;count++;it.remove();
+            }
+            completed=true;
+        } finally {
+            captureStats.finish(completed,it.hasNext(),count>=2,dirty.size(),System.nanoTime()-begin);
         }
         if(ticks%100==0 && lastLogged!=dirty.size()) {
             lastLogged=dirty.size();
-            CubicChunks.LOGGER.info("CC/DH capture: ticks={} notifications={} snapshots={} pending={} copyMs={} clientH={} clientV={} height=[{},{}).",
+            CubicChunks.LOGGER.info("CC/DH capture: ticks={} notifications={} snapshots={} pending={} copyMs={} clientH={} clientV={} height=[{},{}). work={}",
                 ticks,notifications,captures,dirty.size(),captureNanos/1_000_000.0,Minecraft.getMinecraft().gameSettings.renderDistanceChunks,
-                CubicChunksConfig.verticalCubeLoadDistance,level.getMinHeight(),level.getMaxHeight());
+                CubicChunksConfig.verticalCubeLoadDistance,level.getMinHeight(),level.getMaxHeight(),captureStats.summary());
         }
     }
 }
