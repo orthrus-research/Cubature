@@ -32,6 +32,19 @@ lab observer records per-worker CPU and allocation counters, complete native
 view delivery and frame intervals. Qualify those scopes separately from DH
 coverage, presentation latency, water rendering and long traversal.
 
+Cubature also records exclusive server-thread costs throughout every complete
+`MinecraftServer.tick`, with a bounded 1,200-tick ring available through
+`TickDiagnostics` and a mean/p95 log summary once a minute. Columns, cube
+construction and registration, population, first light, surface tracking, light
+queues, sends, packet snapshots, native DH feed, unload/save submission, arrivals
+and regional planning have separate phases; nested work belongs only to its
+innermost phase, and the remainder is `OTHER`. Worker and Netty work is excluded.
+The lab retains the chronological phase vectors and provides an independent
+complete-tick timer for comparison. Its install counts include unique
+generated or loaded cube registrations and the share with no storage; part
+costs per cube are capture aggregates, since installation may span ticks. These
+counters observe the existing governors without changing their admission.
+
 DH's 1.12.2 receive hook observes vanilla chunk packets. Cubic packets bypass it,
 and the vanilla DH reader assumes sixteen section-array entries and Y 0..255.
 CC supplies three adaptations:

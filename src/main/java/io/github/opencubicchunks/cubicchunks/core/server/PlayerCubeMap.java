@@ -301,7 +301,12 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
 
         long currentTime = this.getWorldServer().getTotalWorldTime();
 
-        arrivals.tick(currentTime);
+        TickDiagnostics.enter(TickDiagnostics.Phase.ARRIVALS);
+        try {
+            arrivals.tick(currentTime);
+        } finally {
+            TickDiagnostics.exit();
+        }
 
         getWorldServer().profiler.startSection("addPendingPlayers");
         addPendingPlayers();
@@ -328,17 +333,37 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
         generateColumns(canGenerateChunkPredicate);
         generateCubes(canGenerateChunkPredicate, concurrent);
         getWorldServer().profiler.endStartSection("send");
-        sendColumnsToClients();
-        sendCubesToClients();
-        addPlayersToWatchers();
+        TickDiagnostics.enter(TickDiagnostics.Phase.SEND);
+        try {
+            sendColumnsToClients();
+            sendCubesToClients();
+            addPlayersToWatchers();
+        } finally {
+            TickDiagnostics.exit();
+        }
         getWorldServer().profiler.endStartSection("unload");
-        unloadIfNoPlayers();
+        TickDiagnostics.enter(TickDiagnostics.Phase.UNLOAD_SAVE);
+        try {
+            unloadIfNoPlayers();
+        } finally {
+            TickDiagnostics.exit();
+        }
         getWorldServer().profiler.endStartSection("sendCubes");//unload
-        sender.send();
+        TickDiagnostics.enter(TickDiagnostics.Phase.SEND);
+        try {
+            sender.send();
+        } finally {
+            TickDiagnostics.exit();
+        }
         if (deliveryMode.prefetch()) prepareAhead(canGenerateChunkPredicate, currentTime);
         if (deliveryMode.incremental()) maintain();
         getWorldServer().profiler.endStartSection("prepareRegions");
-        prepareRegions(canGenerateChunkPredicate);
+        TickDiagnostics.enter(TickDiagnostics.Phase.REGION_PREPARATION);
+        try {
+            prepareRegions(canGenerateChunkPredicate);
+        } finally {
+            TickDiagnostics.exit();
+        }
         getWorldServer().profiler.endSection();//prepareRegions
         getWorldServer().profiler.endSection();//playerCubeMapTick
     }

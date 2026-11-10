@@ -27,6 +27,7 @@ package io.github.opencubicchunks.cubicchunks.core.network;
 import io.github.opencubicchunks.cubicchunks.api.util.CubePos;
 import io.github.opencubicchunks.cubicchunks.core.CubicChunks;
 import io.github.opencubicchunks.cubicchunks.core.client.CubeProviderClient;
+import io.github.opencubicchunks.cubicchunks.core.server.TickDiagnostics;
 import io.github.opencubicchunks.cubicchunks.core.util.PacketUtils;
 import io.github.opencubicchunks.cubicchunks.core.world.cube.Cube;
 import io.netty.buffer.ByteBuf;
@@ -73,6 +74,15 @@ public class PacketCubes implements IMessage {
      * that work to encoding and reports -1 until then.
      */
     public PacketCubes(List<Cube> batch, boolean exactSize) {
+        TickDiagnostics.enter(TickDiagnostics.Phase.PACKET_ENCODE);
+        try {
+            snapshot(batch, exactSize);
+        } finally {
+            TickDiagnostics.exit();
+        }
+    }
+
+    private void snapshot(List<Cube> batch, boolean exactSize) {
         CubeSendDiagnostics.Observer observer = CubeSendDiagnostics.getObserver();
         long started = observer == null ? 0 : System.nanoTime();
         List<Cube> cubes = new ArrayList<>(batch);
@@ -160,6 +170,15 @@ public class PacketCubes implements IMessage {
 
     @Override
     public void toBytes(ByteBuf buf) {
+        TickDiagnostics.enter(TickDiagnostics.Phase.PACKET_ENCODE);
+        try {
+            encode(buf);
+        } finally {
+            TickDiagnostics.exit();
+        }
+    }
+
+    private void encode(ByteBuf buf) {
         int start = buf.writerIndex();
         buf.writeShort(cubePos.length);
         for (CubePos pos : cubePos) {

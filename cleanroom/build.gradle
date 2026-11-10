@@ -83,7 +83,7 @@ unimined.minecraft {
     defaultRemapJar = false
     mods { remap(configurations.modCompileOnly) }
     remap(tasks.named('jar').get()) {
-        mixinRemap { enableBaseMixin() }
+        mixinRemap { enableBaseMixin(); enableMixinExtra() }
     }
     runs.all {
         javaVersion = JavaVersion.toVersion(25)

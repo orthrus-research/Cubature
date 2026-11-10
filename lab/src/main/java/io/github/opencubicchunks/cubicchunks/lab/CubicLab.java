@@ -4,6 +4,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import io.github.opencubicchunks.cubicchunks.api.world.CubeEvent;
 import io.github.opencubicchunks.cubicchunks.api.world.CubeDataEvent;
+import io.github.opencubicchunks.cubicchunks.core.server.TickDiagnostics;
 import net.minecraft.command.*;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.MinecraftServer;
@@ -28,6 +29,10 @@ public final class CubicLab {
         Network.initialize(); MinecraftForge.EVENT_BUS.register(this); proxy.initialize();
         LabStorageContent.initialize();MinecraftForge.EVENT_BUS.register(new LabStorageContent());
         LabHooks.installDiagnostics();
+        TickDiagnostics.setObserver(sample -> {
+            LabJob job = active;
+            if (job != null && job.started != 0) job.tickCosts.record(sample);
+        });
         LabLodTrace.mark("trace-start");
     }
     @Mod.EventHandler public void serverStarting(FMLServerStartingEvent event) { event.registerServerCommand(new LabCommand()); }

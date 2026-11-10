@@ -57,6 +57,15 @@ public class ChunkGc {
     }
 
     public void tick() {
+        TickDiagnostics.enter(TickDiagnostics.Phase.UNLOAD_SAVE);
+        try {
+            collect();
+        } finally {
+            TickDiagnostics.exit();
+        }
+    }
+
+    private void collect() {
         cubeCache.world.profiler.startSection("chunkGc");
         tick++;
         if (tick > CubicChunksConfig.chunkGCInterval) {

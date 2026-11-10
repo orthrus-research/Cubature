@@ -30,6 +30,7 @@ import static io.github.opencubicchunks.cubicchunks.api.util.Coords.localToBlock
 import io.github.opencubicchunks.cubicchunks.api.util.Coords;
 import io.github.opencubicchunks.cubicchunks.api.world.ICube;
 import io.github.opencubicchunks.cubicchunks.core.CubicChunksConfig;
+import io.github.opencubicchunks.cubicchunks.core.server.TickDiagnostics;
 import io.github.opencubicchunks.cubicchunks.core.asm.mixin.ICubicWorldInternal;
 import io.github.opencubicchunks.cubicchunks.core.lighting.phosphor.LightingHooks;
 import io.github.opencubicchunks.cubicchunks.core.lighting.phosphor.PhosphorLightEngine;
@@ -104,7 +105,12 @@ public class LightingManager implements ILightingManager {
         if (CubicChunksConfig.disableLighting) {
             return;
         }
-        lightEngine.processLightUpdates();
+        TickDiagnostics.enter(TickDiagnostics.Phase.LIGHT_QUEUE);
+        try {
+            lightEngine.processLightUpdates();
+        } finally {
+            TickDiagnostics.exit();
+        }
     }
 
     @Override public void processUpdatesOnAccess() {
@@ -183,7 +189,12 @@ public class LightingManager implements ILightingManager {
             return;
         }
         assert firstLightProcessor != null;
-        firstLightProcessor.diffuseSkylight(cube);
+        TickDiagnostics.enter(TickDiagnostics.Phase.CUBE_FIRST_LIGHT);
+        try {
+            firstLightProcessor.diffuseSkylight(cube);
+        } finally {
+            TickDiagnostics.exit();
+        }
     }
 
     /**

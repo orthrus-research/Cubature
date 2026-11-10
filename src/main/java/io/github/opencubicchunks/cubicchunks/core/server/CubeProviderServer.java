@@ -231,6 +231,15 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
     /** Saves every dirty cube and column now. The periodic autosave uses {@link #beginPeriodicAutosave()}. */
     @Override
     public boolean saveChunks(boolean alwaysTrue) {
+        TickDiagnostics.enter(TickDiagnostics.Phase.UNLOAD_SAVE);
+        try {
+            return saveDirtyChunks(alwaysTrue);
+        } finally {
+            TickDiagnostics.exit();
+        }
+    }
+
+    private boolean saveDirtyChunks(boolean alwaysTrue) {
         // Lighting can dirty cubes that the scan would otherwise skip, including cubes before
         // the first dirty entry. Complete queued updates before selecting any save candidates.
         ((ICubicWorldInternal) worldServer).getLightingManager().processUpdates();
@@ -254,7 +263,12 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
      * autosave budget. Only the server's periodic save calls this; {@link #saveChunks} saves at once.
      */
     public void beginPeriodicAutosave() {
-        autosave.begin(cubeMap, loadedChunks.values());
+        TickDiagnostics.enter(TickDiagnostics.Phase.UNLOAD_SAVE);
+        try {
+            autosave.begin(cubeMap, loadedChunks.values());
+        } finally {
+            TickDiagnostics.exit();
+        }
     }
 
     /** Pending owner-thread snapshots, distinct from the writer's serialized-NBT backlog. */
@@ -277,7 +291,12 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
     public boolean tick() {
         // NOTE: the return value is completely ignored
         profiler.startSection("providerTick");
-        autosave.tick();
+        TickDiagnostics.enter(TickDiagnostics.Phase.UNLOAD_SAVE);
+        try {
+            autosave.tick();
+        } finally {
+            TickDiagnostics.exit();
+        }
         long i = System.currentTimeMillis();
         Random rand = this.world.rand;
         Iterator<Cube> watchersIterator = demand().getCubeIterator();
@@ -456,8 +475,18 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
      * @param column The column of the cube
      */
     private void onCubeLoaded(@Nullable Cube cube, Chunk column) {
+        TickDiagnostics.enter(TickDiagnostics.Phase.CUBE_CONSTRUCT);
+        try {
+            registerCube(cube, column);
+        } finally {
+            TickDiagnostics.exit();
+        }
+    }
+
+    private void registerCube(@Nullable Cube cube, Chunk column) {
         if (cube != null) {
             Cube previous = cubeMap.put(cube); // cache the Cube
+            if (previous != cube) TickDiagnostics.installedCube(cube.getStorage() == null);
             if (maintenance != null) {
                 if (previous != cube) maintenance.cubes().remove(previous);
                 maintenance.cubes().add(cube);
@@ -519,8 +548,13 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
                 return emptyCube;
             }
             // forced full population of this cube
-            if (!populateCube(cube, timing)) {
-                return cube;
+            TickDiagnostics.enter(TickDiagnostics.Phase.CUBE_POPULATE);
+            try {
+                if (!populateCube(cube, timing)) {
+                    return cube;
+                }
+            } finally {
+                TickDiagnostics.exit();
             }
             if (req == Requirement.POPULATE) {
                 return cube;
@@ -531,7 +565,12 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
             calculateDiffuseSkylight(cube);
         }
         if (!cube.isSurfaceTracked()) {
-            cube.trackSurface();
+            TickDiagnostics.enter(TickDiagnostics.Phase.CUBE_TRACK_SURFACE);
+            try {
+                cube.trackSurface();
+            } finally {
+                TickDiagnostics.exit();
+            }
         }
 
         return cube;
@@ -552,8 +591,14 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
         CubePrimer prepared = concurrentGeneration == null ? null : concurrentGeneration.takeCube(cubeX, cubeY, cubeZ);
         return (prepared != null ? Optional.of(prepared) : cubeGen.tryGenerateCube(cubeX, cubeY, cubeZ, this.cubePrimer, forceGenerate))
                 .map(primer -> {
-                    Cube cube = new Cube(column, cubeY, primer);
-                    onCubeLoaded(cube, column);
+                    Cube cube;
+                    TickDiagnostics.enter(TickDiagnostics.Phase.CUBE_CONSTRUCT);
+                    try {
+                        cube = new Cube(column, cubeY, primer);
+                        onCubeLoaded(cube, column);
+                    } finally {
+                        TickDiagnostics.exit();
+                    }
                     // don't bother resetting the primer if it wasn't used by the generator.
                     // if the generator modifies the primer and then returns a different one it's
                     // not implementing generateCube correctly, so we don't account for that case
@@ -716,6 +761,16 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
      */
     @Nullable
     private Chunk postProcessColumn(int columnX, int columnZ, @Nullable Chunk column, Requirement req, Timing timing) {
+        TickDiagnostics.enter(TickDiagnostics.Phase.COLUMN_INSTALL);
+        try {
+            return installColumn(columnX, columnZ, column, req, timing);
+        } finally {
+            TickDiagnostics.exit();
+        }
+    }
+
+    @Nullable
+    private Chunk installColumn(int columnX, int columnZ, @Nullable Chunk column, Requirement req, Timing timing) {
         Chunk loaded = getLoadedColumn(columnX, columnZ);
         if (loaded != null) {
             if (column != null && loaded != column) {

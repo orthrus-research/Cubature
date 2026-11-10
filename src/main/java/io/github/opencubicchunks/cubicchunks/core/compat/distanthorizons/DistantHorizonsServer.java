@@ -14,6 +14,7 @@ import io.github.opencubicchunks.cubicchunks.api.worldgen.ICubeGenerator;
 import io.github.opencubicchunks.cubicchunks.api.worldgen.ICubicTerrainPreview;
 import io.github.opencubicchunks.cubicchunks.api.world.CubeEvent;
 import io.github.opencubicchunks.cubicchunks.core.CubicChunks;
+import io.github.opencubicchunks.cubicchunks.core.server.TickDiagnostics;
 import io.github.opencubicchunks.cubicchunks.core.server.delivery.PreviewPool;
 import java.util.IdentityHashMap;
 import java.util.Iterator;
@@ -144,10 +145,15 @@ public final class DistantHorizonsServer extends DhApiLevelLoadEvent {
     }
     /** A loaded column's snapshot handed to DH's level; false when it yields none. */
     private static boolean feed(Chunk column, ILevelWrapper level) {
-        CubicChunkSnapshot snapshot=CubicChunkSnapshot.capture(column,level);
-        if (snapshot==null) return false;
-        SharedApi.INSTANCE.applyChunkUpdate(snapshot,level,true);
-        return true;
+        TickDiagnostics.enter(TickDiagnostics.Phase.DH_FEED);
+        try {
+            CubicChunkSnapshot snapshot=CubicChunkSnapshot.capture(column,level);
+            if (snapshot==null) return false;
+            SharedApi.INSTANCE.applyChunkUpdate(snapshot,level,true);
+            return true;
+        } finally {
+            TickDiagnostics.exit();
+        }
     }
     private static boolean feedNow(Chunk column) {
         ILevelWrapper level=ProxyUtil.getLevelWrapper(column.getWorld());

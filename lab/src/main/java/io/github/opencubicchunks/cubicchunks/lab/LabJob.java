@@ -34,6 +34,7 @@ final class LabJob {
     final Map<CubePos, java.util.function.Consumer<Cube>> subscriptions = new HashMap<>();
     final Samples ticks = new Samples(), operations = new Samples();
     final Samples completeTicks = new Samples();
+    final LabTickCosts tickCosts = new LabTickCosts();
     final LabHooks.PacketCounters packets = new LabHooks.PacketCounters();
     final LabStageTimings stages = new LabStageTimings();
     final LabBenchmarkWorkload benchmark = LabBenchmarkWorkload.configured();
@@ -358,6 +359,7 @@ final class LabJob {
         data.put("captureStartLoadedCubes",captureStartLoadedCubes);
         data.put("retainedFixtureCubes", held.size()); data.put("serverTicks", ticks.summary()); data.put("operationDurations", operations.summary());
         data.put("completeServerTicks",completeTicks.summary());
+        data.put("deliveryTickCosts",tickCosts.summary());
         data.put("completeServerTickScope","MinecraftServer.tick invocations overlapping active capture, including the whole first/final tick and all tick event callbacks. Cleanroom periodic saves are also inside the Forge event interval. Lab report serialization after the invocation is excluded. Compare this metric only with the same boundary, not historical Forge-event serverTicks.");
         data.put("saveSubmissionNanos", submissionNanos); data.put("blockingFlushNanos", flushNanos);
         data.put("stageTimings", stages.summary());

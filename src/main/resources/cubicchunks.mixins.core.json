@@ -28,6 +28,7 @@
         "common.MixinEntityTrackerEntry",
         "common.MixinIBlockAccess_MinMaxHeight",
         "common.MixinMinecraftServer",
+        "common.MixinServerTickCosts",
     "common.MixinNetHandlerPlayServer_DeferredArrival",
         "common.MixinPlayerList",
         "common.MixinStructureStart",
