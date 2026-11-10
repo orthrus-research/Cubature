@@ -6,7 +6,7 @@ import io.github.opencubicchunks.cubicchunks.core.server.TickDiagnostics;
 import net.minecraft.server.MinecraftServer;
 import org.spongepowered.asm.mixin.Mixin;
 
-/** Applies first, placing the core measurement inside the lab's independent complete-tick wrapper. */
+/** Runs inside the lab's higher-priority wrapper, which observes the complete tick independently. */
 @Mixin(value = MinecraftServer.class, priority = 1100)
 public abstract class MixinServerTickCosts {
     @WrapMethod(method = "tick")

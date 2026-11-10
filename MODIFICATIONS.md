@@ -9,6 +9,8 @@ formats retain their existing names.
 On November 9, 2026, always-on exclusive server-tick phase counters, a bounded
 history and minute summaries were added; the lab records their vectors, cube
 installation costs and no-storage counts without changing delivery admission.
+The lab's complete-tick wrapper encloses the core phase clock, so the final phase vector is
+published before the job's independent duration is recorded and its report is frozen.
 
 The lab fetcher publishes verified dependencies through short, unique temporary basenames beside
 their destinations, so cached and downloaded libraries fit legacy Windows path limits.

@@ -63,6 +63,12 @@ publishing them for the lab, and a change to them must keep the lab building
 
 Results describe the measured machine and runtime; they are diagnostics, not performance claims.
 
+The lab's complete-tick wrapper has priority 1200, above the core phase clock's 1100. CleanMix
+applies lower priorities first; MixinExtras wraps the preceding stage, so the lab clock encloses
+the core clock. The core publishes every phase vector, including the final tick, before the lab
+records its independent duration and freezes the job. Both series must have equal counts and
+chronological boundaries; matching the phase sum to its own clock alone does not prove coverage.
+
 The lab also records the first wall-clock minute after the dedicated server's actual `Done`
 message, independently of when a client joins or a scenario starts. Only ticks whose start lies
 inside that minute count; a tick crossing its end keeps its entire duration. Clean shutdown writes
