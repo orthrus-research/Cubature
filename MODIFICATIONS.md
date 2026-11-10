@@ -25,6 +25,8 @@ each player, then cubes inside their column's surface band (or with no known ban
 between a player's level and the band, then the rest, each class by distance. A hidden cube that
 has waited 200 ticks may move ahead of the surface class, one per queue every 20 ticks. Bands
 come from the generator's optional classification; without them the order is distance order.
+Regional preparation in a world players respawn in ranks regions around its spawn point while no
+player is present, so the time before the first join prepares what that join needs.
 
 The lab fetcher publishes verified dependencies through short, unique temporary basenames beside
 their destinations, so cached and downloaded libraries fit legacy Windows path limits.

@@ -5,6 +5,7 @@ import io.github.opencubicchunks.cubicchunks.core.CubicChunks;
 import io.github.opencubicchunks.cubicchunks.core.CubicChunksConfig;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.WorldServer;
 import net.minecraft.world.border.WorldBorder;
 
@@ -48,6 +49,9 @@ public final class RegionalPreparation {
     static final long DECLINED_PAUSE = TimeUnit.SECONDS.toNanos(30);
     static final long PLAN_PERIOD = TimeUnit.SECONDS.toNanos(1);
     static final long TRICKLE_PERIOD = TimeUnit.SECONDS.toNanos(5);
+
+    /** The key of the spawn's stand-in position while no player is in the world. */
+    static final Object SPAWN = new Object();
 
     /** A player's position, keyed by something stable from tick to tick. */
     record Position(Object id, double x, double z) {}
@@ -136,6 +140,12 @@ public final class RegionalPreparation {
             nextPlan = now + PLAN_PERIOD;
             List<Position> positions = new ArrayList<>(players.size());
             for (EntityPlayerMP player : players) positions.add(new Position(player.getUniqueID(), player.posX, player.posZ));
+            // With nobody here, a world players respawn in prepares around its spawn, so the time
+            // before the first join bakes the regions that join will need.
+            if (positions.isEmpty() && world.provider.canRespawnHere()) {
+                BlockPos spawn = world.getSpawnPoint();
+                positions.add(new Position(SPAWN, spawn.getX() + .5, spawn.getZ() + .5));
+            }
             WorldBorder border = world.getWorldBorder();
             plan(now, positions, CubicChunksConfig.regionalPreparationReachBlocks, viewChunks * 16,
                     (minX, minZ, maxX, maxZ) -> maxX > border.minX() && minX < border.maxX()
