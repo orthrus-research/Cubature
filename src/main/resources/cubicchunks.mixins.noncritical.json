@@ -18,6 +18,7 @@
     ],
     "client": [
         "client.MixinGuiOverlayDebug",
+        "client.MixinRegionRenderCacheBuilder",
         "client.MixinRenderChunk",
         "client.MixinRenderWorker",
         "client.MixinViewFrustum_VertViewDistance"

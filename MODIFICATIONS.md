@@ -37,6 +37,10 @@ A cube generated this session is not saved while it holds no blocks, biomes, ent
 entities, capabilities or pending neighbour light checks and its generator reports it
 `regenerable` (the new optional `ICubeClassification.regenerable`, asked when saving is
 considered); reloading it generates it again. Once saved, it saves like any other cube.
+Chunk-mesh builders start their layer buffers at 512 KiB (solid), 128 KiB (cutout, cutout mipped)
+and 256 KiB (translucent) instead of vanilla's 8 MiB, 512 KiB and 1 MiB; buffers still grow on
+demand. Vanilla keeps about ten builders per processor, so this returns most of 0.8 GiB of direct
+memory on 8 processors and 1.8 GiB on 32.
 
 The lab fetcher publishes verified dependencies through short, unique temporary basenames beside
 their destinations, so cached and downloaded libraries fit legacy Windows path limits.
