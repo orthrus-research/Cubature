@@ -4,6 +4,7 @@ import io.github.opencubicchunks.cubicchunks.api.util.CubePos;
 import io.github.opencubicchunks.cubicchunks.api.worldgen.CubePrimer;
 import io.github.opencubicchunks.cubicchunks.api.worldgen.ICubeGenerator;
 import io.github.opencubicchunks.cubicchunks.api.worldgen.ICubeGenerator.GeneratorReadyState;
+import io.github.opencubicchunks.cubicchunks.api.worldgen.IRetainedColumnPreparation;
 import io.github.opencubicchunks.cubicchunks.core.CubicChunks;
 import io.github.opencubicchunks.cubicchunks.core.CubicChunksConfig;
 import net.minecraft.util.math.ChunkPos;
@@ -13,6 +14,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.UUID;
 
 import javax.annotation.Nullable;
 
@@ -23,10 +25,15 @@ import javax.annotation.Nullable;
  * generates synchronously as before.
  */
 public final class ConcurrentGeneration {
+    public enum ArrivalState { PENDING, READY, FAILED }
+
+    public record ArrivalStatus(ArrivalState state, String detail) { }
+
     private final ICubeGenerator generator;
     private final ThreadPoolExecutor workers;
     private final GenerationQueue<CubePos, CubePrimer> cubes;
     private final GenerationQueue<ChunkPos, Boolean> columns;
+    @Nullable private final ArrivalColumnPreparation arrivals;
     private final AtomicBoolean reported = new AtomicBoolean();
 
     private ConcurrentGeneration(ICubeGenerator generator, int threads, int capacity, String world) {
@@ -46,6 +53,8 @@ public final class ConcurrentGeneration {
             generator.prepareColumn(pos.x, pos.z);
             return Boolean.TRUE;
         }, this::report, capacity);
+        this.arrivals = generator instanceof IRetainedColumnPreparation retained
+                ? new ArrivalColumnPreparation(workers, retained, capacity) : null;
     }
 
     /** Null unless the generator declares concurrent generation and the worker count is not zero. */
@@ -61,6 +70,36 @@ public final class ConcurrentGeneration {
     }
 
     public boolean saturated() { return cubes.saturated() || columns.saturated(); }
+
+    /** Whether held arrivals can retain their immutable column data independently of memo eviction. */
+    public boolean retainsArrivalColumns() { return arrivals != null; }
+
+    public void retainArrivalColumn(UUID owner, int columnX, int columnZ) {
+        if (arrivals != null) arrivals.retain(owner, columnX, columnZ);
+    }
+
+    public void releaseArrivalColumn(UUID owner) {
+        if (arrivals != null) arrivals.release(owner);
+    }
+
+    /** Arrival-only outcomes do not spend retained successes or retry retained failures. */
+    public ArrivalStatus arrivalStatus(int columnX, int columnZ) {
+        if (arrivals != null) {
+            ArrivalColumnPreparation.Status status = arrivals.status(columnX, columnZ);
+            ArrivalState state = switch (status.state()) {
+                case READY -> ArrivalState.READY;
+                case PENDING -> ArrivalState.PENDING;
+                case FAILED -> ArrivalState.FAILED;
+            };
+            return new ArrivalStatus(state, status.detail());
+        }
+        GeneratorReadyState state = pollColumn(columnX, columnZ, true);
+        return new ArrivalStatus(switch (state) {
+            case READY -> ArrivalState.READY;
+            case WAITING -> ArrivalState.PENDING;
+            case FAIL -> ArrivalState.FAILED;
+        }, "generator or generation worker column preparation");
+    }
 
     /**
      * With {@code schedule}, hands the column to the workers if they do not hold it yet and reports
@@ -91,6 +130,7 @@ public final class ConcurrentGeneration {
     }
 
     public void close() {
+        if (arrivals != null) arrivals.close();
         cubes.close();
         columns.close();
         workers.shutdownNow();

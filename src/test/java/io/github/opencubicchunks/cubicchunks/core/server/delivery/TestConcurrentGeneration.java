@@ -5,6 +5,7 @@ import io.github.opencubicchunks.cubicchunks.api.world.ICube;
 import io.github.opencubicchunks.cubicchunks.api.worldgen.CubePrimer;
 import io.github.opencubicchunks.cubicchunks.api.worldgen.ICubeGenerator;
 import io.github.opencubicchunks.cubicchunks.api.worldgen.ICubeGenerator.GeneratorReadyState;
+import io.github.opencubicchunks.cubicchunks.api.worldgen.IRetainedColumnPreparation;
 import io.github.opencubicchunks.cubicchunks.core.CubicChunksConfig;
 import net.minecraft.entity.EnumCreatureType;
 import net.minecraft.util.math.BlockPos;
@@ -15,6 +16,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -58,7 +60,46 @@ public class TestConcurrentGeneration {
         assertEquals(1, generator.prepared.get());
     }
 
-    private static final class PreparingGenerator implements ICubeGenerator {
+    @Test public void arrivalPreparationRetainsItsLeaseWithoutSpendingReadiness() throws InterruptedException {
+        RetainedGenerator generator = new RetainedGenerator();
+        generation = ConcurrentGeneration.create(generator, "retained-test");
+        assertNotNull(generation);
+        assertTrue(generation.retainsArrivalColumns());
+        UUID owner = new UUID(0, 1);
+        generation.retainArrivalColumn(owner, 1, 2);
+        ConcurrentGeneration.ArrivalStatus status = generation.arrivalStatus(1, 2);
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (status.state() == ConcurrentGeneration.ArrivalState.PENDING && System.nanoTime() < deadline) {
+            Thread.sleep(1);
+            status = generation.arrivalStatus(1, 2);
+        }
+        assertEquals(ConcurrentGeneration.ArrivalState.READY, status.state());
+        assertEquals(ConcurrentGeneration.ArrivalState.READY, generation.arrivalStatus(1, 2).state());
+        assertEquals(1, generator.retained.get());
+        assertEquals(0, generator.prepared.get());
+        assertEquals(0, generator.released.get());
+        generation.releaseArrivalColumn(owner);
+        assertEquals(1, generator.released.get());
+        generation.close();
+        assertEquals(1, generator.released.get());
+    }
+
+    @Test public void disabledWorkersDoNotCreateRetainedArrivalWork() {
+        CubicChunksConfig.concurrentGenerationThreads = 0;
+        RetainedGenerator generator = new RetainedGenerator();
+        assertNull(ConcurrentGeneration.create(generator, "disabled-test"));
+        assertEquals(0, generator.retained.get());
+    }
+
+    private static final class RetainedGenerator extends PreparingGenerator implements IRetainedColumnPreparation {
+        final AtomicInteger retained = new AtomicInteger(), released = new AtomicInteger();
+        @Override public ColumnLease prepareRetainedColumn(int columnX, int columnZ) {
+            retained.incrementAndGet();
+            return released::incrementAndGet;
+        }
+    }
+
+    private static class PreparingGenerator implements ICubeGenerator {
         final AtomicInteger prepared = new AtomicInteger();
 
         @Override public boolean supportsConcurrentCubeGeneration() { return true; }

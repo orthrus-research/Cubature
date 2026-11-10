@@ -56,6 +56,12 @@ The same day `processPlayer`'s own `setPlayerLocation` calls began running throu
 vanilla puts a move it rejects for colliding back where the player stood before it, after
 `processPlayer` has already moved the player to where the client claimed; read as a teleport
 elsewhere, that dropped the hold, and the player never arrived.
+An optional `IRetainedColumnPreparation` API and a separate arrival-preparation queue allow
+generation workers to retain immutable column data through installation, independent of memo
+eviction. Requests share keyed leases by UUID owner within the existing executor and queue capacity.
+Owned results cannot be evicted; failures remain explicit until cancellation or an owner's requested
+retry, and abandoned or stopped preparations release late results. This API addition leaves ordinary
+generation polling and its synchronous failure fallback unchanged.
 The Cubature name and license packaging were adopted on October 19, 2026;
 that change added no terrain or scheduling algorithm.
 
