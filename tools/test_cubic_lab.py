@@ -14,6 +14,37 @@ import lab_instance
 import lab_process
 import lab_profiles as profiles
 
+
+NMT_FIXTURE = """Native Memory Tracking:
+
+Total: reserved=1200MB, committed=80MB
+       malloc: 3MB #100, peak=3MB #100
+       mmap:   reserved=1197MB, committed=77MB
+
+-                 Java Heap (reserved=1024MB, committed=64MB)
+"""
+SYSTEM_MAP_FIXTURE = """from               to                        vsize prot  state      offset vminfo/file
+===========================================================================================
+0x00000000c0000000-0x00000000c4000000     67108864 rw-   c-pvt           0 JAVAHEAP 
+0x00000000c4000000-0x0000000100000000   1006632960 ---   r-pvt   0x4000000 JAVAHEAP 
+0x0000000013000000-0x0000000013a00000     10485760 rw-   c-pvt           0 CODE 
+0x0000020000000000-0x0000020000600000      6291456 rw-W  c-pvt           0 
+0x00007ff75a0f0000-0x00007ff75a0f1000         4096 r--   c-img           0 C:\jdk\bin\java.exe
+"""
+VMMAP_FIXTURE = """"Process:","java.exe"
+
+"Type","Size","Committed","Private","Total WS","Private WS","Shareable WS","Shared WS","Locked WS","Blocks","Largest",
+
+"Total","2,000,000","94,208","88,064","90,000","80,000","","","","10",""
+"Heap","6,000","5,120","5,120","5,000","5,000","","","","2","1,024"
+"Image","4","4","","4","","4","4","","1","4"
+"Mapped File","1,024","1,024","","1,024","","","","","1","1,024"
+"Private Data","1,100,000","81,920","81,920","80,000","80,000","","","","5","1,048,576"
+"Stack","1,024","1,024","1,024","1,000","1,000","","","","1","1,024"
+
+"Address","Type","Size","Committed","Private","Total WS","Private WS","Shareable WS","Shared WS","Locked WS","Blocks","Protection","Details",
+"""
+
 class LabControlTest(unittest.TestCase):
     def test_foreign_workload_preflight_retains_failure_without_launching(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -166,19 +197,31 @@ class LabControlTest(unittest.TestCase):
     def test_native_memory_profile_records_each_process_summary_after_a_scenario(self):
         self.assertEqual([v for v in profiles.JVM_VARIANTS if profiles.tracks_native_memory({'jvmProfile': profiles.jvm_profile(v)})],
                          ['g1-ship8-nmt'])
-        with tempfile.TemporaryDirectory() as temporary:
-            evidence = Path(temporary)
-            calls = []
-            def run(command, stdout, **_):
-                calls.append(command); stdout.write('Native Memory Tracking:\n')
-            processes = {'server': mock.Mock(pid=11), 'client': mock.Mock(pid=22)}
-            with mock.patch.object(lab.subprocess, 'run', side_effect=run):
-                lab.native_memory_summaries({'java': str(evidence / 'java.exe')}, evidence, 'full-view', processes)
-            self.assertEqual([c[1:] for c in calls], [['11', 'VM.native_memory', 'summary', 'scale=MB'],
-                                                      ['22', 'VM.native_memory', 'summary', 'scale=MB']])
-            self.assertTrue(all(Path(c[0]).name.startswith('jcmd') for c in calls))
-            self.assertEqual(sorted(p.name for p in evidence.glob('*-native-memory.txt')),
-                             ['full-view-client-native-memory.txt', 'full-view-server-native-memory.txt'])
+        outputs = {'VM.native_memory': NMT_FIXTURE, 'System.map': SYSTEM_MAP_FIXTURE}
+        for vmmap in (None, 'C:/tools/vmmap.exe'):
+            with tempfile.TemporaryDirectory() as temporary:
+                evidence = Path(temporary)
+                calls = []
+                def run(command, stdout, **_):
+                    calls.append(command)
+                    if command[0] == vmmap: Path(command[-1]).write_text(VMMAP_FIXTURE, encoding='utf-8')
+                    else: stdout.write(outputs[command[2]])
+                processes = {'server': mock.Mock(pid=11), 'client': mock.Mock(pid=22)}
+                with mock.patch.object(lab.subprocess, 'run', side_effect=run), mock.patch.object(lab.shutil, 'which', return_value=vmmap):
+                    lab.native_memory_summaries({'java': str(evidence / 'java.exe')}, evidence, 'full-view', processes)
+                jvm = [c[1:] for c in calls if c[0] != vmmap]
+                self.assertEqual(jvm, [['11', 'VM.native_memory', 'summary', 'scale=MB'], ['11', 'System.map'],
+                                       ['22', 'VM.native_memory', 'summary', 'scale=MB'], ['22', 'System.map']])
+                self.assertEqual(len(calls) - len(jvm), 0 if vmmap is None else 2)
+                accounts = sorted(evidence.glob('*-memory-account.json'))
+                self.assertEqual(len(accounts), 0 if vmmap is None else 2)
+                if vmmap:
+                    private = json.loads(accounts[0].read_text())['privateMiB']
+                    self.assertEqual(private['Java heap'], 64)
+                    self.assertEqual(private['JVM malloc (NMT; direct buffers, internal)'], 3)
+                    self.assertEqual(private['Native malloc beyond the JVM (C heaps: libraries, drivers)'], 2)
+                    self.assertEqual(private['Native VirtualAlloc the JVM did not reserve (drivers, libraries)'], 6)
+                    self.assertEqual(private['Accounted'], private['VMMap private total'])
 
     def test_native_capture_requires_effective_heap_and_collector_on_both_sides(self):
         # The default profile is the shipping G1 profile on the 8 GiB floor.

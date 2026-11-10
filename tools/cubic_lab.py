@@ -56,14 +56,32 @@ def native_measurement_lease(root, name):
 
 
 def native_memory_summaries(manifest, evidence, scenario, processes):
-    """Each process's native memory tracking summary, in MiB, once a scenario has reported."""
+    """Once a scenario has reported, each process's memory as the JVM and Windows see it: the NMT
+    summary, the JVM's tagged address-space map, VMMap's CSV where Sysinternals VMMap is on PATH, and
+    the account joining them (lab_memory). Diagnostics only: a failed step never fails the capture."""
     tool = Path(manifest['java']).with_name('jcmd.exe' if os.name == 'nt' else 'jcmd')
+    vmmap = shutil.which('vmmap.exe' if os.name == 'nt' else 'vmmap')
     for side, process in processes.items():
+        stem = evidence / f'{scenario}-{side}'
+        steps = [(f'{stem}-native-memory.txt', [str(tool), str(process.pid), 'VM.native_memory', 'summary', 'scale=MB']),
+                 (f'{stem}-system-map.txt', [str(tool), str(process.pid), 'System.map'])]
+        for path, command in steps:
+            try:
+                with open(path, 'w', encoding='utf-8') as log:
+                    subprocess.run(command, stdout=log, stderr=subprocess.STDOUT, timeout=60, check=False)
+            except (OSError, subprocess.TimeoutExpired): pass
+        if not vmmap: continue
         try:
-            with (evidence / f'{scenario}-{side}-native-memory.txt').open('w', encoding='utf-8') as log:
-                subprocess.run([str(tool), str(process.pid), 'VM.native_memory', 'summary', 'scale=MB'],
-                               stdout=log, stderr=subprocess.STDOUT, timeout=30, check=False)
-        except (OSError, subprocess.TimeoutExpired): pass
+            subprocess.run([vmmap, '-accepteula', '-p', str(process.pid), f'{stem}-vmmap.csv'],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=120, check=False)
+            lab_memory_account(stem)
+        except (OSError, ValueError, subprocess.TimeoutExpired): pass
+
+
+def lab_memory_account(stem):
+    import lab_memory
+    result = lab_memory.account_files(f'{stem}-native-memory.txt', f'{stem}-system-map.txt', f'{stem}-vmmap.csv')
+    Path(f'{stem}-memory-account.json').write_text(json.dumps(result, indent=2) + '\n', encoding='utf-8')
 
 
 def selected_scenarios(args, manifest):
