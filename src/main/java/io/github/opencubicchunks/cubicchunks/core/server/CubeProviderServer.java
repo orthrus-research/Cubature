@@ -127,8 +127,8 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
         this.deliveryMode = deliveryMode;
         this.maintenance = deliveryMode.incremental() ? new MaintenanceState(deliveryMode.continuousSave()) : null;
         this.autosave = new PeriodicAutosave(this, maintenance);
-        // The build pool first, so the generator holds it before any cube generates.
-        this.buildPool = GeneratorBuildPool.open(cubeGen, "dimension " + worldServer.provider.getDimension());
+        // Adopt the pool the world type may already have used to construct its biome provider.
+        this.buildPool = GeneratorBuildPool.open(worldServer, cubeGen);
         this.regionalPreparation = RegionalPreparation.open(cubeGen, buildPool, "dimension " + worldServer.provider.getDimension());
         this.concurrentGeneration = ConcurrentGeneration.create(cubeGen, "dimension " + worldServer.provider.getDimension());
         this.worldServer = worldServer;

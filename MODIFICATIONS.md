@@ -38,6 +38,11 @@ ForkJoin build pool (`generatorBuildThreads`, by default a quarter of the proces
 holding at most twice that while tasks block) and offers it to its generator for the generator's
 own parallel work, then withdraws it when the world closes, so that work stays inside the worker
 budget instead of the JVM's common pool.
+The world type can request that same pool before constructing its biome provider through
+`WorldBuildPool.request`; the cube provider then adopts it. A failed construction can release an
+unadopted pool through `WorldBuildPool.abandon`. Cubature closes requested pools on failed or skipped
+world initialization, world unload and server stop, and rejects requests from closed worlds or a
+retired server. Adoption and withdrawal happen once, including when a generator callback fails.
 The same day the Forge 14.23.5.2860 / Java 8 fallback build was retired: Cubature builds for
 Cleanroom only, as Java 25 bytecode tested on Java 26. `ICubeGenerator` also gained
 `preparationRegionBlocks` and `prepareRegion`: each world prepares its generator's regional plans

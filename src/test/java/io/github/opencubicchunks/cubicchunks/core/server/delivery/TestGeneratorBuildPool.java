@@ -16,22 +16,33 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.Assert.*;
 
 public class TestGeneratorBuildPool {
     private int threads;
+    private final Object server = new Object();
+    private GeneratorBuildPool.Registry<Object> worlds;
 
-    @Before public void remember() { threads = CubicChunksConfig.generatorBuildThreads; }
+    @Before public void remember() {
+        threads = CubicChunksConfig.generatorBuildThreads;
+        worlds = new GeneratorBuildPool.Registry<>();
+        worlds.start(server);
+    }
 
-    @After public void restore() { CubicChunksConfig.generatorBuildThreads = threads; }
+    @After public void restore() {
+        try { worlds.stop(); }
+        finally { CubicChunksConfig.generatorBuildThreads = threads; }
+    }
 
     @Test public void theGeneratorHoldsThePoolUntilTheWorldCloses() throws InterruptedException {
         CubicChunksConfig.generatorBuildThreads = 2;
         PoolGenerator generator = new PoolGenerator();
-        GeneratorBuildPool build = GeneratorBuildPool.open(generator, "test");
+        GeneratorBuildPool build = worlds.open(server, new Object(), generator, "test");
         ForkJoinPool pool = build.pool();
         assertNotNull(pool);
         assertEquals(2, pool.getParallelism());
@@ -54,7 +65,7 @@ public class TestGeneratorBuildPool {
     @Test public void blockedTasksWaitOnceThePoolHoldsTwiceItsTarget() throws InterruptedException {
         CubicChunksConfig.generatorBuildThreads = 2;
         PoolGenerator generator = new PoolGenerator();
-        GeneratorBuildPool build = GeneratorBuildPool.open(generator, "test");
+        GeneratorBuildPool build = worlds.open(server, new Object(), generator, "test");
         ForkJoinPool pool = build.pool();
         assertNotNull(pool);
         CompletableFuture<Void> gate = new CompletableFuture<>();
@@ -83,7 +94,7 @@ public class TestGeneratorBuildPool {
     @Test public void aZeroTargetOffersNoPool() {
         CubicChunksConfig.generatorBuildThreads = 0;
         PoolGenerator generator = new PoolGenerator();
-        GeneratorBuildPool build = GeneratorBuildPool.open(generator, "test");
+        GeneratorBuildPool build = worlds.open(server, new Object(), generator, "test");
         assertNull(build.pool());
         assertEquals(1, generator.offered.size());
         assertNull(generator.offered.get(0));
@@ -96,7 +107,204 @@ public class TestGeneratorBuildPool {
         assertEquals(expected, GeneratorBuildPool.threads());
     }
 
-    private static final class PoolGenerator implements ICubeGenerator {
+    @Test public void anEarlyRequestIsAdoptedAndClosedExactlyOnce() {
+        CubicChunksConfig.generatorBuildThreads = 2;
+        Object world = new Object();
+        GeneratorBuildPool early = worlds.get(server, world, "test");
+        PoolGenerator generator = new PoolGenerator();
+        assertSame(early, worlds.get(server, world, "test"));
+        assertSame(early, worlds.open(server, world, generator, "test"));
+        assertSame(early, worlds.open(server, world, generator, "test"));
+        assertEquals(1, generator.offered.size());
+        assertSame(early.pool(), generator.offered.get(0));
+
+        worlds.close(world);
+        early.close();
+        worlds.close(world);
+        worlds.stop();
+        assertEquals(2, generator.offered.size());
+        assertNull(generator.offered.get(1));
+        assertTrue(early.pool().isShutdown());
+        assertThrows(IllegalStateException.class, () -> worlds.get(server, world, "test"));
+    }
+
+    @Test public void equalWorldKeysHaveSeparatePools() {
+        CubicChunksConfig.generatorBuildThreads = 1;
+        Object first = new String("world"), second = new String("world");
+        assertEquals(first, second);
+        GeneratorBuildPool a = worlds.get(server, first, "a");
+        GeneratorBuildPool b = worlds.get(server, second, "b");
+        assertNotSame(a, b);
+        assertNotSame(a.pool(), b.pool());
+        worlds.close(first);
+        assertSame(b, worlds.get(server, second, "b"));
+        assertFalse(b.pool().isShutdown());
+    }
+
+    @Test public void aZeroTargetStillHasOneWorldHolder() {
+        CubicChunksConfig.generatorBuildThreads = 0;
+        Object world = new Object();
+        GeneratorBuildPool early = worlds.get(server, world, "test");
+        PoolGenerator generator = new PoolGenerator();
+        assertNull(early.pool());
+        assertSame(early, worlds.open(server, world, generator, "test"));
+        assertSame(early, worlds.get(server, world, "test"));
+        assertEquals(1, generator.offered.size());
+        assertNull(generator.offered.get(0));
+    }
+
+    @Test public void anUnadoptedPoolClosesAndCannotBeReopened() {
+        CubicChunksConfig.generatorBuildThreads = 1;
+        Object world = new Object();
+        GeneratorBuildPool early = worlds.get(server, world, "test");
+        worlds.close(world);
+        assertTrue(early.pool().isShutdown());
+        PoolGenerator generator = new PoolGenerator();
+        assertThrows(IllegalStateException.class, () -> worlds.open(server, world, generator, "test"));
+        assertTrue(generator.offered.isEmpty());
+    }
+
+    @Test public void aSecondGeneratorCannotReplaceTheOwner() {
+        CubicChunksConfig.generatorBuildThreads = 1;
+        Object world = new Object();
+        PoolGenerator owner = new PoolGenerator(), other = new PoolGenerator();
+        GeneratorBuildPool holder = worlds.open(server, world, owner, "test");
+        assertThrows(IllegalStateException.class, () -> worlds.open(server, world, other, "test"));
+        assertTrue(other.offered.isEmpty());
+        assertEquals(1, owner.offered.size());
+        assertFalse(holder.pool().isShutdown());
+    }
+
+    @Test public void providerCloseRejectsRequestsBeforeTheWorldUnloadEvent() {
+        CubicChunksConfig.generatorBuildThreads = 1;
+        Object world = new Object();
+        PoolGenerator generator = new PoolGenerator();
+        GeneratorBuildPool holder = worlds.open(server, world, generator, "test");
+        holder.close();
+        assertThrows(IllegalStateException.class, () -> worlds.get(server, world, "test"));
+        assertThrows(IllegalStateException.class, () -> worlds.get(server, world, "test"));
+        assertTrue(holder.pool().isShutdown());
+        assertEquals(2, generator.offered.size());
+    }
+
+    @Test public void aFailedOfferRetiresThePoolEvenIfWithdrawalAlsoFails() {
+        CubicChunksConfig.generatorBuildThreads = 1;
+        Object world = new Object();
+        GeneratorBuildPool early = worlds.get(server, world, "test");
+        IllegalStateException offer = new IllegalStateException("offer"), withdraw = new IllegalStateException("withdraw");
+        PoolGenerator generator = new PoolGenerator() {
+            @Override public void useBuildPool(ForkJoinPool pool) {
+                super.useBuildPool(pool);
+                throw pool == null ? withdraw : offer;
+            }
+        };
+        assertSame(offer, assertThrows(IllegalStateException.class, () -> worlds.open(server, world, generator, "test")));
+        assertArrayEquals(new Throwable[] {withdraw}, offer.getSuppressed());
+        assertEquals(2, generator.offered.size());
+        assertTrue(early.pool().isShutdown());
+        assertThrows(IllegalStateException.class, () -> worlds.get(server, world, "test"));
+    }
+
+    @Test public void theSameOfferAndWithdrawalFailureIsPreserved() {
+        CubicChunksConfig.generatorBuildThreads = 1;
+        Object world = new Object();
+        GeneratorBuildPool early = worlds.get(server, world, "test");
+        IllegalStateException failure = new IllegalStateException("callback");
+        PoolGenerator generator = new PoolGenerator() {
+            @Override public void useBuildPool(ForkJoinPool pool) {
+                super.useBuildPool(pool);
+                throw failure;
+            }
+        };
+        assertSame(failure, assertThrows(IllegalStateException.class, () -> worlds.open(server, world, generator, "test")));
+        assertEquals(0, failure.getSuppressed().length);
+        assertEquals(2, generator.offered.size());
+        assertTrue(early.pool().isShutdown());
+    }
+
+    @Test public void serverStopClosesEveryPoolAfterAWithdrawalFails() {
+        CubicChunksConfig.generatorBuildThreads = 1;
+        IllegalStateException failure = new IllegalStateException("withdraw");
+        PoolGenerator broken = new PoolGenerator() {
+            @Override public void useBuildPool(ForkJoinPool pool) {
+                super.useBuildPool(pool);
+                if (pool == null) throw failure;
+            }
+        };
+        GeneratorBuildPool first = worlds.open(server, new Object(), broken, "first");
+        GeneratorBuildPool sameFailure = worlds.open(server, new Object(), new PoolGenerator() {
+            @Override public void useBuildPool(ForkJoinPool pool) {
+                if (pool == null) throw failure;
+            }
+        }, "same failure");
+        PoolGenerator normal = new PoolGenerator();
+        GeneratorBuildPool second = worlds.open(server, new Object(), normal, "second");
+        GeneratorBuildPool unadopted = worlds.get(server, new Object(), "unadopted");
+        assertSame(failure, assertThrows(IllegalStateException.class, worlds::stop));
+        assertTrue(first.pool().isShutdown());
+        assertTrue(sameFailure.pool().isShutdown());
+        assertTrue(second.pool().isShutdown());
+        assertTrue(unadopted.pool().isShutdown());
+        assertEquals(2, broken.offered.size());
+        assertEquals(2, normal.offered.size());
+        worlds.stop();
+        assertEquals(2, broken.offered.size());
+    }
+
+    @Test public void aRetiredServerCannotRequestPoolsAfterRestart() {
+        CubicChunksConfig.generatorBuildThreads = 1;
+        Object oldWorld = new Object(), newWorld = new Object(), nextServer = new Object();
+        GeneratorBuildPool old = worlds.get(server, oldWorld, "old");
+        worlds.stop();
+        assertTrue(old.pool().isShutdown());
+        assertThrows(IllegalStateException.class, () -> worlds.get(server, new Object(), "late"));
+        worlds.start(nextServer);
+        assertThrows(IllegalStateException.class, () -> worlds.get(server, new Object(), "late"));
+        assertThrows(IllegalStateException.class, () -> worlds.get(nextServer, oldWorld, "old"));
+        assertNotNull(worlds.get(nextServer, newWorld, "new").pool());
+    }
+
+    @Test public void closeRacingAdoptionWithdrawsThePoolOnce() throws Exception {
+        CubicChunksConfig.generatorBuildThreads = 1;
+        Object world = new Object();
+        GeneratorBuildPool early = worlds.get(server, world, "test");
+        CountDownLatch offerStarted = new CountDownLatch(1), release = new CountDownLatch(1);
+        AtomicReference<Throwable> failed = new AtomicReference<>();
+        PoolGenerator generator = new PoolGenerator() {
+            @Override public void useBuildPool(ForkJoinPool pool) {
+                super.useBuildPool(pool);
+                if (pool != null) {
+                    offerStarted.countDown();
+                    try { assertTrue(release.await(10, TimeUnit.SECONDS)); }
+                    catch (InterruptedException interrupted) { throw new AssertionError(interrupted); }
+                }
+            }
+        };
+        Thread adopting = new Thread(() -> {
+            try { worlds.open(server, world, generator, "test"); }
+            catch (Throwable failure) { failed.set(failure); }
+        });
+        Thread closing = new Thread(() -> {
+            try { worlds.close(world); }
+            catch (Throwable failure) { failed.set(failure); }
+        });
+        adopting.start();
+        try {
+            assertTrue(offerStarted.await(10, TimeUnit.SECONDS));
+            closing.start();
+        } finally { release.countDown(); }
+        adopting.join(10000);
+        closing.join(10000);
+        assertFalse(adopting.isAlive());
+        assertFalse(closing.isAlive());
+        assertNull(failed.get());
+        assertEquals(2, generator.offered.size());
+        assertNull(generator.offered.get(1));
+        assertTrue(early.pool().isShutdown());
+        assertThrows(IllegalStateException.class, () -> worlds.get(server, world, "test"));
+    }
+
+    private static class PoolGenerator implements ICubeGenerator {
         final List<ForkJoinPool> offered = new ArrayList<>();
 
         @Override public void useBuildPool(ForkJoinPool pool) { offered.add(pool); }

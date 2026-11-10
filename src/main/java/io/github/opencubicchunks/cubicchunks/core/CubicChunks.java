@@ -35,6 +35,7 @@ import io.github.opencubicchunks.cubicchunks.core.client.ClientEventHandler;
 import io.github.opencubicchunks.cubicchunks.core.network.PacketDispatcher;
 import io.github.opencubicchunks.cubicchunks.core.server.TickDiagnostics;
 import io.github.opencubicchunks.cubicchunks.core.server.delivery.ServerDeliveryMode;
+import io.github.opencubicchunks.cubicchunks.core.server.delivery.GeneratorBuildPool;
 import io.github.opencubicchunks.cubicchunks.core.server.chunkio.RegionCubeStorage;
 import io.github.opencubicchunks.cubicchunks.core.util.CompatHandler;
 import io.github.opencubicchunks.cubicchunks.core.util.SideUtils;
@@ -175,6 +176,7 @@ public class CubicChunks {
     @EventHandler
     public void onServerAboutToStart(FMLServerAboutToStartEvent event) {
         TickDiagnostics.reset();
+        GeneratorBuildPool.serverStarting(event.getServer());
         // Before any world is built: every dimension of this server shares the mode.
         ServerDeliveryMode.resolve();
         SideUtils.runForSide(
@@ -193,10 +195,14 @@ public class CubicChunks {
 
     @EventHandler
     public void onServerStopped(FMLServerStoppedEvent event) {
-        TickDiagnostics.reset();
-        ServerDeliveryMode.clear();
-        if (Loader.isModLoaded("distanthorizons")) {
-            io.github.opencubicchunks.cubicchunks.core.compat.distanthorizons.DistantHorizonsServer.serverStopped();
+        try {
+            GeneratorBuildPool.serverStopped();
+        } finally {
+            TickDiagnostics.reset();
+            ServerDeliveryMode.clear();
+            if (Loader.isModLoaded("distanthorizons")) {
+                io.github.opencubicchunks.cubicchunks.core.compat.distanthorizons.DistantHorizonsServer.serverStopped();
+            }
         }
     }
 

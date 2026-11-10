@@ -28,6 +28,8 @@ import com.google.common.collect.ImmutableList;
 import io.github.opencubicchunks.cubicchunks.api.util.IntRange;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorldType;
+import io.github.opencubicchunks.cubicchunks.api.worldgen.WorldBuildPool;
+import io.github.opencubicchunks.cubicchunks.core.server.delivery.GeneratorBuildPool;
 import io.github.opencubicchunks.cubicchunks.core.asm.mixin.ICubicWorldInternal;
 import io.github.opencubicchunks.cubicchunks.core.asm.mixin.ICubicWorldSettings;
 import io.github.opencubicchunks.cubicchunks.core.network.PacketCubicWorldData;
@@ -64,20 +66,39 @@ import javax.annotation.ParametersAreNonnullByDefault;
 @ParametersAreNonnullByDefault
 @MethodsReturnNonnullByDefault
 public class CommonEventHandler {
+    @SubscribeEvent
+    public void onBuildPoolRequest(WorldBuildPool.Request event) {
+        event.offer(GeneratorBuildPool.request(event.getWorld()));
+    }
+
+    @SubscribeEvent
+    public void onBuildPoolAbandoned(WorldBuildPool.Abandoned event) {
+        GeneratorBuildPool.close(event.getWorld());
+    }
+
     @SubscribeEvent // this event is fired early enough to replace world with cubic chunks without any issues
     public void onWorldAttachCapabilities(AttachCapabilitiesEvent<World> evt) {
         if (evt.getObject().isRemote || !(evt.getObject() instanceof WorldServer)) {
             return; // we will send packet to the client when it joins, client shouldn't change world types as it wants
         }
         WorldServer world = (WorldServer) evt.getObject();
+        try {
+            initializeCubicWorld(world);
+        } catch (RuntimeException | Error failure) {
+            try { GeneratorBuildPool.close(world); }
+            catch (RuntimeException | Error cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
+            throw failure;
+        }
+    }
 
+    private void initializeCubicWorld(WorldServer world) {
         WorldSavedCubicChunksData savedData =
-                (WorldSavedCubicChunksData) evt.getObject().getPerWorldStorage().getOrLoadData(WorldSavedCubicChunksData.class, "cubicChunksData");
-        boolean ccWorldType = evt.getObject().getWorldType() instanceof ICubicWorldType;
-        boolean ccGenerator = ccWorldType && ((ICubicWorldType) evt.getObject().getWorldType()).hasCubicGeneratorForWorld(evt.getObject());
+                (WorldSavedCubicChunksData) world.getPerWorldStorage().getOrLoadData(WorldSavedCubicChunksData.class, "cubicChunksData");
+        boolean ccWorldType = world.getWorldType() instanceof ICubicWorldType;
+        boolean ccGenerator = ccWorldType && ((ICubicWorldType) world.getWorldType()).hasCubicGeneratorForWorld(world);
         boolean savedCC = savedData != null && savedData.isCubicChunks;
         boolean ccWorldInfo = ((ICubicWorldSettings) world.getWorldInfo()).isCubic() && (savedData == null || savedData.isCubicChunks);
-        boolean excludeCC = CubicChunksConfig.isDimensionExcluded(evt.getObject().provider.getDimension());
+        boolean excludeCC = CubicChunksConfig.isDimensionExcluded(world.provider.getDimension());
         boolean forceExclusions = CubicChunksConfig.forceDimensionExcludes;
         // TODO: simplify this mess of booleans and document where each of them comes from
         // these espressions are generated using Quine McCluskey algorithm
@@ -112,22 +133,24 @@ public class CommonEventHandler {
             savedData = new WorldSavedCubicChunksData("cubicChunksData", isCC, minY, maxY);
         }
         savedData.markDirty();
-        evt.getObject().getPerWorldStorage().setData("cubicChunksData", savedData);
-        evt.getObject().getPerWorldStorage().saveAllData();
+        world.getPerWorldStorage().setData("cubicChunksData", savedData);
+        world.getPerWorldStorage().saveAllData();
 
         if (!isCC) {
+            GeneratorBuildPool.close(world);
             return;
         }
 
         if (shouldSkipWorld(world)) {
-            CubicChunks.LOGGER.info("Skipping world " + evt.getObject() + " with type " + evt.getObject().getWorldType() + " due to potential "
+            CubicChunks.LOGGER.info("Skipping world " + world + " with type " + world.getWorldType() + " due to potential "
                     + "compatibility issues");
+            GeneratorBuildPool.close(world);
             return;
         }
-        CubicChunks.LOGGER.info("Initializing world " + evt.getObject() + " with type " + evt.getObject().getWorldType());
+        CubicChunks.LOGGER.info("Initializing world " + world + " with type " + world.getWorldType());
 
         IntRange generationRange = new IntRange(0, ((ICubicWorldProvider) world.provider).getOriginalActualHeight());
-        WorldType type = evt.getObject().getWorldType();
+        WorldType type = world.getWorldType();
         if (type instanceof ICubicWorldType && ((ICubicWorldType) type).hasCubicGeneratorForWorld(world)) {
             generationRange = ((ICubicWorldType) type).calculateGenerationHeightRange(world);
         }
@@ -182,23 +205,22 @@ public class CommonEventHandler {
 
     @SubscribeEvent
     public void onWorldUnload(WorldEvent.Unload event) {
-        if (event.getWorld().isRemote || !((ICubicWorld) event.getWorld()).isCubicWorld()) {
-            return;
-        }
-
-        ICubicWorld world = (ICubicWorld) event.getWorld();
-        if (!world.isCubicWorld()) {
-            return;
-        }
-
-        if (world.getCubeCache() instanceof io.github.opencubicchunks.cubicchunks.core.server.CubeProviderServer) {
-            ((io.github.opencubicchunks.cubicchunks.core.server.CubeProviderServer) world.getCubeCache()).closeConcurrentGeneration();
-        }
-        ICubeIO io = ((ICubeProviderInternal.Server) world.getCubeCache()).getCubeIO();
+        if (event.getWorld().isRemote) return;
         try {
-            io.close();
-        } catch (IOException e) {
-            CubicChunks.LOGGER.catching(e);
+            ICubicWorld world = (ICubicWorld) event.getWorld();
+            if (!world.isCubicWorld()) return;
+
+            if (world.getCubeCache() instanceof io.github.opencubicchunks.cubicchunks.core.server.CubeProviderServer) {
+                ((io.github.opencubicchunks.cubicchunks.core.server.CubeProviderServer) world.getCubeCache()).closeConcurrentGeneration();
+            }
+            ICubeIO io = ((ICubeProviderInternal.Server) world.getCubeCache()).getCubeIO();
+            try {
+                io.close();
+            } catch (IOException e) {
+                CubicChunks.LOGGER.catching(e);
+            }
+        } finally {
+            GeneratorBuildPool.close(event.getWorld());
         }
     }
 }
