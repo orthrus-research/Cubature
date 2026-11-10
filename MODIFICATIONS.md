@@ -14,7 +14,9 @@ published before the job's independent duration is recorded and its report is fr
 
 On November 10, 2026, the server-tick phases also separate random-tick cube selection and ticking,
 the player cube map's own bookkeeping, queued packet handlers with the network tick, and Forge's
-server and world tick events, so uninstrumented work is a small remainder.
+server and world tick events, so uninstrumented work is a small remainder. The random-tick cube
+iterator skips its watcher scan while the map holds no non-spectator player, since every watcher
+would be rejected; force-loaded cubes still tick.
 Also on November 10, 2026, initial sky light and surface tracking return early for a cube without
 storage that lies above every staged column top in a sky-lit world: its 4,096 sky checks
 changed nothing, and the column's dirtying, staging removal and surface notifications still run.

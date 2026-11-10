@@ -1111,10 +1111,20 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
         return this.cubeWatchers.randomWrappedIterator(seed);
     }
     
+    private boolean hasNonSpectator() {
+        for (PlayerWrapper player : players.valueCollection())
+            if (NOT_SPECTATOR.apply(player.playerEntity)) return true;
+        return false;
+    }
+
     @Override
     public Iterator<Cube> getCubeIterator() {
         WorldServer world = this.getWorldServer();
-        final Iterator<CubeWatcher> iterator = this.tickableCubeTracker.iterator();
+        // A watcher's cube ticks only with a non-spectator watching it within range, and watchers
+        // hold only this map's players: with none of them, every watcher would be rejected, so the
+        // scan is skipped. Forced cubes below still tick.
+        final Iterator<CubeWatcher> iterator = hasNonSpectator()
+                ? this.tickableCubeTracker.iterator() : Collections.emptyIterator();
         ImmutableSetMultimap<ChunkPos, Ticket> persistentChunksFor = ForgeChunkManager.getPersistentChunksFor(world);
         world.profiler.startSection("forcedChunkLoading");
         @SuppressWarnings("unchecked")
