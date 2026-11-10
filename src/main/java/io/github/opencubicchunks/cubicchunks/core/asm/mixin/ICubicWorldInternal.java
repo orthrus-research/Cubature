@@ -85,8 +85,6 @@ public interface ICubicWorldInternal extends ICubicWorld {
     @Override
     Cube getCubeFromBlockCoords(BlockPos pos);
 
-    void fakeWorldHeight(int height);
-
     default BlockPos getTopSolidOrLiquidBlockVanilla(BlockPos pos) {
         Chunk chunk = ((World) this).getChunk(pos);
 

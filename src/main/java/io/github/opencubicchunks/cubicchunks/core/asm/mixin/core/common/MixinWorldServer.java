@@ -47,7 +47,6 @@ import io.github.opencubicchunks.cubicchunks.core.server.PlayerCubeMap;
 import io.github.opencubicchunks.cubicchunks.core.server.delivery.ServerDeliveryMode;
 import io.github.opencubicchunks.cubicchunks.core.server.SpawnCubes;
 import io.github.opencubicchunks.cubicchunks.core.server.VanillaNetworkHandler;
-import io.github.opencubicchunks.cubicchunks.core.util.CompatHandler;
 import io.github.opencubicchunks.cubicchunks.core.util.world.CubeSplitTickList;
 import io.github.opencubicchunks.cubicchunks.core.util.world.CubeSplitTickSet;
 import io.github.opencubicchunks.cubicchunks.core.world.CubeWorldEntitySpawner;

@@ -367,12 +367,8 @@ public class CubicChunksConfig {
         @Config.LangKey("cubicchunks.config.vanilla_clients.horizontal_slices")
         @Config.Comment("Enables horizontal slices for vanilla clients. "
                         + "This will cause coordinates to wrap around on the X and Z axes in the same way as on Y.")
-        public boolean horizontalSlices = true;
+        public boolean horizontalSlices = false;
 
-        @Config.LangKey("cubicchunks.config.vanilla_clients.horizontal_slices_bedrock_only")
-        @Config.Comment("If horizontal slices is enabled, restricts horizontal slices to Bedrock edition clients.\n"
-                        + "Note that Bedrock clients are not supported directly, but only when connecting through a proxy such as Geyser.")
-        public boolean horizontalSlicesBedrockOnly = true;
         @Config.RangeInt(min = 16, max = 30000000)
         @Config.LangKey("cubicchunks.config.vanilla_clients.horizontal_slice_size")
         @Config.Comment("The size (radius) of a horizontal slice.")

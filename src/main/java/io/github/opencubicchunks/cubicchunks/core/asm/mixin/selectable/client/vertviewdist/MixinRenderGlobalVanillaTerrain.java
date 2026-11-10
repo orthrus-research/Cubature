@@ -38,7 +38,7 @@ import org.spongepowered.asm.mixin.Shadow;
 import javax.annotation.Nullable;
 
 @Mixin(value = RenderGlobal.class, priority = 2000)
-public class MixinRenderGlobalNoOptifine {
+public class MixinRenderGlobalVanillaTerrain {
 
     @Shadow private ViewFrustum viewFrustum;
 

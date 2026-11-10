@@ -40,10 +40,10 @@ public class TestVerticalRenderDistanceOption {
             assertTrue(plugin.shouldApplyMixin(prefix + "MixinChunkCache_Cubic"));
             choice.setBoolean(option, true);
             for (String name : names) assertTrue(name, plugin.shouldApplyMixin(name));
-            String noOptifine = prefix + "vertviewdist.MixinRenderGlobalNoOptifine";
-            assertTrue(names.contains(noOptifine));
-            conditions.put(noOptifine, false);
-            assertFalse(plugin.shouldApplyMixin(noOptifine));
+            String vanillaTerrain = prefix + "vertviewdist.MixinRenderGlobalVanillaTerrain";
+            assertTrue(names.contains(vanillaTerrain));
+            conditions.put(vanillaTerrain, false);
+            assertFalse(plugin.shouldApplyMixin(vanillaTerrain));
         } finally { choice.setBoolean(option, before); }
     }
 }

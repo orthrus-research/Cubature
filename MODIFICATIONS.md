@@ -15,10 +15,19 @@ published before the job's independent duration is recorded and its report is fr
 On November 10, 2026, the server-tick phases also separate random-tick cube selection and ticking
 and the player cube map's own bookkeeping, both inside Cubature's own methods. Phases for queued
 packet handlers with the network tick and for Forge's server and world tick events are charged only
-by the lab, which wraps those vanilla call sites; the mod itself adds no mixin to them, since hybrid
-servers and other mods rewrite them. The random-tick cube
+by the lab, which wraps those vanilla call sites; the mod itself adds no mixin to them, since other
+mods may overwrite or move them. The random-tick cube
 iterator skips its watcher scan while the map holds no non-spectator player, since every watcher
 would be rejected; force-loaded cubes still tick.
+Also on November 10, 2026, compatibility code for mods and platforms outside Cubature's runtime
+(official Cleanroom with Distant Horizons, and Demonica with its bundled Celeritas) was removed:
+Forge+Bukkit hybrid mixins and the hybrid check, OptiFine's render mixins, interfaces and version
+detection, BetterFps' fast-beacon mixin, the WorldEdit class transformer, the per-mod world-height
+faking and fake chunk-load events for other mods' generators, ForgeEssentials' world class and
+Geyser (Bedrock) client detection. The vanilla-sided mixins that were the hybrid check's
+alternative now load with the core configuration under descriptive names. A cubic world reports its
+own height, and the client and server cap view distance at 32 chunks. Unmodded Java clients keep
+their default of no horizontal slices; the slice option now applies to them when enabled.
 Also on November 10, 2026, initial sky light and surface tracking return early for a cube without
 storage that lies above every staged column top in a sky-lit world: its 4,096 sky checks
 changed nothing, and the column's dirtying, staging removal and surface notifications still run.

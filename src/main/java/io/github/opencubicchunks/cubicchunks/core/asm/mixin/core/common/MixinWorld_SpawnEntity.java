@@ -22,24 +22,37 @@
  *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  *  THE SOFTWARE.
  */
-package io.github.opencubicchunks.cubicchunks.core.asm.mixin.selectable.client.optifine;
+package io.github.opencubicchunks.cubicchunks.core.asm.mixin.core.common;
 
-import io.github.opencubicchunks.cubicchunks.core.asm.optifine.ChunkPos3;
-import net.minecraft.client.renderer.ViewFrustum;
-import net.minecraft.client.renderer.chunk.RenderChunk;
-import net.minecraft.util.math.ChunkPos;
-import org.spongepowered.asm.mixin.Dynamic;
+import static io.github.opencubicchunks.cubicchunks.api.util.Coords.cubeToMinBlock;
+
+import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
+import io.github.opencubicchunks.cubicchunks.core.asm.mixin.core.common.MixinWorld_HeightLimits;
+import net.minecraft.entity.Entity;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.World;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
-@SuppressWarnings("target")
-@Mixin(ViewFrustum.class)
-public class MixinViewFrustum {
+/**
+ * In a cubic world, an entity spawns where its block is loaded, not wherever its column is.
+ */
+@Mixin(World.class)
+public abstract class MixinWorld_SpawnEntity implements ICubicWorld {
 
-    @Dynamic @Redirect(method = "updateVboRegion(Lnet/minecraft/client/renderer/chunk/RenderChunk;)V",
-            at = @At(value = "NEW", target = "net/minecraft/util/math/ChunkPos"))
-    private ChunkPos getChunkPos(int x, int z, RenderChunk renderChunk) {
-        return new ChunkPos3(x, renderChunk.getPosition().getY() & ~255, z);
+    @Shadow protected abstract boolean isChunkLoaded(int x, int z, boolean allowEmpty);
+
+    @Shadow public abstract boolean isBlockLoaded(BlockPos pos, boolean allowEmpty);
+
+    @Redirect(method = "spawnEntity", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/World;isChunkLoaded(IIZ)Z"))
+    private boolean spawnEntity_isChunkLoaded(World world, int chunkX, int chunkZ, boolean allowEmpty, Entity ent) {
+        assert this == (Object) world;
+        if (isCubicWorld()) {
+            return this.isBlockLoaded(new BlockPos(cubeToMinBlock(chunkX), ent.posY, cubeToMinBlock(chunkZ)), allowEmpty);
+        } else {
+            return this.isChunkLoaded(chunkX, chunkZ, allowEmpty);
+        }
     }
 }

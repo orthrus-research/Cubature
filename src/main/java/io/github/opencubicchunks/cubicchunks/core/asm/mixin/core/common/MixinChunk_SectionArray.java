@@ -22,7 +22,7 @@
  *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  *  THE SOFTWARE.
  */
-package io.github.opencubicchunks.cubicchunks.core.asm.mixin.core_sided.vanilla.common;
+package io.github.opencubicchunks.cubicchunks.core.asm.mixin.core.common;
 
 import io.github.opencubicchunks.cubicchunks.api.util.Coords;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
@@ -37,7 +37,7 @@ import org.spongepowered.asm.mixin.injection.ModifyConstant;
 import org.spongepowered.asm.mixin.injection.Slice;
 
 @Mixin(value = Chunk.class, priority = 999)
-public abstract class MixinChunk_Cubes_Vanilla_Sided {
+public abstract class MixinChunk_SectionArray {
     @ModifyConstant(method = "<init>(Lnet/minecraft/world/World;II)V", constant = @Constant(intValue = 16),
             slice = @Slice(to = @At(
                     value = "FIELD",

@@ -47,7 +47,6 @@ import io.github.opencubicchunks.cubicchunks.core.lighting.LightingManager;
 import io.github.opencubicchunks.cubicchunks.core.server.CubeWatcher;
 import io.github.opencubicchunks.cubicchunks.core.server.SpawnCubes;
 import io.github.opencubicchunks.cubicchunks.core.util.AddressTools;
-import io.github.opencubicchunks.cubicchunks.core.util.CompatHandler;
 import io.github.opencubicchunks.cubicchunks.core.util.ticket.ITicket;
 import io.github.opencubicchunks.cubicchunks.core.util.ticket.TicketList;
 import io.github.opencubicchunks.cubicchunks.core.world.EntityContainer;
@@ -72,7 +71,6 @@ import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.common.capabilities.Capability;
 import net.minecraftforge.common.capabilities.CapabilityDispatcher;
 import net.minecraftforge.event.AttachCapabilitiesEvent;
-import net.minecraftforge.event.world.ChunkEvent;
 
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -607,7 +605,6 @@ public class Cube implements ICube {
             ((IColumnInternal) getColumn()).addToStagingHeightmap(this);
         }
         ((ICubicWorldInternal) world).getLightingManager().onCubeLoad(this);
-        CompatHandler.onCubeLoad(new ChunkEvent.Load(getColumn()));
         EVENT_BUS.post(new CubeEvent.Load(this));
     }
 

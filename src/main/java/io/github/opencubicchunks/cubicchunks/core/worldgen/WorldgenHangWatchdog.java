@@ -26,7 +26,7 @@ package io.github.opencubicchunks.cubicchunks.core.worldgen;
 
 import io.github.opencubicchunks.cubicchunks.core.CubicChunks;
 import io.github.opencubicchunks.cubicchunks.core.CubicChunksConfig;
-import io.github.opencubicchunks.cubicchunks.core.util.CompatHandler;
+import io.github.opencubicchunks.cubicchunks.core.util.ModAttribution;
 
 import java.util.Map;
 import java.util.Set;
@@ -120,11 +120,11 @@ public class WorldgenHangWatchdog {
                         for (StackTraceElement[] stacktrace : e.samples()) {
                             sb.append("--------------------------------------------\n");
 
-                            Set<String> likelyModsInvolved = CompatHandler.getModsForStacktrace(stacktrace);
+                            Set<String> likelyModsInvolved = ModAttribution.getModsForStacktrace(stacktrace);
                             sb.append("SAMPLE #").append(i).append(", likely mods involved: ").append(String.join(", ", likelyModsInvolved))
                                     .append('\n');
                             for (StackTraceElement traceElement : stacktrace) {
-                                String modid = CompatHandler.getModForStacktraceElement(traceElement);
+                                String modid = ModAttribution.getModForStacktraceElement(traceElement);
                                 sb.append("\tat ").append(traceElement).append(" [Likely mod: ").append(modid).append("]\n");
                             }
                             i++;

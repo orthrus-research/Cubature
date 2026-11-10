@@ -99,11 +99,10 @@ The saved-cube count describes those test worlds and is not a coverage, memory o
 guarantee. Current native checks run through the [lab](../lab/README.md) and Riven's smoke
 capture (`riven.ps1 full`).
 
-Still unqualified: client launch/rendering, network play, OptiFine and
-Bukkit hybrid integrations, the full upstream LaunchWrapper test suite,
+Still unqualified: client launch/rendering, network play, the full upstream LaunchWrapper test suite,
 long-running load/unload and concurrent native I/O stress, complete addon
 compatibility, terrain/content/progression parity and native performance.
-Optional OptiFine/Bukkit/Celeritas and wildcard-selector remap warnings remain
+Optional Celeritas and wildcard-selector remap warnings remain
 visible. The build compiles against the DH JAR and the Celeritas JAR inside
 Demonica, which `tools/fetch_build_inputs.py` fetches (a Riven checkout
 supplies them from `dev/pins`). The prior synchronous load-event recursion limitation remains.

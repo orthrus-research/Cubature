@@ -439,7 +439,6 @@ public class TestEmptyCubeInitialLight {
         @Override public int getMinGenerationHeight() { return -256; }
         @Override public int getMaxGenerationHeight() { return 512; }
         @Override public void tickCubicWorld() { throw new AssertionError("World tick"); }
-        @Override public void fakeWorldHeight(int height) { throw new AssertionError("Compatibility height"); }
         @Override public Cube getCubeFromCubeCoords(int x, int y, int z) { return providerFixture.getLoadedCube(x, y, z); }
         @Override public Cube getCubeFromBlockCoords(BlockPos pos) { return getCubeFromCubeCoords(pos.getX() >> 4, pos.getY() >> 4, pos.getZ() >> 4); }
         @Override public int getEffectiveHeight(int x, int z) { return getChunk(x >> 4, z >> 4).getHeightValue(x & 15, z & 15); }

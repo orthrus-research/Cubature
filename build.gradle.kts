@@ -85,7 +85,6 @@ minecraft {
 }
 
 sourceSets {
-    create("optifine_dummy")
     // TODO: make this unnecessary, it's an awful hack
     create("api") {
         if (!System.getProperty("idea.sync.active", "false").toBoolean()) {
@@ -121,9 +120,6 @@ repositories {
     maven {
         setUrl("https://repo.spongepowered.org/maven")
     }
-    maven {
-        setUrl("https://hub.spigotmc.org/nexus/content/repositories/snapshots/")
-    }
 }
 
 dependencies {
@@ -131,9 +127,6 @@ dependencies {
 
     embed("com.flowpowered:flow-noise:1.0.1-SNAPSHOT")
 
-    compileOnly(sourceSets["optifine_dummy"].output)
-
-    compileOnly("org.spigotmc:spigot-api:1.12.2-R0.1-SNAPSHOT") // Spigot API - used for Bukkit sided mixins
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.hamcrest:hamcrest-junit:2.0.0.0")
     testImplementation("it.ozimov:java7-hamcrest-matchers:1.3.0")
@@ -176,14 +169,6 @@ mixinGen {
     defaultCompatibilityLevel = "JAVA_8"
     defaultMinVersion = "0.7.10"
 
-    config("core_sided.bukkit") {
-        required = false
-        conformVisibility = true
-    }
-    config("core_sided.vanilla") {
-        required = false
-        conformVisibility = true
-    }
     config("core") {
         required = true
         conformVisibility = true
@@ -542,7 +527,6 @@ license {
     exclude("assets/*")
     exclude("io/github/opencubicchunks/cubicchunks/core/server/chunkio/async/forge/*") // Taken from forge
     exclude("io/github/opencubicchunks/cubicchunks/core/lighting/phosphor/*") // Taken from Phosphor
-    exclude("net/optifine/**/*")
     header = file("HEADER.txt")
     ignoreFailures = false
     strictCheck = true

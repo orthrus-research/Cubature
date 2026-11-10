@@ -28,7 +28,6 @@ import io.github.opencubicchunks.cubicchunks.api.util.MathUtil;
 import io.github.opencubicchunks.cubicchunks.core.CubicChunksConfig;
 import io.github.opencubicchunks.cubicchunks.core.asm.mixin.core.client.IGuiCreateWorld;
 import io.github.opencubicchunks.cubicchunks.core.asm.mixin.core.client.IGuiOptionsRowList;
-import io.github.opencubicchunks.cubicchunks.core.asm.mixin.core.client.IGuiScreen;
 import io.github.opencubicchunks.cubicchunks.core.asm.mixin.selectable.client.IGuiVideoSettings;
 import io.github.opencubicchunks.cubicchunks.core.server.ICubicPlayerList;
 import io.github.opencubicchunks.cubicchunks.core.CubicChunks;
@@ -97,43 +96,9 @@ public class ClientEventHandler {
         GuiScreen currentGui = event.getGui();
         if (currentGui instanceof GuiVideoSettings) {
             GuiVideoSettings gvs = (GuiVideoSettings) currentGui;
-            if (!FMLClientHandler.instance().hasOptifine()) {
-                IGuiOptionsRowList gowl = (IGuiOptionsRowList) ((IGuiVideoSettings) gvs).getOptionsRowList();
-                GuiOptionsRowList.Row row = this.createRow(100, gvs.width);
-                gowl.getOptions().add(1, row);
-            } else {
-                int idx = 3;
-                int btnSpacing = 20;
-                ((IGuiScreen) gvs).getButtonList()
-                        .add(idx, new VertViewDistanceSlider(100, gvs.width / 2 - 155 + 160, gvs.height / 6 + btnSpacing * (idx / 2) - 12));
-                List<GuiButton> buttons = ((IGuiScreen) gvs).getButtonList();
-                // reposition all buttons except the last 4 (last 3 and done)
-                for (int i = 0; i < buttons.size() - 4; i++) {
-                    GuiButton btn = buttons.get(i);
-                    int x = gvs.width / 2 - 155 + i % 2 * 160;
-                    int y = gvs.height / 6 + 21 * (i / 2) - 12;
-                    btn.x = x;
-                    btn.y = y;
-                }
-                // now position the last 3 buttons excluding "done" to be 3-in-a-row
-                for (int i = buttons.size() - 4; i < buttons.size() - 1; i++) {
-                    GuiButton btn = buttons.get(i);
-
-                    int newBtnWidth = 150 * 2 / 3;
-                    int minX = gvs.width / 2 - 155;
-                    int maxX = gvs.width / 2 - 155 + 160 + btn.width;
-
-                    int minXCenter = minX + newBtnWidth / 2;
-                    int maxXCenter = maxX - newBtnWidth / 2;
-
-                    int x = minXCenter + (i % 3) * (maxXCenter - minXCenter) / 2 - newBtnWidth / 2;
-                    int y = gvs.height / 6 + 21 * (buttons.size() - 4) / 2 - 12;
-
-                    btn.x = x;
-                    btn.y = y;
-                    btn.width = newBtnWidth;
-                }
-            }
+            IGuiOptionsRowList gowl = (IGuiOptionsRowList) ((IGuiVideoSettings) gvs).getOptionsRowList();
+            GuiOptionsRowList.Row row = this.createRow(100, gvs.width);
+            gowl.getOptions().add(1, row);
         }
     }
 
@@ -145,7 +110,7 @@ public class ClientEventHandler {
 
     private class VertViewDistanceSlider extends GuiButton {
 
-        private final int MAX_VIEW_DIST = CubicChunks.hasOptifine() ?  64 : 32;
+        private final int MAX_VIEW_DIST = 32;
         private float sliderValue;
         public boolean dragging;
 

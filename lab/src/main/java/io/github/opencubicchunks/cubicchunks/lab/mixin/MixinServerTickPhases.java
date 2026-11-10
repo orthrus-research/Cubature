@@ -14,7 +14,7 @@ import org.spongepowered.asm.mixin.injection.At;
 
 /**
  * Measurement only: charges vanilla's queued tasks and network tick to NETWORK and Forge's tick
- * events to TICK_EVENTS. These call sites are what hybrid servers and other mods rewrite, so the mod
+ * events to TICK_EVENTS. These call sites are what other mods may overwrite or move, so the mod
  * itself never wraps them; outside the lab their time stays in OTHER.
  */
 @Mixin(value = MinecraftServer.class, priority = 1100)

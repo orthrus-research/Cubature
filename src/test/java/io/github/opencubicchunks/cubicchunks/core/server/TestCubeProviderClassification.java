@@ -19,7 +19,6 @@ import io.github.opencubicchunks.cubicchunks.core.server.chunkio.ICubeIO;
 import io.github.opencubicchunks.cubicchunks.core.server.chunkio.async.forge.AsyncWorldIOExecutor;
 import io.github.opencubicchunks.cubicchunks.core.server.delivery.ConcurrentGeneration;
 import io.github.opencubicchunks.cubicchunks.core.server.delivery.MaintenanceState;
-import io.github.opencubicchunks.cubicchunks.core.util.CompatHandler;
 import io.github.opencubicchunks.cubicchunks.core.world.IColumnInternal;
 import io.github.opencubicchunks.cubicchunks.core.world.ServerHeightMap;
 import io.github.opencubicchunks.cubicchunks.core.world.cube.BlankCube;
@@ -71,7 +70,6 @@ import static org.junit.Assert.*;
 public class TestCubeProviderClassification {
     @BeforeClass public static void plainLoaderPreflight() throws Exception {
         Bootstrap.register();
-        Class.forName(CompatHandler.class.getName());
     }
 
     @Test public void cachedAndLoadOnlyMissesDoNotClassifyOrGenerate() throws Exception {
@@ -356,7 +354,6 @@ public class TestCubeProviderClassification {
         @Override public int getMinHeight() { return -256; } @Override public int getMaxHeight() { return 512; }
         @Override public int getMinGenerationHeight() { return -256; } @Override public int getMaxGenerationHeight() { return 512; }
         @Override public void tickCubicWorld() { throw new AssertionError("world tick"); }
-        @Override public void fakeWorldHeight(int height) { throw new AssertionError("fake height"); }
         @Override public Cube getCubeFromCubeCoords(int x, int y, int z) { return fixture.provider.getLoadedCube(x, y, z); }
         @Override public Cube getCubeFromBlockCoords(BlockPos pos) { return getCubeFromCubeCoords(pos.getX() >> 4, pos.getY() >> 4, pos.getZ() >> 4); }
         @Override public int getEffectiveHeight(int x, int z) { return 64; }

@@ -916,8 +916,8 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
             return;
         }
 
-        newHorizontalViewDistance = clamp(newHorizontalViewDistance, 3, CubicChunks.hasOptifine() ? 64 : 32);
-        newVerticalViewDistance = clamp(newVerticalViewDistance, 3, CubicChunks.hasOptifine() ? 64 : 32);
+        newHorizontalViewDistance = clamp(newHorizontalViewDistance, 3, 32);
+        newVerticalViewDistance = clamp(newVerticalViewDistance, 3, 32);
 
         if (newHorizontalViewDistance == this.horizontalViewDistance && newVerticalViewDistance == this.verticalViewDistance) {
             return;

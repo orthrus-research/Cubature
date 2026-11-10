@@ -70,33 +70,6 @@ public class MixinNetHandlerPlayServer {
 
     @Shadow private int teleportId;
 
-    @Inject(method = "processCustomPayload",
-            at = @At(value = "INVOKE", shift = At.Shift.AFTER,
-                    target = "Lnet/minecraft/network/PacketThreadUtil;checkThreadAndEnqueue(Lnet/minecraft/network/Packet;"
-                             + "Lnet/minecraft/network/INetHandler;Lnet/minecraft/util/IThreadListener;)V"))
-    private void preprocessPacket(CPacketCustomPayload packet, CallbackInfo ci) {
-        if (!CubicChunksConfig.allowVanillaClients || !"MC|Brand".equals(packet.getChannelName())) {
-            return;
-        }
-        PacketBuffer packetbuffer = packet.getBufferData();
-        if (packetbuffer.readString(32767).contains("Geyser")) {
-            VanillaNetworkHandler.addBedrockPlayer(this.player);
-
-            if (CubicChunksConfig.vanillaClients.horizontalSlices && CubicChunksConfig.vanillaClients.horizontalSlicesBedrockOnly) {
-                //notify vanilla handler, because otherwise bedrock players will log in at the wrong location as the client brand
-                //is sent later in the handshake than the first call to updatePlayerPosition
-                WorldServer world = (WorldServer) player.world;
-                if (!((ICubicWorld) world).isCubicWorld()) {
-                    return;
-                }
-                VanillaNetworkHandler vanillaHandler = ((ICubicWorldInternal.Server) world).getVanillaNetworkHandler();
-                vanillaHandler.updatePlayerPosition((PlayerCubeMap) world.getPlayerChunkMap(), this.player,
-                        new CubePos(Coords.blockToCube(player.posX), Coords.blockToCube(player.posY), Coords.blockToCube(player.posZ)));
-            }
-        }
-        packetbuffer.resetReaderIndex(); // reset buffer position in case another mod tries to access the client brand the same way
-    }
-
     @Inject(method = "processPlayerDigging",
             at = @At(value = "INVOKE", shift = At.Shift.AFTER,
                     target = "Lnet/minecraft/network/PacketThreadUtil;checkThreadAndEnqueue(Lnet/minecraft/network/Packet;"

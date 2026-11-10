@@ -28,7 +28,6 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Set;
 
@@ -56,40 +55,8 @@ public class CubicChunksMixinConfig implements IMixinConfigPlugin {
     public static Logger LOGGER = LogManager.getLogger("CubicChunksMixinConfig");
     private final Object2BooleanMap<String> modDependencyConditions = new Object2BooleanLinkedOpenHashMap<String>();
 
-    @SuppressWarnings({"unchecked", "rawtypes"})
     @Override
     public void onLoad(String mixinPackage) {
-        OptifineState optifineState;
-        String optifineVersion = System.getProperty("cubicchunks.optifineVersion", null);
-        if (optifineVersion == null) {
-            try {
-                Class optifineInstallerClass = Class.forName("optifine.Installer");
-                Method getVersionHandler = optifineInstallerClass.getMethod("getOptiFineVersion", new Class[0]);
-                optifineVersion = (String) getVersionHandler.invoke(null, new Object[0]);
-                optifineVersion = optifineVersion.replace("_pre", "");
-                optifineVersion = optifineVersion.substring(optifineVersion.length() - 2);
-                LOGGER.info("Detected Optifine version: " + optifineVersion);
-            } catch (ClassNotFoundException e) {
-                optifineVersion = null;
-                LOGGER.info("No Optifine detected");
-            } catch (Exception e) {
-                LOGGER.error("Optifine detected, but could not detect version. It may not work. Assuming Optifine E1...", e);
-                optifineVersion = "E1";
-            }
-        }
-
-        if (optifineVersion == null) {
-            optifineState = OptifineState.NOT_LOADED;
-        } else if (optifineVersion.compareTo("G5") > 0) {
-            LOGGER.error("Unknown optifine version: " + optifineVersion + ", it may not work. Assuming E1-G5.");
-            optifineState = OptifineState.LOADED_E1;
-        } else if (optifineVersion.compareTo("E1") >= 0) {
-            optifineState = OptifineState.LOADED_E1;
-        } else {
-            new RuntimeException("Unsupported optifine version " + optifineVersion + ", trying E1-G5 specific mixins").printStackTrace();
-            optifineState = OptifineState.LOADED_E1;
-        }
-
         // Celeritas (alone or bundled in Demonica) overwrites RenderGlobal.setupTerrain and draws terrain with its own
         // section renderer, so the vanilla terrain-path mixins below have nothing to hook. Checked as a resource so no
         // Celeritas class loads this early.
@@ -99,11 +66,11 @@ public class CubicChunksMixinConfig implements IMixinConfigPlugin {
 
         modDependencyConditions.defaultReturnValue(true);
         modDependencyConditions.put(
-                "io.github.opencubicchunks.cubicchunks.core.asm.mixin.selectable.client.MixinRenderGlobalNoOptifine",
-                optifineState == OptifineState.NOT_LOADED && !celeritas);
+                "io.github.opencubicchunks.cubicchunks.core.asm.mixin.selectable.client.MixinRenderGlobalVanillaTerrain",
+                !celeritas);
         modDependencyConditions.put(
-                "io.github.opencubicchunks.cubicchunks.core.asm.mixin.selectable.client.vertviewdist.MixinRenderGlobalNoOptifine",
-                optifineState == OptifineState.NOT_LOADED && !celeritas && BoolOptions.VERT_RENDER_DISTANCE.getValue());
+                "io.github.opencubicchunks.cubicchunks.core.asm.mixin.selectable.client.vertviewdist.MixinRenderGlobalVanillaTerrain",
+                !celeritas && BoolOptions.VERT_RENDER_DISTANCE.getValue());
         modDependencyConditions.put(
                 "io.github.opencubicchunks.cubicchunks.core.asm.mixin.selectable.client.vertviewdist.MixinRenderGlobal",
                 !celeritas);
@@ -122,52 +89,6 @@ public class CubicChunksMixinConfig implements IMixinConfigPlugin {
             modDependencyConditions.put(
                     "io.github.opencubicchunks.cubicchunks.core.asm.mixin.selectable.client.demonica." + mixin, demonica);
         }
-
-        modDependencyConditions.put(
-                "io.github.opencubicchunks.cubicchunks.core.asm.mixin.selectable.client.optifine.MixinRenderGlobalOptifine_E",
-                optifineState != OptifineState.NOT_LOADED);
-        modDependencyConditions.put(
-                "io.github.opencubicchunks.cubicchunks.core.asm.mixin.selectable.client.optifine.MixinRenderChunk",
-                optifineState != OptifineState.NOT_LOADED);
-        modDependencyConditions.put(
-                "io.github.opencubicchunks.cubicchunks.core.asm.mixin.selectable.client.optifine.MixinRenderChunkUtils",
-                optifineState != OptifineState.NOT_LOADED);
-        modDependencyConditions.put(
-                "io.github.opencubicchunks.cubicchunks.core.asm.mixin.selectable.client.optifine.MixinExtendedBlockStorage",
-                optifineState != OptifineState.NOT_LOADED);
-        modDependencyConditions.put(
-                "io.github.opencubicchunks.cubicchunks.core.asm.mixin.selectable.client.optifine.MixinRenderList",
-                optifineState != OptifineState.NOT_LOADED);
-        modDependencyConditions.put(
-                "io.github.opencubicchunks.cubicchunks.core.asm.mixin.selectable.client.optifine.MixinViewFrustum",
-                optifineState != OptifineState.NOT_LOADED);
-        modDependencyConditions.put(
-                "io.github.opencubicchunks.cubicchunks.core.asm.mixin.selectable.client.optifine.MixinChunkVisibility",
-                optifineState != OptifineState.NOT_LOADED);
-        modDependencyConditions.put(
-                "io.github.opencubicchunks.cubicchunks.core.asm.mixin.selectable.client.IGuiVideoSettings",
-                optifineState == OptifineState.NOT_LOADED);
-
-        //BetterFps FastBeacon Handling
-        boolean enableBetterFpsBeaconFix = false;
-        try{
-            Class betterFpsConditions = Class.forName("guichaguri.betterfps.transformers.Conditions");
-            Method getFixSetting = betterFpsConditions.getMethod("shouldPatch", String.class);
-            boolean betterFpsFastBeaconActive = (boolean) getFixSetting.invoke(null, "fastBeacon");
-            if(betterFpsFastBeaconActive){
-                enableBetterFpsBeaconFix = true;
-                LOGGER.info("BetterFps FastBeacon active, will activate mixin for beacons with FastBeacon.");
-            }else{
-                LOGGER.info("BetterFps is installed, but FastBeacon is not active. Will not enable FastBeacon mixin.");
-            }
-        } catch (ClassNotFoundException e) {
-            LOGGER.info("BetterFps is NOT installed. Will not enable FastBeacon mixin.");
-        } catch (Exception e) {
-            LOGGER.info("Problem trying to detect BetterFps settings. Will not enable FastBeacon mixin.");
-        }
-        modDependencyConditions.put(
-                "io.github.opencubicchunks.cubicchunks.core.asm.mixin.selectable.common.MixinTileEntityBeaconBetterFps", 
-                enableBetterFpsBeaconFix);
 
         File folder = new File(".", "config");
         folder.mkdirs();
@@ -261,7 +182,7 @@ public class CubicChunksMixinConfig implements IMixinConfigPlugin {
                 new String[] {},
                 new String[] {"io.github.opencubicchunks.cubicchunks.core.asm.mixin.selectable.client.vertviewdist.MixinEntityRenderer",
                         "io.github.opencubicchunks.cubicchunks.core.asm.mixin.selectable.client.vertviewdist.MixinRenderGlobal",
-                        "io.github.opencubicchunks.cubicchunks.core.asm.mixin.selectable.client.vertviewdist.MixinRenderGlobalNoOptifine"},
+                        "io.github.opencubicchunks.cubicchunks.core.asm.mixin.selectable.client.vertviewdist.MixinRenderGlobalVanillaTerrain"},
                 "Enabling this option will make the vertical view distance slider affect clientside vertical render distance." +
                         " When disabled, only serverside load distance is affected.");
 
@@ -340,10 +261,5 @@ public class CubicChunksMixinConfig implements IMixinConfigPlugin {
         reader.close();
         if (expectingOptionsNumber != 0)
             this.writeConfigToJson(configFile);
-    }
-
-    private enum OptifineState {
-        NOT_LOADED,
-        LOADED_E1
     }
 }

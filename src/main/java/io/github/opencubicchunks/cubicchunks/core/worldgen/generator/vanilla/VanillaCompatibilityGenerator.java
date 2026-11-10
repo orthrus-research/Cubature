@@ -35,7 +35,6 @@ import io.github.opencubicchunks.cubicchunks.core.CubicChunks;
 import io.github.opencubicchunks.cubicchunks.core.CubicChunksConfig;
 import io.github.opencubicchunks.cubicchunks.core.asm.mixin.ICubicWorldInternal;
 import io.github.opencubicchunks.cubicchunks.core.asm.mixin.core.common.IGameRegistry;
-import io.github.opencubicchunks.cubicchunks.core.util.CompatHandler;
 import io.github.opencubicchunks.cubicchunks.core.world.IColumnInternal;
 import io.github.opencubicchunks.cubicchunks.core.world.cube.Cube;
 import io.github.opencubicchunks.cubicchunks.core.worldgen.WorldgenHangWatchdog;
@@ -354,7 +353,6 @@ public class VanillaCompatibilityGenerator implements ICubeGenerator {
                 }
 
                 try {
-                    CompatHandler.beforePopulate(world, vanilla);
                     vanilla.populate(cube.getX(), cube.getZ());
                 } catch (IllegalArgumentException ex) {
                     StackTraceElement[] stack = ex.getStackTrace();
@@ -365,8 +363,6 @@ public class VanillaCompatibilityGenerator implements ICubeGenerator {
                     } else {
                         CubicChunks.LOGGER.error("Error while populating. Likely known mod issue, ignoring...", ex);
                     }
-                } finally {
-                    CompatHandler.afterPopulate(world);
                 }
                 applyModGenerators(cube.getX(), cube.getZ(), world, vanilla, world.getChunkProvider());
             }
@@ -390,12 +386,7 @@ public class VanillaCompatibilityGenerator implements ICubeGenerator {
 
         for (IWorldGenerator generator : generators) {
             fmlRandom.setSeed(chunkSeed);
-            try {
-                CompatHandler.beforeGenerate(world, generator);
-                generator.generate(fmlRandom, x, z, world, vanillaGen, provider);
-            } finally {
-                CompatHandler.afterGenerate(world);
-            }
+            generator.generate(fmlRandom, x, z, world, vanillaGen, provider);
         }
     }
 

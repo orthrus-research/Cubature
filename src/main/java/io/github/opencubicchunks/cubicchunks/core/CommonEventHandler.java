@@ -37,9 +37,7 @@ import io.github.opencubicchunks.cubicchunks.core.network.PacketCubicWorldData;
 import io.github.opencubicchunks.cubicchunks.core.network.PacketDispatcher;
 import io.github.opencubicchunks.cubicchunks.core.server.SpawnCubes;
 import io.github.opencubicchunks.cubicchunks.core.server.PlayerCubeMap;
-import io.github.opencubicchunks.cubicchunks.core.server.VanillaNetworkHandler;
 import io.github.opencubicchunks.cubicchunks.core.server.chunkio.ICubeIO;
-import io.github.opencubicchunks.cubicchunks.core.util.ReflectionUtil;
 import io.github.opencubicchunks.cubicchunks.core.world.ICubeProviderInternal;
 import io.github.opencubicchunks.cubicchunks.core.world.WorldSavedCubicChunksData;
 import io.github.opencubicchunks.cubicchunks.core.world.provider.ICubicWorldProvider;
@@ -57,7 +55,6 @@ import net.minecraftforge.event.AttachCapabilitiesEvent;
 import net.minecraftforge.event.entity.EntityJoinWorldEvent;
 import net.minecraftforge.event.world.WorldEvent;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import net.minecraftforge.fml.common.gameevent.PlayerEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 import net.minecraftforge.fml.relauncher.Side;
 
@@ -195,21 +192,10 @@ public class CommonEventHandler {
         }
     }
 
-    @SubscribeEvent
-    public void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
-        VanillaNetworkHandler.removeBedrockPlayer((EntityPlayerMP) event.player);
-    }
-
     @SuppressWarnings("unchecked")
     private final List<Class<?>> allowedServerWorldClasses = ImmutableList.copyOf(new Class[]{
             WorldServer.class,
-            WorldServerMulti.class,
-            // non-existing classes will be Objects
-            ReflectionUtil.getClassOrDefault("WorldServerOF", Object.class), // OptiFine's WorldServer, no package
-            ReflectionUtil.getClassOrDefault("WorldServerMultiOF", Object.class), // OptiFine's WorldServerMulti, no package
-            ReflectionUtil.getClassOrDefault("net.optifine.override.WorldServerOF", Object.class), // OptiFine's WorldServer
-            ReflectionUtil.getClassOrDefault("net.optifine.override.WorldServerMultiOF", Object.class), // OptiFine's WorldServerMulti
-            ReflectionUtil.getClassOrDefault("com.forgeessentials.multiworld.WorldServerMultiworld", Object.class) // ForgeEssentials world
+            WorldServerMulti.class
     });
 
     @SuppressWarnings("unchecked")

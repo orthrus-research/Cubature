@@ -59,7 +59,7 @@ public abstract class MixinRenderGlobal {
 
     @Shadow
     private WorldClient world;
-    // NOTE: the field name here and in MixinRendeerGlobalNoOptifine have to match
+    // NOTE: the field name here and in MixinRenderGlobalVanillaTerrain have to match
     private int verticalRenderDistanceCubes;
 
     @Inject(

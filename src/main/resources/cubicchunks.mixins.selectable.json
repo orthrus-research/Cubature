@@ -27,7 +27,6 @@
         "common.MixinDistantHorizonsNoWorldMessages",
         "common.MixinChunkCache",
         "common.MixinPathNavigate",
-        "common.MixinTileEntityBeaconBetterFps",
         "common.MixinWalkNodeProcessor",
         "common.MixinWorld_CollisionCheck",
         "common.MixinWorld_SlowCollisionCheck",
@@ -50,17 +49,10 @@
         "client.MixinDistantHorizonsArrivalRequests",
         "client.MixinChunkCache_Cubic",
         "client.MixinChunkCache_Vanilla",
-        "client.MixinRenderGlobalNoOptifine",
-        "client.optifine.MixinChunkVisibility",
-        "client.optifine.MixinExtendedBlockStorage",
-        "client.optifine.MixinRenderChunk",
-        "client.optifine.MixinRenderChunkUtils",
-        "client.optifine.MixinRenderGlobalOptifine_E",
-        "client.optifine.MixinRenderList",
-        "client.optifine.MixinViewFrustum",
+        "client.MixinRenderGlobalVanillaTerrain",
         "client.vertviewdist.MixinEntityRenderer",
         "client.vertviewdist.MixinRenderGlobal",
-        "client.vertviewdist.MixinRenderGlobalNoOptifine"
+        "client.vertviewdist.MixinRenderGlobalVanillaTerrain"
     ],
     "server": []
 }

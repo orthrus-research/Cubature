@@ -70,14 +70,12 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static io.github.opencubicchunks.cubicchunks.api.util.Coords.*;
 
 public class VanillaNetworkHandler {
     private static final Map<Class<?>, Field[]> packetFields = new IdentityHashMap<>();
-    private static final Set<UUID> bedrockPlayers = new HashSet<>();
     private final WorldServer world;
     private Map<EntityPlayerMP, CubePos> playerOffsets = new IdentityHashMap<>();
     // separate offset because when switching layers, there is a short moment where
@@ -89,13 +87,7 @@ public class VanillaNetworkHandler {
         this.world = world;
     }
 
-    public static void addBedrockPlayer(EntityPlayerMP player) {
-        bedrockPlayers.add(player.getUniqueID());
-    }
 
-    public static void removeBedrockPlayer(EntityPlayerMP player) {
-        bedrockPlayers.remove(player.getUniqueID());
-    }
 
     // TODO: more efficient way?
     public static Packet<?> copyPacket(Packet<?> packetIn) {
@@ -269,8 +261,7 @@ public class VanillaNetworkHandler {
         int posZ = managedPos.getZ() + offset.getZ();
 
         boolean shouldSliceTransition = posY < 2 || posY >= 14;
-        boolean isHorizontalSlices = CubicChunksConfig.vanillaClients.horizontalSlices
-                && (!CubicChunksConfig.vanillaClients.horizontalSlicesBedrockOnly || bedrockPlayers.contains(player.getUniqueID()));
+        boolean isHorizontalSlices = CubicChunksConfig.vanillaClients.horizontalSlices;
         if (isHorizontalSlices) {
             int horizontalSliceSize = CubicChunksConfig.vanillaClients.horizontalSliceSize;
             int maxHorizontalOffset = Math.max(Math.abs(posX), Math.abs(posZ));

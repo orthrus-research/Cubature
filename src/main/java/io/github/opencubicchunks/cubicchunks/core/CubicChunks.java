@@ -37,7 +37,6 @@ import io.github.opencubicchunks.cubicchunks.core.server.TickDiagnostics;
 import io.github.opencubicchunks.cubicchunks.core.server.delivery.ServerDeliveryMode;
 import io.github.opencubicchunks.cubicchunks.core.server.delivery.GeneratorBuildPool;
 import io.github.opencubicchunks.cubicchunks.core.server.chunkio.RegionCubeStorage;
-import io.github.opencubicchunks.cubicchunks.core.util.CompatHandler;
 import io.github.opencubicchunks.cubicchunks.core.util.SideUtils;
 import io.github.opencubicchunks.cubicchunks.core.world.type.VanillaCubicWorldType;
 import io.github.opencubicchunks.cubicchunks.core.worldgen.WorldgenHangWatchdog;
@@ -47,14 +46,12 @@ import net.minecraft.world.World;
 import net.minecraft.world.gen.IChunkGenerator;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.RegistryEvent;
-import net.minecraftforge.fml.client.FMLClientHandler;
 import net.minecraftforge.fml.common.FMLCommonHandler;
 import net.minecraftforge.fml.common.ICrashCallable;
 import net.minecraftforge.fml.common.Loader;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.Mod.EventHandler;
 import net.minecraftforge.fml.common.event.FMLInitializationEvent;
-import net.minecraftforge.fml.common.event.FMLPostInitializationEvent;
 import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
 import net.minecraftforge.fml.common.event.FMLServerAboutToStartEvent;
 import net.minecraftforge.fml.common.event.FMLServerStartingEvent;
@@ -158,11 +155,6 @@ public class CubicChunks {
             }
         });
         PacketDispatcher.registerPackets();
-    }
-
-    @EventHandler
-    public void postInit(FMLPostInitializationEvent event) {
-        CompatHandler.init();
     }
 
     @EventHandler
@@ -298,12 +290,5 @@ public class CubicChunks {
             LOGGER.log(Level.WARN, "*  at {}{}", trace[i].toString(), i == 9 ? "..." : "");
         }
         LOGGER.log(Level.WARN, "****************************************");
-    }
-
-    public static boolean hasOptifine() {
-        return SideUtils.getForSide(
-                () -> () -> FMLClientHandler.instance().hasOptifine(),
-                () -> () -> false
-        );
     }
 }

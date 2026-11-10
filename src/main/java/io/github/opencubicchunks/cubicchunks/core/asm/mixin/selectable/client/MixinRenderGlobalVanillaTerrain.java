@@ -48,7 +48,7 @@ import javax.annotation.ParametersAreNonnullByDefault;
 @MethodsReturnNonnullByDefault
 @ParametersAreNonnullByDefault
 @Mixin(RenderGlobal.class)
-public class MixinRenderGlobalNoOptifine {
+public class MixinRenderGlobalVanillaTerrain {
 
     @Nullable private BlockPos position;
 

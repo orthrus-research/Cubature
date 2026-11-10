@@ -105,7 +105,7 @@ public abstract class MixinWorld implements ICubicWorldInternal {
 
     @Nullable protected LightingManager lightingManager;
     protected boolean isCubicWorld;
-    protected int minHeight = 0, maxHeight = 256, fakedMaxHeight = 0;
+    protected int minHeight = 0, maxHeight = 256;
     private int minGenerationHeight = 0, maxGenerationHeight = 256;
 
     @Shadow public abstract boolean isValid(BlockPos pos);
@@ -144,11 +144,7 @@ public abstract class MixinWorld implements ICubicWorldInternal {
 
     @Shadow public abstract void setLightFor(EnumSkyBlock type, BlockPos pos, int lightValue);
 
-    /*
-     * This shadow method is used by MixinWorldServer, place in here for Bukkit compatibility.
-     * As World#spawnEntity method is not getting overridden in CraftBukkit WorldServer class,
-     * shadowing spawnEntity in WorldServer will break Bukkit compatibility.
-     */
+    // Used by MixinWorldServer.
     @Shadow public abstract boolean spawnEntity(Entity entityIn);
 
     protected void initCubicWorld(IntRange heightRange, IntRange generationRange) {
@@ -156,7 +152,6 @@ public abstract class MixinWorld implements ICubicWorldInternal {
         // Set the world height boundaries to their highest and lowest values respectively
         this.minHeight = heightRange.getMin();
         this.maxHeight = heightRange.getMax();
-        this.fakedMaxHeight = this.maxHeight;
 
         this.minGenerationHeight = generationRange.getMin();
         this.maxGenerationHeight = generationRange.getMax();
@@ -239,22 +234,17 @@ public abstract class MixinWorld implements ICubicWorldInternal {
         throw new NoSuchMethodError("World.tickCubicWorld: Classes extending World need to implement tickCubicWorld in CubicChunks");
     }
 
-    @Override public void fakeWorldHeight(int height) {
-        this.fakedMaxHeight = height;
-    }
-
     /**
-     * Some mod's world generation will try to do their work over the whole world height.
-     * This allows to fake the world height for them.
+     * A cubic world reports its own height.
      *
      * @return world height
      * @author Barteks2x
-     * @reason Optionally return fake height
+     * @reason Cubic world height
      */
     @Overwrite
     public int getHeight() {
-        if (fakedMaxHeight != 0) {
-            return fakedMaxHeight;
+        if (isCubicWorld()) {
+            return maxHeight;
         }
         return this.provider.getHeight();
     }
