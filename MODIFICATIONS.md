@@ -30,6 +30,9 @@ player is present, so the time before the first join prepares what that join nee
 An explicit flush or close writes each region's whole backlog as one storage batch, so a region
 file takes one data force and one header force per flush instead of two per 64-entry batch; the
 background writer keeps its bounded batches.
+Storage compression reuses one deflater per thread, writing the same gzip bytes as
+CompressedStreamTools, and compresses a batch of more than 64 entries on up to four shared
+workers.
 
 The lab fetcher publishes verified dependencies through short, unique temporary basenames beside
 their destinations, so cached and downloaded libraries fit legacy Windows path limits.

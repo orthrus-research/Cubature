@@ -51,12 +51,13 @@ public class TestRegionCubeStorage {
             assertFalse(reopened.cubeExists(new CubePos(-1, -8, 0)));
         }
     }
-    @Test public void runtimeKeyMappingFailureReleasesEarlierBuffers() throws Exception {
+    @Test public void runtimeKeyMappingFailureAllocatesNoBuffer() throws Exception {
         try (TrackedStore storage = new TrackedStore(temporary.newFolder().toPath())) {
             Map<Integer, NBTTagCompound> values = new LinkedHashMap<>(); values.put(0, TestPendingCubeWrites.tag(0)); values.put(1, TestPendingCubeWrites.tag(1));
             try { storage.compressNBTForBatchWrite(values, key -> { if (key == 1) throw new IllegalArgumentException("key failed"); return key; }); fail(); }
             catch (IllegalArgumentException expected) { }
-            assertEquals(1, storage.buffers.size()); assertEquals(0, storage.buffers.get(0).refCnt());
+            // Keys are mapped before any compression starts, so nothing was allocated.
+            assertEquals(0, storage.buffers.size());
         }
     }
     @Test public void bothFactoriesRoundTripNormalOverflowAndEnumerationBeyondCapacity() throws Exception {
@@ -111,11 +112,61 @@ public class TestRegionCubeStorage {
         }
         try (RegionCubeStorage reopened = new RegionCubeStorage(bPath)) { assertEquals(TestPendingCubeWrites.tag(3), reopened.readCube(pos)); }
     }
+    @Test public void parallelCompressionRoundTripsAndReleasesEveryBuffer() throws Exception {
+        Path path = temporary.newFolder().toPath();
+        Map<CubePos, NBTTagCompound> cubes = new LinkedHashMap<>();
+        for (int i = 0; i < 5 * RegionCubeStorage.COMPRESSION_SLICE + 7; i++)
+            cubes.put(new CubePos(i % 16, i / 256 - 8, (i / 16) % 16), TestPendingCubeWrites.tag(i));
+        try (TrackedStore storage = new TrackedStore(path)) {
+            storage.writeBatch(new ICubicStorage.NBTBatch(Collections.emptyMap(), cubes));
+            storage.flush();
+            assertEquals(cubes.size(), storage.buffers.size());
+            storage.buffers.forEach(buffer -> assertEquals(0, buffer.refCnt()));
+        }
+        try (RegionCubeStorage reopened = new RegionCubeStorage(path)) {
+            for (Map.Entry<CubePos, NBTTagCompound> entry : cubes.entrySet())
+                assertEquals(entry.getValue(), reopened.readCube(entry.getKey()));
+        }
+    }
+    @Test public void parallelCompressionFailureReleasesEveryBufferAndWritesNothing() throws Exception {
+        try (TrackedStore storage = new TrackedStore(temporary.newFolder().toPath())) {
+            Map<CubePos, NBTTagCompound> cubes = new LinkedHashMap<>();
+            for (int i = 0; i < 4 * RegionCubeStorage.COMPRESSION_SLICE; i++)
+                cubes.put(new CubePos(i % 16, -8, i / 16), TestPendingCubeWrites.tag(i));
+            storage.failAt = 2 * RegionCubeStorage.COMPRESSION_SLICE + 5;
+            try { storage.writeBatch(new ICubicStorage.NBTBatch(Collections.emptyMap(), cubes)); fail(); }
+            catch (IOException expected) { assertEquals("compression failed", expected.getMessage()); }
+            assertTrue(storage.buffers.size() >= 1);
+            storage.buffers.forEach(buffer -> assertEquals(0, buffer.refCnt()));
+            assertNull(storage.readCube(new CubePos(0, -8, 0)));
+        }
+    }
+    @Test public void reusedGzipMatchesTheStandardStreamAndDecodes() throws Exception {
+        try (TrackedStore storage = new TrackedStore(temporary.newFolder().toPath())) {
+            Random random = new Random(7);
+            for (int round = 0; round < 50; round++) {
+                NBTTagCompound nbt = TestPendingCubeWrites.tag(round);
+                byte[] payload = new byte[random.nextInt(20000)];
+                for (int i = 0; i < payload.length; i++) payload[i] = (byte) (random.nextInt(4) == 0 ? random.nextInt() : i % 7);
+                nbt.setByteArray("data", payload);
+                ByteBuf ours = storage.compressNBT(nbt);
+                try {
+                    byte[] bytes = new byte[ours.readableBytes()]; ours.getBytes(ours.readerIndex(), bytes);
+                    assertEquals(nbt, net.minecraft.nbt.CompressedStreamTools.readCompressed(new java.io.ByteArrayInputStream(bytes)));
+                    java.io.ByteArrayOutputStream standard = new java.io.ByteArrayOutputStream();
+                    net.minecraft.nbt.CompressedStreamTools.writeCompressed(nbt, standard);
+                    assertArrayEquals(standard.toByteArray(), bytes);
+                } finally { ours.release(); }
+            }
+        }
+    }
     private static class TrackedStore extends RegionCubeStorage {
-        final List<ByteBuf> buffers = new ArrayList<>(); int calls, failAt = -1;
+        final List<ByteBuf> buffers = Collections.synchronizedList(new ArrayList<>());
+        final java.util.concurrent.atomic.AtomicInteger calls = new java.util.concurrent.atomic.AtomicInteger();
+        volatile int failAt = -1;
         TrackedStore(Path path) throws IOException { super(path); }
         @Override protected ByteBuf compressNBT(NBTTagCompound nbt) throws IOException {
-            if (++calls == failAt) throw new IOException("compression failed");
+            if (calls.incrementAndGet() == failAt) throw new IOException("compression failed");
             ByteBuf buffer = super.compressNBT(nbt); buffers.add(buffer); return buffer;
         }
     }
