@@ -3,9 +3,11 @@ package io.github.opencubicchunks.cubicchunks.core.server.delivery;
 import static io.github.opencubicchunks.cubicchunks.api.util.Coords.blockToCube;
 
 import io.github.opencubicchunks.cubicchunks.core.CubicChunks;
+import io.github.opencubicchunks.cubicchunks.core.server.CubeProviderServer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.network.play.server.SPacketPlayerPosLook;
 import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraft.world.WorldServer;
 
 import java.util.Collections;
@@ -14,67 +16,111 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import javax.annotation.Nullable;
+
 /**
- * Teleports held while generation workers prepare their destination column. A teleport
- * (NetHandlerPlayServer.setPlayerLocation) into a column that is neither loaded nor saved is held, so
- * the server thread does not generate it on the spot and every player keeps ticking. The player stays
- * where they are until tick completes the teleport, with its target and rotation made absolute when
- * it was held; a later teleport that moves the player replaces a held one, and a held teleport
- * completes after TIMEOUT_TICKS even if its column is not prepared. Vanilla's corrections of a
- * client's moves never replace a held teleport ({@link #correct}), and neither does a teleport that
- * leaves the player where they are.
+ * Teleports held while generation workers prepare their destination column. The target and rotation
+ * become absolute when held; replacement, departure and explicit forced moves release the request.
+ * A long wait is reported, never completed merely because time passed. Vanilla's move corrections
+ * ({@link #correct}) and teleports that leave a player in place preserve the held destination.
  */
 public final class DeferredArrivals {
-    /** A held teleport completes this long after it was held even if its column is not prepared. */
-    public static final long TIMEOUT_TICKS = 600;
+    static final long WATCHDOG_TICKS = 600;
+    static final long MESSAGE_PERIOD = TimeUnit.SECONDS.toNanos(1);
 
-    /**
-     * Whether a player may arrive in a column now. Asking may hand the column to the generation
-     * workers (CubeProviderServer.arrivalReady).
-     */
-    @FunctionalInterface
-    public interface Readiness {
-        boolean ready(int columnX, int columnZ);
-    }
-
-    private static final class Arrival {
-        final double x, y, z;
-        final float yaw, pitch;
-        final int columnX, columnZ;
-        final long since;
-
-        Arrival(double x, double y, double z, float yaw, float pitch, long since) {
-            this.x = x; this.y = y; this.z = z; this.yaw = yaw; this.pitch = pitch; this.since = since;
-            columnX = blockToCube(MathHelper.floor(x));
-            columnZ = blockToCube(MathHelper.floor(z));
+    record Target(double x, double y, double z, float yaw, float pitch, int columnX, int columnZ) {
+        Target(double x, double y, double z, float yaw, float pitch) {
+            this(x, y, z, yaw, pitch, blockToCube(MathHelper.floor(x)), blockToCube(MathHelper.floor(z)));
         }
 
-        /** Whether this arrival leaves a player at (px, py, pz) where they are. */
         boolean at(double px, double py, double pz) {
             return Math.abs(x - px) < 1.0E-3 && Math.abs(y - py) < 1.0E-3 && Math.abs(z - pz) < 1.0E-3;
         }
     }
 
-    private final WorldServer world;
-    private final Readiness readiness;
+    /** World operations kept outside the hold lifecycle so it can be tested without world objects. */
+    interface Host {
+        boolean immediate(int columnX, int columnZ);
+        ConcurrentGeneration.ArrivalStatus status(int columnX, int columnZ);
+        void hold(UUID player, int columnX, int columnZ);
+        void release(UUID player);
+        boolean present(UUID player);
+        void complete(UUID player, Target target);
+        void preparing(UUID player, boolean failed);
+        void watchdog(UUID player, Target target, long ticks, ConcurrentGeneration.ArrivalStatus status);
+    }
+
+    private static final class Arrival {
+        final Target target;
+        final long since;
+        long lastMessage = Long.MIN_VALUE;
+        boolean overdue, failed;
+
+        Arrival(Target target, long since) {
+            this.target = target;
+            this.since = since;
+        }
+    }
+
+    private final Host host;
+    @Nullable private final WorldServer world;
     private final Map<UUID, Arrival> arrivals = new HashMap<>();
     /** Set while a held teleport completes, so it is not held again. */
     private boolean completing;
     /** Set while vanilla corrects a client's move, which neither holds nor replaces a teleport. */
     private boolean correcting;
 
-    public DeferredArrivals(WorldServer world, Readiness readiness) {
+    DeferredArrivals(Host host) {
+        this(null, host);
+    }
+
+    private DeferredArrivals(@Nullable WorldServer world, Host host) {
         this.world = world;
-        this.readiness = readiness;
+        this.host = host;
+    }
+
+    /** Holds teleports against this world's provider; generation and retention remain host-owned. */
+    public static DeferredArrivals open(WorldServer world, CubeProviderServer provider) {
+        return new DeferredArrivals(world, new Host() {
+            @Override public boolean immediate(int x, int z) { return provider.arrivalImmediate(x, z); }
+            @Override public ConcurrentGeneration.ArrivalStatus status(int x, int z) { return provider.arrivalStatus(x, z); }
+            @Override public void hold(UUID player, int x, int z) { provider.retainArrivalColumn(player, x, z); }
+            @Override public void release(UUID player) { provider.releaseArrivalColumn(player); }
+            @Override public boolean present(UUID player) {
+                EntityPlayerMP entity = entity(player);
+                return entity != null && entity.world == world && entity.connection != null;
+            }
+            @Override public void complete(UUID player, Target target) {
+                EntityPlayerMP entity = entity(player);
+                if (entity != null) {
+                    provider.installPreparedArrivalColumn(target.columnX(), target.columnZ());
+                    entity.connection.setPlayerLocation(target.x(), target.y(), target.z(),
+                            target.yaw(), target.pitch(), Collections.emptySet());
+                }
+            }
+            @Override public void preparing(UUID player, boolean failed) {
+                EntityPlayerMP entity = entity(player);
+                if (entity != null) entity.sendStatusMessage(new TextComponentTranslation(failed
+                        ? "cubicchunks.arrival.preparation_failed" : "cubicchunks.arrival.preparing"), true);
+            }
+            @Override public void watchdog(UUID player, Target target, long ticks, ConcurrentGeneration.ArrivalStatus status) {
+                CubicChunks.LOGGER.warn("Cubature: teleport of {} to column ({}, {}) remains held after {} ticks; {}: {}",
+                        player, target.columnX(), target.columnZ(), ticks, status.state(), status.detail());
+            }
+            private EntityPlayerMP entity(UUID player) {
+                return world.getMinecraftServer().getPlayerList().getPlayerByUUID(player);
+            }
+        });
     }
 
     /** Holds a teleport whose destination column is not ready. Returns whether it was held. */
     public boolean defer(EntityPlayerMP player, double x, double y, double z, float yaw, float pitch,
             Set<SPacketPlayerPosLook.EnumFlags> relative) {
         return defer(player.getUniqueID(), player.posX, player.posY, player.posZ, player.rotationYaw, player.rotationPitch,
-                x, y, z, yaw, pitch, relative, world.getTotalWorldTime());
+                x, y, z, yaw, pitch, relative, player.world.getTotalWorldTime());
     }
 
     /**
@@ -94,86 +140,136 @@ public final class DeferredArrivals {
         }
     }
 
-    /** The hold for a player at (posX, posY, posZ), apart from the player and world objects. */
+    /** The hold for a player apart from the player and world objects. */
     boolean defer(UUID player, double posX, double posY, double posZ, float rotationYaw, float rotationPitch,
             double x, double y, double z, float yaw, float pitch, Set<SPacketPlayerPosLook.EnumFlags> relative, long now) {
         if (completing || correcting) return false;
-        Arrival arrival = new Arrival(
+        Target target = new Target(
                 x + (relative.contains(SPacketPlayerPosLook.EnumFlags.X) ? posX : 0),
                 y + (relative.contains(SPacketPlayerPosLook.EnumFlags.Y) ? posY : 0),
                 z + (relative.contains(SPacketPlayerPosLook.EnumFlags.Z) ? posZ : 0),
                 yaw + (relative.contains(SPacketPlayerPosLook.EnumFlags.Y_ROT) ? rotationYaw : 0),
-                pitch + (relative.contains(SPacketPlayerPosLook.EnumFlags.X_ROT) ? rotationPitch : 0),
-                now);
-        if (readiness.ready(arrival.columnX, arrival.columnZ)) {
-            if (!arrival.at(posX, posY, posZ)) {
-                Arrival held = arrivals.remove(player);
-                if (held != null) replaced(player, held, arrival);
+                pitch + (relative.contains(SPacketPlayerPosLook.EnumFlags.X_ROT) ? rotationPitch : 0));
+        if (host.immediate(target.columnX(), target.columnZ())) {
+            if (!target.at(posX, posY, posZ)) {
+                Arrival held = remove(player);
+                if (held != null) replaced(player, held.target, target);
             }
             return false;
         }
-        Arrival held = arrivals.put(player, arrival);
-        if (held != null) replaced(player, held, arrival);
+        Arrival next = new Arrival(target, now);
+        Arrival held = arrivals.put(player, next);
+        if (held != null) {
+            next.lastMessage = held.lastMessage;
+            replaced(player, held.target, target);
+        }
+        // The host replaces this owner's request atomically, retaining a shared same-column result.
+        host.hold(player, target.columnX(), target.columnZ());
         return true;
     }
 
-    /**
-     * A held teleport that will never complete is logged with the calls that replaced it, so a lost
-     * teleport can be traced to its caller.
-     */
-    private static void replaced(UUID player, Arrival held, Arrival by) {
+    private static void replaced(UUID player, Target held, Target by) {
         String callers = StackWalker.getInstance().walk(frames -> frames
                 .filter(f -> !f.getClassName().equals(DeferredArrivals.class.getName()))
                 .limit(4)
                 .map(f -> f.getClassName().substring(f.getClassName().lastIndexOf('.') + 1) + "." + f.getMethodName())
                 .collect(Collectors.joining(" < ")));
         CubicChunks.LOGGER.info("Cubature: a teleport of {} to ({}, {}, {}) replaced the one held to ({}, {}, {}), from {}",
-                player, by.x, by.y, by.z, held.x, held.y, held.z, callers);
+                player, by.x(), by.y(), by.z(), held.x(), held.y(), held.z(), callers);
     }
 
-    /** Whether a teleport of the player is held. */
     public boolean holds(UUID player) {
         return arrivals.containsKey(player);
     }
 
     /** Teleports at once, generating the destination column on this thread if it must (scripted moves). */
     public void teleportNow(EntityPlayerMP player, double x, double y, double z, float yaw, float pitch) {
-        arrivals.remove(player.getUniqueID());
-        completing = true;
+        teleportNow(player.getUniqueID(), new Target(x, y, z, yaw, pitch));
+    }
+
+    void teleportNow(UUID player, Target target) {
+        remove(player);
+        complete(player, target);
+    }
+
+    /** Drops a departed player's hold immediately, including its urgent request and retained result. */
+    public void departed(UUID player) {
+        Arrival held = remove(player);
+        if (held != null) dropped(player, held.target);
+    }
+
+    /** Releases every hold when its world stops. */
+    public void close() {
+        for (UUID player : arrivals.keySet()) host.release(player);
+        arrivals.clear();
+    }
+
+    private Arrival remove(UUID player) {
+        Arrival held = arrivals.remove(player);
+        if (held != null) host.release(player);
+        return held;
+    }
+
+    private static void dropped(UUID player, Target target) {
+        CubicChunks.LOGGER.info("Cubature: dropped the teleport of {} held to ({}, {}, {}); the player left this world",
+                player, target.x(), target.y(), target.z());
+    }
+
+    /** Completes ready destinations; elapsed time only triggers diagnostics and player messages. */
+    public void tick(long now) {
+        if (world != null) world.profiler.startSection("arrivals");
         try {
-            player.connection.setPlayerLocation(x, y, z, yaw, pitch);
+            tick(now, System.nanoTime());
         } finally {
-            completing = false;
+            if (world != null) world.profiler.endSection();
         }
     }
 
-    /** Completes each held teleport whose column is prepared or whose wait has run out. */
-    public void tick(long now) {
-        if (arrivals.isEmpty()) return;
-        world.profiler.startSection("arrivals");
+    void tick(long now, long nanoTime) {
         Iterator<Map.Entry<UUID, Arrival>> it = arrivals.entrySet().iterator();
         while (it.hasNext()) {
             Map.Entry<UUID, Arrival> entry = it.next();
-            Arrival a = entry.getValue();
-            EntityPlayerMP player = world.getMinecraftServer().getPlayerList().getPlayerByUUID(entry.getKey());
-            if (player == null || player.world != world || player.connection == null) {
+            UUID player = entry.getKey();
+            Arrival arrival = entry.getValue();
+            Target target = arrival.target;
+            if (!host.present(player)) {
                 it.remove();
-                CubicChunks.LOGGER.info("Cubature: dropped the teleport of {} held to ({}, {}, {}); the player left this world",
-                        entry.getKey(), a.x, a.y, a.z);
+                host.release(player);
+                dropped(player, target);
                 continue;
             }
-            boolean waited = now - a.since >= TIMEOUT_TICKS;
-            if (!waited && !readiness.ready(a.columnX, a.columnZ)) continue;
-            it.remove();
-            if (waited) CubicChunks.LOGGER.info("Cubature: completing the teleport of {} to ({}, {}, {}) after {} ticks, its wait run out",
-                    entry.getKey(), a.x, a.y, a.z, now - a.since);
-            completing = true;
-            try {
-                player.connection.setPlayerLocation(a.x, a.y, a.z, a.yaw, a.pitch, Collections.emptySet());
-            } finally {
-                completing = false;
+            ConcurrentGeneration.ArrivalStatus status = host.status(target.columnX(), target.columnZ());
+            if (status.state() == ConcurrentGeneration.ArrivalState.READY) {
+                it.remove();
+                // Retention extends through generateColumn and installation, including exceptions.
+                try {
+                    complete(player, target);
+                } finally {
+                    host.release(player);
+                }
+                continue;
+            }
+            long waited = now - arrival.since;
+            boolean failed = status.state() == ConcurrentGeneration.ArrivalState.FAILED;
+            boolean overdue = waited >= WATCHDOG_TICKS;
+            if ((failed && !arrival.failed) || (overdue && !arrival.overdue))
+                host.watchdog(player, target, waited, status);
+            arrival.failed = failed;
+            arrival.overdue |= overdue;
+            if (arrival.lastMessage == Long.MIN_VALUE || nanoTime - arrival.lastMessage >= MESSAGE_PERIOD) {
+                arrival.lastMessage = nanoTime;
+                host.preparing(player, failed);
             }
         }
-        world.profiler.endSection();
+    }
+
+    private void complete(UUID player, Target target) {
+        boolean outer = completing;
+        completing = true;
+        try {
+            host.complete(player, target);
+        } finally {
+            completing = outer;
+        }
     }
 }

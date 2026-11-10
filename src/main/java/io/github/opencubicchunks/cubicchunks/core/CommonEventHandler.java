@@ -35,6 +35,7 @@ import io.github.opencubicchunks.cubicchunks.core.asm.mixin.ICubicWorldSettings;
 import io.github.opencubicchunks.cubicchunks.core.network.PacketCubicWorldData;
 import io.github.opencubicchunks.cubicchunks.core.network.PacketDispatcher;
 import io.github.opencubicchunks.cubicchunks.core.server.SpawnCubes;
+import io.github.opencubicchunks.cubicchunks.core.server.PlayerCubeMap;
 import io.github.opencubicchunks.cubicchunks.core.server.VanillaNetworkHandler;
 import io.github.opencubicchunks.cubicchunks.core.server.chunkio.ICubeIO;
 import io.github.opencubicchunks.cubicchunks.core.util.ReflectionUtil;
@@ -210,14 +211,22 @@ public class CommonEventHandler {
             ICubicWorld world = (ICubicWorld) event.getWorld();
             if (!world.isCubicWorld()) return;
 
-            if (world.getCubeCache() instanceof io.github.opencubicchunks.cubicchunks.core.server.CubeProviderServer) {
-                ((io.github.opencubicchunks.cubicchunks.core.server.CubeProviderServer) world.getCubeCache()).closeConcurrentGeneration();
-            }
-            ICubeIO io = ((ICubeProviderInternal.Server) world.getCubeCache()).getCubeIO();
             try {
-                io.close();
-            } catch (IOException e) {
-                CubicChunks.LOGGER.catching(e);
+                if (event.getWorld() instanceof WorldServer server && server.getPlayerChunkMap() instanceof PlayerCubeMap map)
+                    map.arrivals().close();
+            } finally {
+                try {
+                    if (world.getCubeCache() instanceof io.github.opencubicchunks.cubicchunks.core.server.CubeProviderServer) {
+                        ((io.github.opencubicchunks.cubicchunks.core.server.CubeProviderServer) world.getCubeCache()).closeConcurrentGeneration();
+                    }
+                } finally {
+                    ICubeIO io = ((ICubeProviderInternal.Server) world.getCubeCache()).getCubeIO();
+                    try {
+                        io.close();
+                    } catch (IOException e) {
+                        CubicChunks.LOGGER.catching(e);
+                    }
+                }
             }
         } finally {
             GeneratorBuildPool.close(event.getWorld());

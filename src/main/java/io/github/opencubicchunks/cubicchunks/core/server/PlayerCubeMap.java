@@ -221,7 +221,7 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
         this.setPlayerViewDistance(worldServer.getMinecraftServer().getPlayerList().getViewDistance(),
                 ((ICubicPlayerList) worldServer.getMinecraftServer().getPlayerList()).getVerticalViewDistance());
         this.chunkGc = new ChunkGc(((ICubicWorldInternal.Server) worldServer).getCubeCache());
-        this.arrivals = new DeferredArrivals(worldServer, cubeCache::arrivalReady);
+        this.arrivals = DeferredArrivals.open(worldServer, cubeCache);
         this.vanillaNetworkHandler = ((ICubicWorldInternal.Server) worldServer).getVanillaNetworkHandler();
     }
 
@@ -725,6 +725,7 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
     // CHECKED: 1.10.2-12.18.1.2092
     @Override
     public void removePlayer(EntityPlayerMP player) {
+        arrivals.departed(player.getUniqueID());
         PlayerWrapper playerWrapper = this.players.get(player.getEntityId());
         if (playerWrapper == null) {
             return;

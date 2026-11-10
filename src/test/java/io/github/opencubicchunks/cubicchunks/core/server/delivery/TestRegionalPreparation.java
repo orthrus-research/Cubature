@@ -10,11 +10,13 @@ import net.minecraft.world.biome.Biome;
 import net.minecraft.world.chunk.Chunk;
 import org.junit.Test;
 import java.util.ArrayList;
+import java.util.ArrayDeque;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.Executor;
 import static org.junit.Assert.*;
 
 public class TestRegionalPreparation {
@@ -105,6 +107,135 @@ public class TestRegionalPreparation {
         assertEquals(key(0, 0), (long) generator.prepared.get(0));
     }
 
+    @Test public void anUrgentDestinationStartsBeyondReachWhileNativeDeliveryAndTheGovernorAreBehind() {
+        RecordingGenerator generator = new RecordingGenerator();
+        RegionalPreparation preparation = new RegionalPreparation(generator, Runnable::run, 4);
+        preparation.plan(SECOND, players(0, 0), REACH, NEAR, ANYWHERE, .99, 10);
+        assertEquals(0, preparation.permits());
+        preparation.urgent("arrival", 6250, -6250);
+        preparation.pump(SECOND, true);
+        assertEquals(List.of(key(48, -49)), generator.prepared);
+    }
+
+    @Test public void sharedUrgencySurvivesOneOwnersDeparture() {
+        RecordingGenerator generator = new RecordingGenerator();
+        RegionalPreparation preparation = new RegionalPreparation(generator, Runnable::run, 4);
+        preparation.urgent("first", 6250, -6250);
+        preparation.urgent("second", 6250, -6250);
+        preparation.withdraw("first");
+        preparation.pump(SECOND, true);
+        preparation.pump(2 * SECOND, true);
+        assertEquals(List.of(key(48, -49)), generator.prepared);
+        preparation.withdraw("second");
+    }
+
+    @Test public void withdrawingEveryOwnerBeforeAdmissionStartsNothing() {
+        RecordingGenerator generator = new RecordingGenerator();
+        RegionalPreparation preparation = new RegionalPreparation(generator, Runnable::run, 4);
+        preparation.urgent("first", 6250, -6250);
+        preparation.urgent("second", 6250, -6250);
+        preparation.withdraw("first");
+        preparation.withdraw("second");
+        preparation.pump(SECOND, true);
+        assertTrue(generator.prepared.isEmpty());
+    }
+
+    @Test public void replacingAnUrgentDestinationDoesNotPrepareTheAbandonedRegion() {
+        RecordingGenerator generator = new RecordingGenerator();
+        RegionalPreparation preparation = new RegionalPreparation(generator, Runnable::run, 4);
+        preparation.urgent("arrival", 6250, 6250);
+        preparation.urgent("arrival", -6250, -6250);
+        preparation.pump(SECOND, true);
+        assertEquals(List.of(key(-49, -49)), generator.prepared);
+    }
+
+    @Test public void urgentPreparationUsesTheSameBoundAndDoesNotPreemptRunningWork() {
+        RecordingGenerator generator = new RecordingGenerator();
+        ManualExecutor executor = new ManualExecutor();
+        RegionalPreparation preparation = new RegionalPreparation(generator, executor, 1);
+        preparation.plan(SECOND, players(1024, 1024), REACH, NEAR, ANYWHERE, .40, .5);
+        preparation.pump(SECOND, false);
+        assertEquals(1, preparation.running());
+        assertEquals(1, executor.pending.size());
+        preparation.urgent("arrival", 6250, -6250);
+        preparation.pump(2 * SECOND, true);
+        assertEquals(1, executor.pending.size());
+        executor.pending.remove().run();
+        preparation.pump(3 * SECOND, true);
+        assertEquals(1, preparation.running());
+        assertEquals(1, executor.pending.size());
+        executor.pending.remove().run();
+        preparation.pump(4 * SECOND, true);
+        assertEquals(List.of(key(0, 0), key(48, -49)), generator.prepared);
+        assertEquals(0, preparation.running());
+    }
+
+    @Test public void aDeclinedUrgentRegionIsNotRetriedOnEveryHeldTick() {
+        RecordingGenerator generator = new RecordingGenerator();
+        generator.decline = true;
+        RegionalPreparation preparation = new RegionalPreparation(generator, Runnable::run, 4);
+        preparation.urgent("arrival", 6250, -6250);
+        for (int tick = 0; tick < 2000; tick++) preparation.pump(SECOND + tick, true);
+        assertEquals(1, generator.prepared.size());
+        assertTrue(preparation.urgentStatus(6250, -6250).contains("declined"));
+        preparation.withdraw("arrival");
+        preparation.urgent("arrival", 6250, -6250);
+        preparation.pump(2 * SECOND, true);
+        assertEquals(2, generator.prepared.size());
+    }
+
+    @Test public void ordinaryPlanningCannotRetryADeclinedUrgentRegion() {
+        RecordingGenerator generator = new RecordingGenerator();
+        generator.decline = true;
+        RegionalPreparation preparation = new RegionalPreparation(generator, Runnable::run, 4);
+        preparation.plan(SECOND, players(1024, 1024), REACH, NEAR, ANYWHERE, .40, .5);
+        preparation.urgent("arrival", 64, 64);
+        for (int tick = 0; tick < 2000; tick++) preparation.pump(SECOND + tick, false);
+        assertEquals(1, generator.prepared.stream().filter(k -> k == key(0, 0)).count());
+    }
+
+    @Test public void aFailedUrgentRegionIsReportedAsFailedWithoutAutomaticRetries() {
+        RecordingGenerator generator = new RecordingGenerator();
+        generator.fail = true;
+        RegionalPreparation preparation = new RegionalPreparation(generator, Runnable::run, 4);
+        preparation.urgent("arrival", 6250, -6250);
+        for (int tick = 0; tick < 2000; tick++) preparation.pump(SECOND + tick, true);
+        assertEquals(1, generator.prepared.size());
+        assertTrue(preparation.urgentStatus(6250, -6250).contains("failed"));
+        assertFalse(preparation.urgentStatus(6250, -6250).contains("region prepared"));
+    }
+
+    @Test public void unsupportedOrStoppedRegionalPreparationIgnoresUrgency() {
+        RecordingGenerator generator = new RecordingGenerator();
+        generator.blocks = 0;
+        RegionalPreparation unsupported = new RegionalPreparation(generator, Runnable::run, 4);
+        unsupported.urgent("arrival", 6250, -6250);
+        unsupported.pump(SECOND, true);
+        generator.blocks = REGION;
+        RegionalPreparation noPool = new RegionalPreparation(generator, null, 4);
+        noPool.urgent("arrival", 6250, -6250);
+        noPool.pump(SECOND, true);
+        RegionalPreparation stopped = new RegionalPreparation(generator, Runnable::run, 4);
+        stopped.urgent("arrival", 6250, -6250);
+        stopped.close();
+        stopped.pump(SECOND, true);
+        assertTrue(generator.prepared.isEmpty());
+    }
+
+    @Test public void negativeColumnCoordinatesUseFloorDivisionAtRegionBoundaries() {
+        RecordingGenerator generator = new RecordingGenerator();
+        RegionalPreparation preparation = new RegionalPreparation(generator, Runnable::run, 4);
+        preparation.urgent("first", -1, -128);
+        preparation.urgent("second", -129, 0);
+        preparation.pump(SECOND, true);
+        assertEquals(List.of(key(-1, -1), key(-2, 0)), generator.prepared);
+    }
+
+    private static final class ManualExecutor implements Executor {
+        final ArrayDeque<Runnable> pending = new ArrayDeque<>();
+        @Override public void execute(Runnable command) { pending.add(command); }
+    }
+
     private static List<RegionalPreparation.Position> players(double x, double z) {
         return List.of(new RegionalPreparation.Position("player", x, z));
     }
@@ -123,11 +254,12 @@ public class TestRegionalPreparation {
     private static final class RecordingGenerator implements ICubeGenerator {
         final List<Long> prepared = new ArrayList<>();
         int blocks = REGION;
-        boolean decline;
+        boolean decline, fail;
 
         @Override public int preparationRegionBlocks() { return blocks; }
         @Override public boolean prepareRegion(int regionX, int regionZ) {
             prepared.add(key(regionX, regionZ));
+            if (fail) throw new IllegalStateException("test regional preparation failed");
             return !decline;
         }
 

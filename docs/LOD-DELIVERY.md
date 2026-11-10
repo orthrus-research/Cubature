@@ -274,7 +274,7 @@ Figures are p95, in blocks:
   and `cubesToSendToClients`. Their sizes are the native debt.
 - **The gate** (done, `MixinDistantHorizonsNativeFirst`). Previews start only
   while the debt is below one face of the view, `(2 x view distance + 1)^2`
-  cubes (625 at distance 12); regional preparation shares the rule
+  cubes (625 at distance 12); ordinary regional preparation shares the rule
   (`CubeDemand.nativeBehind`). At join and teleport, previews therefore wait
   for the native view, while steady flight stays under the gate. Land route,
   two runs each, after Riven's flood-cell and climate-lattice memos: the first
@@ -291,7 +291,25 @@ Figures are p95, in blocks:
   Y 320 at the 8 km world's join point it spans Y 128-528 over ground at
   Y 77-121, so it shows only air, and holding the tiles left a pit for about
   16 s (the coarse sections over it were answered 15 s after the join).
-  Regional preparation still waits for every view.
+  Ordinary regional preparation still waits for every view.
+- **Held destinations.** A held teleport registers its destination region before ordinary
+  preparation, beyond the reach limit if needed, even while the native view is behind or the
+  preparation governor has no permit. It uses the existing build-pool bound. A declined urgent
+  region is attempted once for that hold; demand can still prepare its column. The teleport
+  remains held until its column is ready, is replaced, the player leaves, or an operator forces
+  it. Preparation messages appear at most once a second, and waits beyond 600 ticks identify
+  the column and pending work without completing synchronously. Vanilla move corrections
+  preserve the held destination. Worlds without generation workers still arrive immediately.
+- **Retained arrival data.** A generator may implement `IRetainedColumnPreparation` to retain
+  immutable column data independently of its evictable memo. Generation workers create a shared
+  lease for each requested key, and held players own it through server-thread installation.
+  Active preparation keys, including abandoned jobs still running, cannot exceed
+  `concurrentGenerationQueue`; additional held destinations wait for capacity. Success is never
+  consumed by a readiness check or evicted while owned; failure remains held and diagnosable.
+  A player repeating their failed destination explicitly retries its shared column; joining
+  a failed destination or ticking never retries it. Cancellation and world shutdown
+  release completed leases and close late worker results. Generators without this optional
+  capability retain their existing worker-readiness and failure path.
 - **Covered sections.** Waiting preview tasks for sections fully covered by
   sent native columns are cancelled, through `removeRetrievalRequestIf` on
   DH's world generation queue. Cubature's native snapshots supply DH there.

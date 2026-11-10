@@ -49,19 +49,23 @@ Cleanroom only, as Java 25 bytecode tested on Java 26. `ICubeGenerator` also gai
 ahead of the players on the build pool (`RegionalPreparation`), within
 `regionalPreparationReachBlocks`, nearest by time to reach first. Regions within the native view
 run up to the pool's size; those beyond run under `PreparationGovernor`, which reads CPU
-contention rather than tick time alone. Nothing starts while more than one face of the native
-view waits to generate or be sent, and the generator declines when its caches lack room.
+contention rather than tick time alone. Ordinary preparation waits while more than one face of the
+native view waits to generate or be sent, and the generator declines when its caches lack room.
 The same day `processPlayer`'s own `setPlayerLocation` calls began running through
 `DeferredArrivals.correct`, so they never replace a held teleport. A held player keeps moving, and
 vanilla puts a move it rejects for colliding back where the player stood before it, after
 `processPlayer` has already moved the player to where the client claimed; read as a teleport
 elsewhere, that dropped the hold, and the player never arrived.
-An optional `IRetainedColumnPreparation` API and a separate arrival-preparation queue allow
-generation workers to retain immutable column data through installation, independent of memo
-eviction. Requests share keyed leases by UUID owner within the existing executor and queue capacity.
-Owned results cannot be evicted; failures remain explicit until cancellation or an owner's requested
-retry, and abandoned or stopped preparations release late results. This API addition leaves ordinary
-generation polling and its synchronous failure fallback unchanged.
+Held teleports now register their destination region ahead of ordinary preparation, without a reach
+or governor limit, within the same bounded build pool. The hold ends when the destination is ready,
+replaced, forced or abandoned; elapsed time produces a watchdog report instead of synchronous
+generation. A translatable action-bar message reports preparation at most once a second. The optional
+`IRetainedColumnPreparation` capability lets generation workers retain immutable column data through
+server-thread installation: held arrivals own shared, capacity-bounded leases whose successes cannot
+be evicted and whose failures remain diagnosable until cancellation or explicit retry. Other concurrent
+generators keep their existing readiness path; worlds without generation workers still arrive at once.
+Departures and world shutdown release held requests and leases, including late worker results. The
+lab distinguishes a genuinely lost teleport from a destination that is still held for preparation.
 The Cubature name and license packaging were adopted on October 19, 2026;
 that change added no terrain or scheduling algorithm.
 

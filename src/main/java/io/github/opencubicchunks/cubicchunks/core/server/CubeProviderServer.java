@@ -73,6 +73,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
@@ -805,15 +806,46 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
 
     boolean concurrentGenerationActive() { return concurrentGeneration != null; }
 
-    /**
-     * Whether a player may arrive in a column now: it is loaded or saved, or generation workers have
-     * prepared it, or there are no workers. Otherwise the column goes to the workers (once) and this
-     * is false, so a teleport can wait for it instead of the server thread generating it on the spot.
-     */
-    public boolean arrivalReady(int columnX, int columnZ) {
+    /** Loaded and saved columns, and worlds without workers, do not need a held arrival. */
+    public boolean arrivalImmediate(int columnX, int columnZ) {
         if (concurrentGeneration == null || getLoadedColumn(columnX, columnZ) != null
                 || cubeIO.columnExists(columnX, columnZ)) return true;
-        return concurrentGeneration.pollColumn(columnX, columnZ, true) == ICubeGenerator.GeneratorReadyState.READY;
+        return !concurrentGeneration.retainsArrivalColumns()
+                && concurrentGeneration.pollColumn(columnX, columnZ, true) == ICubeGenerator.GeneratorReadyState.READY;
+    }
+
+    /** The worker result stays retained until the held arrival has installed its column. */
+    public ConcurrentGeneration.ArrivalStatus arrivalStatus(int columnX, int columnZ) {
+        if (concurrentGeneration == null || getLoadedColumn(columnX, columnZ) != null
+                || cubeIO.columnExists(columnX, columnZ))
+            return new ConcurrentGeneration.ArrivalStatus(ConcurrentGeneration.ArrivalState.READY,
+                    "column loaded or saved, or generation workers disabled");
+        ConcurrentGeneration.ArrivalStatus status = concurrentGeneration.arrivalStatus(columnX, columnZ);
+        return new ConcurrentGeneration.ArrivalStatus(status.state(),
+                status.detail() + "; " + regionalPreparation.urgentStatus(columnX, columnZ));
+    }
+
+    /**
+     * Installs a retained success without joining an older ordinary column job. Its arrival lease
+     * stays owned through this call and the following teleport. Normal column requests are unchanged.
+     */
+    public void installPreparedArrivalColumn(int columnX, int columnZ) {
+        if (concurrentGeneration == null || !concurrentGeneration.retainsArrivalColumns()
+                || getLoadedColumn(columnX, columnZ) != null) return;
+        if (concurrentGeneration.arrivalStatus(columnX, columnZ).state() != ConcurrentGeneration.ArrivalState.READY) return;
+        Chunk column = getColumn(columnX, columnZ, Requirement.GENERATE, Timing.NOW);
+        if (column == null || column == emptyColumn)
+            throw new IllegalStateException("Retained arrival column was not installed at " + columnX + ", " + columnZ);
+    }
+
+    public void retainArrivalColumn(UUID owner, int columnX, int columnZ) {
+        regionalPreparation.urgent(owner, columnX, columnZ);
+        if (concurrentGeneration != null) concurrentGeneration.retainArrivalColumn(owner, columnX, columnZ);
+    }
+
+    public void releaseArrivalColumn(UUID owner) {
+        if (concurrentGeneration != null) concurrentGeneration.releaseArrivalColumn(owner);
+        regionalPreparation.withdraw(owner);
     }
 
     boolean concurrentGenerationSaturated() { return concurrentGeneration != null && concurrentGeneration.saturated(); }

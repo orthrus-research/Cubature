@@ -67,7 +67,8 @@ final class LabPreparationView {
         if(!rendererFailures.isEmpty())throw new IllegalStateException("Full-view renderer qualification failed: "+rendererFailures);
         // Cubature holds a teleport into an unprepared column until its workers prepare it: wait for
         // each participant's first arrival (within the full-view timeout), then require it to stay.
-        boolean waiting=false;
+        boolean waiting=false, unheld=false;
+        io.github.opencubicchunks.cubicchunks.core.server.delivery.DeferredArrivals arrivals=((PlayerCubeMap)job.world.getPlayerChunkMap()).arrivals();
         for(UUID id:clients.keySet()) {
             EntityPlayerMP p=job.server.getPlayerList().getPlayerByUUID(id);
             if(p==null)throw new IllegalStateException("Full-view participant disconnected");
@@ -75,14 +76,17 @@ final class LabPreparationView {
                     &&Math.abs(net.minecraft.util.math.MathHelper.wrapDegrees(p.rotationYaw-geometry.yaw))<=2&&Math.abs(p.rotationPitch-geometry.pitch)<=2;
             if(there)arrived.add(id);
             else if(arrived.contains(id))throw new IllegalStateException("Full-view participant moved");
-            else waiting=true;
+            else {
+                waiting=true;
+                if(!arrivals.holds(id))unheld=true;
+            }
         }
         if(waiting){
-            // Cubature completes a held teleport within TIMEOUT_TICKS: a participant still away 200 ticks
-            // later lost its teleport, so fail now, naming that, instead of at the full-view timeout.
-            long waited=job.elapsedTicks-teleportTick, limit=io.github.opencubicchunks.cubicchunks.core.server.delivery.DeferredArrivals.TIMEOUT_TICKS+200;
-            if(waited>limit)throw new IllegalStateException("Full-view participant did not arrive within "+limit+" ticks of its teleport; Cubature completes a held teleport within "+(limit-200)+" ticks, so the teleport was lost ("+away(job)+")");
-            if(System.nanoTime()-start>job.fullViewTimeoutSeconds*1000000000L)throw new IllegalStateException("Full-view participant did not arrive within " + job.fullViewTimeoutSeconds + " seconds");
+            // An unprepared destination may remain held. A participant away without a hold has lost
+            // its teleport; preserve that early diagnosis separately from the complete-view deadline.
+            long waited=job.elapsedTicks-teleportTick;
+            if(unheld&&waited>200)throw new IllegalStateException("Full-view participant did not arrive and has no held teleport after "+waited+" ticks; the teleport was lost ("+away(job)+")");
+            if(System.nanoTime()-start>job.fullViewTimeoutSeconds*1000000000L)throw new IllegalStateException("Full-view participant did not arrive within " + job.fullViewTimeoutSeconds + " seconds ("+away(job)+")");
             return false;
         }
         if(arrivedNanos==0)arrivedNanos=System.nanoTime()-start;
