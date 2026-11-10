@@ -50,6 +50,11 @@ provider exists. The save-level path is a sibling named `<save>.cubature-cache`;
 provider initialization and resolving it opens or creates no cache files. Clients and worlds without
 a usable save location receive no directory. Consumers namespace files below the shared root by
 kind and generation inputs and release their opened resources with the world's lifecycle.
+An optional `ICubeClassification` contract exposes cached cube classes and inclusive surface bands
+in cube-Y units. Queries read only immutable data already held by a generator and return UNKNOWN
+or no band when required data is missing. EMPTY certifies that generation into a fresh primer
+produces only Minecraft air and no 3D biomes, including decorations rooted in neighbouring columns.
+Saved data, population and normal cube lifecycle work remain authoritative.
 The same day the Forge 14.23.5.2860 / Java 8 fallback build was retired: Cubature builds for
 Cleanroom only, as Java 25 bytecode tested on Java 26. `ICubeGenerator` also gained
 `preparationRegionBlocks` and `prepareRegion`: each world prepares its generator's regional plans
