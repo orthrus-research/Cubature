@@ -12,7 +12,10 @@ installation costs and no-storage counts without changing delivery admission.
 The lab's complete-tick wrapper encloses the core phase clock, so the final phase vector is
 published before the job's independent duration is recorded and its report is frozen.
 
-On November 10, 2026, initial sky light and surface tracking return early for a cube without
+On November 10, 2026, the server-tick phases also separate random-tick cube selection and ticking,
+the player cube map's own bookkeeping, queued packet handlers with the network tick, and Forge's
+server and world tick events, so uninstrumented work is a small remainder.
+Also on November 10, 2026, initial sky light and surface tracking return early for a cube without
 storage that lies above every staged column top in a sky-lit world: its 4,096 sky checks
 changed nothing, and the column's dirtying, staging removal and surface notifications still run.
 A missing cube that a generator classifies EMPTY is installed as an all-air cube on the server

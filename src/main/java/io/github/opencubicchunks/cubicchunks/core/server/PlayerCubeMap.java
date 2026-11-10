@@ -299,6 +299,15 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
     // CHECKED: 1.10.2-12.18.1.2092
     @Override
     public void tick() {
+        TickDiagnostics.enter(TickDiagnostics.Phase.PLAYER_MAP);
+        try {
+            tickMap();
+        } finally {
+            TickDiagnostics.exit();
+        }
+    }
+
+    private void tickMap() {
         getWorldServer().profiler.startSection("playerCubeMapTick");
         boolean spectatorsGenerateChunks = getWorldServer().getGameRules().getBoolean("spectatorsGenerateChunks");
         Predicate<EntityPlayerMP> canGenerateChunkPredicate = player -> player != null && (spectatorsGenerateChunks ||!player.isSpectator());

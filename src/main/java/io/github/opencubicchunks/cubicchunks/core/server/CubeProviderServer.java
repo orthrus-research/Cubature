@@ -299,12 +299,17 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
         } finally {
             TickDiagnostics.exit();
         }
-        long i = System.currentTimeMillis();
-        Random rand = this.world.rand;
-        Iterator<Cube> watchersIterator = demand().getCubeIterator();
-        BooleanSupplier tickFaster = () -> System.currentTimeMillis() - i > 40;
-        while (watchersIterator.hasNext()) {
-            watchersIterator.next().tickCubeServer(tickFaster, rand);
+        TickDiagnostics.enter(TickDiagnostics.Phase.RANDOM_TICK);
+        try {
+            long i = System.currentTimeMillis();
+            Random rand = this.world.rand;
+            Iterator<Cube> watchersIterator = demand().getCubeIterator();
+            BooleanSupplier tickFaster = () -> System.currentTimeMillis() - i > 40;
+            while (watchersIterator.hasNext()) {
+                watchersIterator.next().tickCubeServer(tickFaster, rand);
+            }
+        } finally {
+            TickDiagnostics.exit();
         }
         profiler.endSection();
         return false;
