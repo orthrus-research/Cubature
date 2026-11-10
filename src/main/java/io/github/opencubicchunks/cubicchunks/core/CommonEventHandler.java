@@ -29,6 +29,7 @@ import io.github.opencubicchunks.cubicchunks.api.util.IntRange;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorldType;
 import io.github.opencubicchunks.cubicchunks.api.worldgen.WorldBuildPool;
+import io.github.opencubicchunks.cubicchunks.api.worldgen.WorldDerivedDataDirectory;
 import io.github.opencubicchunks.cubicchunks.core.server.delivery.GeneratorBuildPool;
 import io.github.opencubicchunks.cubicchunks.core.asm.mixin.ICubicWorldInternal;
 import io.github.opencubicchunks.cubicchunks.core.asm.mixin.ICubicWorldSettings;
@@ -50,6 +51,7 @@ import net.minecraft.world.WorldServerMulti;
 import net.minecraft.world.WorldType;
 import net.minecraft.world.chunk.IChunkProvider;
 import net.minecraft.world.gen.ChunkProviderServer;
+import net.minecraft.world.storage.ISaveHandler;
 import net.minecraftforge.common.DimensionManager;
 import net.minecraftforge.event.AttachCapabilitiesEvent;
 import net.minecraftforge.event.entity.EntityJoinWorldEvent;
@@ -59,7 +61,9 @@ import net.minecraftforge.fml.common.gameevent.PlayerEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 import net.minecraftforge.fml.relauncher.Side;
 
+import java.io.File;
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.List;
 
 import javax.annotation.ParametersAreNonnullByDefault;
@@ -67,6 +71,20 @@ import javax.annotation.ParametersAreNonnullByDefault;
 @ParametersAreNonnullByDefault
 @MethodsReturnNonnullByDefault
 public class CommonEventHandler {
+    @SubscribeEvent
+    public void onDerivedDataDirectoryRequest(WorldDerivedDataDirectory.Request event) {
+        World world = event.getWorld();
+        try {
+            ISaveHandler saveHandler = world.getSaveHandler();
+            if (saveHandler == null) return;
+            File saveDirectory = saveHandler.getWorldDirectory();
+            if (saveDirectory != null)
+                event.offer(DerivedDataDirectory.resolve(saveDirectory.toPath()));
+        } catch (InvalidPathException | SecurityException unavailable) {
+            event.offer(null);
+        }
+    }
+
     @SubscribeEvent
     public void onBuildPoolRequest(WorldBuildPool.Request event) {
         event.offer(GeneratorBuildPool.request(event.getWorld()));

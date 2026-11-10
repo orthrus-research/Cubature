@@ -43,6 +43,11 @@ The world type can request that same pool before constructing its biome provider
 unadopted pool through `WorldBuildPool.abandon`. Cubature closes requested pools on failed or skipped
 world initialization, world unload and server stop, and rejects requests from closed worlds or a
 retired server. Adoption and withdrawal happen once, including when a generator callback fails.
+World types can also request a host-owned directory for discardable derived data before their biome
+provider exists. The save-level path is a sibling named `<save>.cubature-cache`; it does not depend on
+provider initialization and resolving it opens or creates no cache files. Clients and worlds without
+a usable save location receive no directory. Consumers namespace files below the shared root by
+kind and generation inputs and release their opened resources with the world's lifecycle.
 The same day the Forge 14.23.5.2860 / Java 8 fallback build was retired: Cubature builds for
 Cleanroom only, as Java 25 bytecode tested on Java 26. `ICubeGenerator` also gained
 `preparationRegionBlocks` and `prepareRegion`: each world prepares its generator's regional plans
