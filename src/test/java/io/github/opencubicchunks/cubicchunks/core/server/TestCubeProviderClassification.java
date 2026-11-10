@@ -41,6 +41,7 @@ import net.minecraft.world.WorldServer;
 import net.minecraft.world.biome.Biome;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.ChunkPrimer;
+import net.minecraft.world.chunk.storage.ExtendedBlockStorage;
 import net.minecraft.world.gen.ChunkProviderServer;
 import net.minecraft.world.storage.WorldInfo;
 import net.minecraftforge.common.MinecraftForge;
@@ -90,7 +91,7 @@ public class TestCubeProviderClassification {
         ClassifiedGenerator g = new ClassifiedGenerator();
         try (Fixture f = new Fixture(g, false)) {
             CubePrimer primer = new CubePrimer(); primer.setBlockState(1, 1, 1, Blocks.STONE.getDefaultState());
-            Cube saved = new Cube(f.column, 4, primer); saved.markSaved(); f.io.saved = saved; f.expectedDirty = false;
+            Cube saved = new Cube(f.column, 4, primer); saved.markSaved(); f.io.saved = saved; f.expectedDirty = false; f.expectedSaving = false;
             assertSame(saved, f.provider.getCube(0, 4, 0, Requirement.GENERATE));
             assertSame(saved, f.provider.getCube(0, 4, 0, Requirement.GET_CACHED));
             assertEquals(Blocks.STONE.getDefaultState(), saved.getBlockState(new BlockPos(1, 65, 1)));
@@ -109,6 +110,49 @@ public class TestCubeProviderClassification {
             assertEquals(0, f.generator.generated.get()); assertEquals(0, f.generator.polled);
             assertEquals(1, f.entries); assertEquals(1, f.loads); assertEquals(1, f.column.cubes.size());
             if (f.maintenance != null) assertEquals(1, f.maintenance.cubes().size());
+        }
+    }
+
+    @Test public void regenerableEmptyCubesStayUnsavedUntilSomethingChangesThem() throws Exception {
+        for (int change = 0; change < 4; change++) {
+            ClassifiedGenerator g = new ClassifiedGenerator(); g.regenerable = true;
+            try (Fixture f = new Fixture(g, false)) {
+                f.expectedSaving = false;
+                Cube cube = f.request(0, Requirement.POPULATE);
+                assertSame(cube, f.request(0, Requirement.LIGHT)); f.world.manager.processUpdates();
+                assertTrue(cube.isFullyPopulated()); assertTrue(cube.isInitialLightingDone()); assertEquals(1, g.populated);
+                assertEquals(true, get(cube, Cube.class, "isModified"));
+                assertFalse(cube.needsSaving());
+                switch (change) {
+                    case 0 -> cube.setBiome(0, 0, 0, Biomes.PLAINS);
+                    case 1 -> ((LightingManager.CubeLightData) cube.getCubeLightData()).neighborLightChecksSky = 1;
+                    case 2 -> cube.setStorage(new ExtendedBlockStorage(64, true));
+                    default -> {
+                        // Once a copy is stored it must stay current: the cube saves like any other.
+                        cube.markSaved(); assertFalse(cube.needsSaving());
+                        cube.markDirty();
+                    }
+                }
+                assertTrue("change " + change, cube.needsSaving());
+            }
+        }
+    }
+
+    @Test public void generatedCubesAskWhetherTheyAreRegenerableWhenSavingIsConsidered() throws Exception {
+        ClassifiedGenerator g = new ClassifiedGenerator();
+        g.classification = ICubeClassification.CubeClass.UNKNOWN; g.forbid = false; g.biomes = false;
+        try (Fixture f = new Fixture(g, false)) {
+            Cube cube = f.request(0, Requirement.GENERATE);
+            assertEquals(1, g.generated.get()); assertNull(cube.getStorage()); assertNull(cube.getBiomeArray());
+            // Unknown at generation; once its neighbours are held the generator can answer.
+            assertTrue(cube.needsSaving());
+            g.regenerable = true;
+            assertFalse(cube.needsSaving());
+            // A true answer stands: classification only ever certifies more.
+            g.regenerable = false;
+            assertFalse(cube.needsSaving());
+            cube.setBiome(0, 0, 0, Biomes.PLAINS);
+            assertTrue(cube.needsSaving());
         }
     }
 
@@ -186,7 +230,7 @@ public class TestCubeProviderClassification {
         final CubeProviderServer provider = allocate(CubeProviderServer.class);
         final Generator generator; final Backend io = new Backend(); final CubePrimer primer = new CubePrimer();
         final Column column; final MaintenanceState maintenance; final IEventListener observer; final int bus;
-        ConcurrentGeneration concurrent; boolean expectedDirty = true; int entries, loads;
+        ConcurrentGeneration concurrent; boolean expectedDirty = true, expectedSaving = true; int entries, loads;
         Fixture(Generator generator, boolean incremental) throws Exception {
             this.generator = generator; world.fixture = this;
             set(world, World.class, "provider", new WorldProviderSurface()); set(world, World.class, "profiler", new Profiler());
@@ -218,7 +262,7 @@ public class TestCubeProviderClassification {
         }
         void enteringLoad() {
             Cube cube = provider.getLoadedCube(0, 4, 0); assertNotNull(cube); assertSame(cube, column.cubes.iterator().next());
-            assertFalse(cube.isCubeLoaded()); assertEquals(expectedDirty, cube.needsSaving());
+            assertFalse(cube.isCubeLoaded()); assertEquals(expectedSaving, cube.needsSaving());
             try { assertEquals(expectedDirty, get(cube, Cube.class, "isModified")); } catch (Exception e) { throw new AssertionError(e); }
             entries++;
         }
@@ -248,7 +292,7 @@ public class TestCubeProviderClassification {
 
     private static class Generator implements ICubeGenerator {
         final AtomicInteger generated = new AtomicInteger(); int polled, populated; boolean forced;
-        volatile boolean forbid; CountDownLatch started, release;
+        volatile boolean forbid; boolean biomes = true; CountDownLatch started, release;
         GeneratorReadyState ready = GeneratorReadyState.READY, populationReady = GeneratorReadyState.READY;
         @Override public boolean supportsConcurrentCubeGeneration() { return true; }
         @Override public GeneratorReadyState pollAsyncCubeGenerator(int x, int y, int z) { if (forbid) throw new AssertionError("generation readiness"); polled++; return ready; }
@@ -256,7 +300,8 @@ public class TestCubeProviderClassification {
         @Override public Optional<CubePrimer> tryGenerateCube(int x, int y, int z, CubePrimer primer, boolean force) {
             if (forbid) throw new AssertionError("generation"); generated.incrementAndGet(); forced = force;
             if (started != null) { started.countDown(); await(release); }
-            primer.setBiome(0, 0, 0, Biomes.PLAINS); return Optional.of(primer);
+            if (biomes) primer.setBiome(0, 0, 0, Biomes.PLAINS);
+            return Optional.of(primer);
         }
         @Override public CubePrimer generateCube(int x, int y, int z) { throw new AssertionError("legacy generation"); }
         @Override public void generateColumn(Chunk column) { throw new AssertionError("column generation"); }
@@ -268,9 +313,10 @@ public class TestCubeProviderClassification {
         @Override public BlockPos getClosestStructure(String name, BlockPos pos, boolean unexplored) { throw new AssertionError("structure"); }
     }
     private static final class ClassifiedGenerator extends Generator implements ICubeClassification {
-        volatile CubeClass classification = CubeClass.EMPTY; int classifications;
+        volatile CubeClass classification = CubeClass.EMPTY; int classifications; boolean regenerable;
         ClassifiedGenerator() { forbid = true; }
         @Override public CubeClass cubeClass(int x, int y, int z) { classifications++; return classification; }
+        @Override public boolean regenerable(int x, int y, int z) { return regenerable; }
         @Override public SurfaceBand surfaceBand(int x, int z) { throw new AssertionError("surface band"); }
     }
 

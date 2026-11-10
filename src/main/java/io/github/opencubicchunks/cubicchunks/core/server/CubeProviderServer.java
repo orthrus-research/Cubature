@@ -539,6 +539,7 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
                 try {
                     cube = new Cube(column, cubeY);
                     cube.markDirty();
+                    cube.markGenerated(classified);
                     onCubeLoaded(cube, column);
                 } finally {
                     TickDiagnostics.exit();
@@ -610,6 +611,7 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
                     TickDiagnostics.enter(TickDiagnostics.Phase.CUBE_CONSTRUCT);
                     try {
                         cube = new Cube(column, cubeY, primer);
+                        if (cubeGen instanceof ICubeClassification classified) cube.markGenerated(classified);
                         onCubeLoaded(cube, column);
                     } finally {
                         TickDiagnostics.exit();

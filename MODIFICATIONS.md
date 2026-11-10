@@ -33,6 +33,10 @@ background writer keeps its bounded batches.
 Storage compression reuses one deflater per thread, writing the same gzip bytes as
 CompressedStreamTools, and compresses a batch of more than 64 entries on up to four shared
 workers.
+A cube generated this session is not saved while it holds no blocks, biomes, entities, tile
+entities, capabilities or pending neighbour light checks and its generator reports it
+`regenerable` (the new optional `ICubeClassification.regenerable`, asked when saving is
+considered); reloading it generates it again. Once saved, it saves like any other cube.
 
 The lab fetcher publishes verified dependencies through short, unique temporary basenames beside
 their destinations, so cached and downloaded libraries fit legacy Windows path limits.

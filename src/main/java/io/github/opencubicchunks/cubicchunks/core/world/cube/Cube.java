@@ -39,9 +39,11 @@ import io.github.opencubicchunks.cubicchunks.api.world.ICube;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
 import io.github.opencubicchunks.cubicchunks.api.world.IHeightMap;
 import io.github.opencubicchunks.cubicchunks.api.worldgen.CubePrimer;
+import io.github.opencubicchunks.cubicchunks.api.worldgen.ICubeClassification;
 import io.github.opencubicchunks.cubicchunks.api.worldgen.ICubeGenerator;
 import io.github.opencubicchunks.cubicchunks.core.CubicChunks;
 import io.github.opencubicchunks.cubicchunks.core.asm.mixin.ICubicWorldInternal;
+import io.github.opencubicchunks.cubicchunks.core.lighting.LightingManager;
 import io.github.opencubicchunks.cubicchunks.core.server.CubeWatcher;
 import io.github.opencubicchunks.cubicchunks.core.server.SpawnCubes;
 import io.github.opencubicchunks.cubicchunks.core.util.AddressTools;
@@ -106,6 +108,14 @@ public class Cube implements ICube {
      * Has anything within the cube changed since it was loaded from disk?
      */
     private boolean isModified = false;
+
+    /**
+     * The generator that made this cube this session, while the cube was never saved and the
+     * generator classifies cubes; null otherwise. See {@link #markGenerated}.
+     */
+    @Nullable private ICubeClassification generatedBy;
+    /** Whether {@link #generatedBy} reported this cube regenerable; an EMPTY answer stays true. */
+    private boolean regenerable;
 
     /**
      * Has the cube generator's populate() method been called for this cube?
@@ -678,7 +688,40 @@ public class Cube implements ICube {
 
     @Override
     public boolean needsSaving() {
+        if (regeneratesUnchanged()) return false;
         return this.entities.needsSaving(true, this.world.getTotalWorldTime(), this.isModified) || cubeLightData.needsSaving(this);
+    }
+
+    /**
+     * Mark this cube as made by its generator this session. While it is never saved and holds
+     * nothing generation would not give it again, it is not saved if the generator reports it
+     * {@link ICubeClassification#regenerable}; the question is asked when saving is considered, by
+     * which time the neighbouring data a classification needs is usually held.
+     */
+    public void markGenerated(@Nullable ICubeClassification generator) {
+        this.generatedBy = generator;
+    }
+
+    /**
+     * Whether this cube may go unsaved: made by its generator this session, never saved since,
+     * holding nothing the generator would not make again, and reported regenerable. Once saved, it
+     * saves like any other cube, so its stored copy never goes stale.
+     */
+    private boolean regeneratesUnchanged() {
+        if (this.generatedBy == null || !holdsOnlyGeneratedNothing()) return false;
+        if (!this.regenerable) this.regenerable = this.generatedBy.regenerable(this.coords.getX(), this.coords.getY(), this.coords.getZ());
+        return this.regenerable;
+    }
+
+    private boolean holdsOnlyGeneratedNothing() {
+        return this.storage == null
+                && this.blockBiomeArray == null
+                && this.entities.size() == 0
+                && this.tileEntityMap.isEmpty()
+                && this.capabilities == null
+                && this.cubeLightData instanceof LightingManager.CubeLightData light
+                && light.neighborLightChecksSky == 0
+                && light.neighborLightChecksBlock == 0;
     }
 
     /**
@@ -687,6 +730,7 @@ public class Cube implements ICube {
     public void markSaved() {
         this.entities.markSaved(this.world.getTotalWorldTime());
         this.isModified = false;
+        this.generatedBy = null;
         this.cubeLightData.markSaved(this);
     }
 

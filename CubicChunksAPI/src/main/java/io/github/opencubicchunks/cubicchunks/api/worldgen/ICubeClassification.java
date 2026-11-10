@@ -39,6 +39,17 @@ public interface ICubeClassification {
     CubeClass cubeClass(int cubeX, int cubeY, int cubeZ);
 
     /**
+     * Whether generating this cube and populating it create nothing: the cube is
+     * {@link CubeClass#EMPTY}, and its population places no block, biome, entity or scheduled work
+     * anywhere, whatever the world's state. A host may then leave such a cube unsaved while nothing
+     * has changed it, and make it again by generation, population included. Like
+     * {@link #cubeClass}, it never builds data; false when unsure.
+     */
+    default boolean regenerable(int cubeX, int cubeY, int cubeZ) {
+        return false;
+    }
+
+    /**
      * A conservative surface band for one chunk column, or null when required cached data is
      * missing. Coordinates are chunk-column coordinates. The band covers the column's surface
      * ground, overlying fluids and generation-time surface decorations, including features rooted

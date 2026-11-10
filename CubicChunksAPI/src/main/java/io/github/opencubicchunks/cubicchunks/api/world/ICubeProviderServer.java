@@ -72,7 +72,9 @@ public interface ICubeProviderServer extends ICubeProvider {
      * @param cubeZ z coordinate of the cube
      * @return true iff, for this position, {@link #getCube(int, int, int, Requirement)} with {@link Requirement#LOAD}
      * would return a non-null value. The result is guaranteed to be true only if the world save is not corrupted
-     * and can otherwise be correctly read.
+     * and can otherwise be correctly read. A cube its generator reports
+     * {@link io.github.opencubicchunks.cubicchunks.api.worldgen.ICubeClassification#regenerable regenerable} is
+     * not saved while unchanged, so once unloaded it reads as not generated; generating it makes it again.
      */
     boolean isCubeGenerated(int cubeX, int cubeY, int cubeZ);
 
