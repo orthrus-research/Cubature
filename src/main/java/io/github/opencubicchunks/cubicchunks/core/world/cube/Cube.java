@@ -601,8 +601,25 @@ public class Cube implements ICube {
         EVENT_BUS.post(new CubeEvent.Load(this));
     }
 
-    @SuppressWarnings("deprecation")
+    /** A concrete sky-lit cube whose implicit air lies above every staged column top. */
+    public static boolean isStorageLessAboveSurface(ICube cube) {
+        if (cube.getClass() != Cube.class) return false;
+        Cube value = (Cube) cube;
+        if (value.storage != null || !value.world.provider.hasSkyLight()) return false;
+        int minimumY = value.coords.getMinBlockY();
+        IColumnInternal column = (IColumnInternal) value.column;
+        for (int x = 0; x < SIZE; x++) for (int z = 0; z < SIZE; z++)
+            if (column.getTopYWithStaging(x, z) >= minimumY) return false;
+        return true;
+    }
+
     public void trackSurface() {
+        if (isStorageLessAboveSurface(this)) { column.setModified(true); finishTrackingSurface(); }
+        else trackSurfaceFromBlocks();
+    }
+
+    @SuppressWarnings("deprecation")
+    private void trackSurfaceFromBlocks() {
         IHeightMap opindex = ((IColumn) column).getOpacityIndex();
         int miny = getCoords().getMinBlockY();
 
@@ -617,6 +634,10 @@ public class Cube implements ICube {
                 }
             }
         }
+        finishTrackingSurface();
+    }
+
+    private void finishTrackingSurface() {
         isSurfaceTracked = true;
         ((IColumnInternal) getColumn()).removeFromStagingHeightmap(this);
         ((ICubicWorldInternal) world).getLightingManager().onTrackCubeSurface(this);

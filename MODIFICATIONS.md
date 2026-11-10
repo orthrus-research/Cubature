@@ -12,6 +12,10 @@ installation costs and no-storage counts without changing delivery admission.
 The lab's complete-tick wrapper encloses the core phase clock, so the final phase vector is
 published before the job's independent duration is recorded and its report is frozen.
 
+On November 10, 2026, initial sky light and surface tracking return early for a cube without
+storage that lies above every staged column top in a sky-lit world: its 4,096 sky checks
+changed nothing, and the column's dirtying, staging removal and surface notifications still run.
+
 The lab fetcher publishes verified dependencies through short, unique temporary basenames beside
 their destinations, so cached and downloaded libraries fit legacy Windows path limits.
 

@@ -63,6 +63,11 @@ public class FirstLightProcessor {
      * @param cube the cube whose skylight is to be initialized
      */
     public void diffuseSkylight(ICube cube) {
+        if (Cube.isStorageLessAboveSurface(cube)) return;
+        diffuseSkylightFromBlocks(cube);
+    }
+
+    private void diffuseSkylightFromBlocks(ICube cube) {
         ILightingManager lm = ((ICubicWorldInternal) cube.getWorld()).getLightingManager();
         Iterable<? extends BlockPos.MutableBlockPos> allBlocks = BlockPos.getAllInBoxMutable(
                 cube.getCoords().getMinBlockPos(),
