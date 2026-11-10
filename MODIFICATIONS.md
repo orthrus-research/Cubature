@@ -12,9 +12,11 @@ installation costs and no-storage counts without changing delivery admission.
 The lab's complete-tick wrapper encloses the core phase clock, so the final phase vector is
 published before the job's independent duration is recorded and its report is frozen.
 
-On November 10, 2026, the server-tick phases also separate random-tick cube selection and ticking,
-the player cube map's own bookkeeping, queued packet handlers with the network tick, and Forge's
-server and world tick events, so uninstrumented work is a small remainder. The random-tick cube
+On November 10, 2026, the server-tick phases also separate random-tick cube selection and ticking
+and the player cube map's own bookkeeping, both inside Cubature's own methods. Phases for queued
+packet handlers with the network tick and for Forge's server and world tick events are charged only
+by the lab, which wraps those vanilla call sites; the mod itself adds no mixin to them, since hybrid
+servers and other mods rewrite them. The random-tick cube
 iterator skips its watcher scan while the map holds no non-spectator player, since every watcher
 would be rejected; force-loaded cubes still tick.
 Also on November 10, 2026, initial sky light and surface tracking return early for a cube without

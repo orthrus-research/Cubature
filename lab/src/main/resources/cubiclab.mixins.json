@@ -3,7 +3,7 @@
   "minVersion": "0.8",
   "package": "io.github.opencubicchunks.cubicchunks.lab.mixin",
   "compatibilityLevel": "JAVA_8",
-  "mixins": ["MixinPacketCubes", "MixinCompleteServerTick"],
+  "mixins": ["MixinPacketCubes", "MixinCompleteServerTick", "MixinServerTickPhases"],
   "client": ["MixinCubeApply"],
   "injectors": {"defaultRequire": 1}
 }

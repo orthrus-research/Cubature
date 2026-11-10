@@ -299,87 +299,85 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
     // CHECKED: 1.10.2-12.18.1.2092
     @Override
     public void tick() {
+        // The map's own bookkeeping is PLAYER_MAP; nested phases still charge themselves. The body
+        // stays in this method, where other mods' injections into it expect to find it.
         TickDiagnostics.enter(TickDiagnostics.Phase.PLAYER_MAP);
         try {
-            tickMap();
+            getWorldServer().profiler.startSection("playerCubeMapTick");
+            boolean spectatorsGenerateChunks = getWorldServer().getGameRules().getBoolean("spectatorsGenerateChunks");
+            Predicate<EntityPlayerMP> canGenerateChunkPredicate = player -> player != null && (spectatorsGenerateChunks ||!player.isSpectator());
+
+            long currentTime = this.getWorldServer().getTotalWorldTime();
+
+            TickDiagnostics.enter(TickDiagnostics.Phase.ARRIVALS);
+            try {
+                arrivals.tick(currentTime);
+            } finally {
+                TickDiagnostics.exit();
+            }
+
+            getWorldServer().profiler.startSection("addPendingPlayers");
+            addPendingPlayers();
+            getWorldServer().profiler.endStartSection("tickEntries");
+            updateWatchers(currentTime);
+            getWorldServer().profiler.endStartSection("sortTickableTracker");
+            tickableCubeTracker.tick();
+
+            getWorldServer().profiler.endStartSection("sortToGenerate");
+            surfaceBands.tick();
+            this.cubesToGenerate.tick();
+            this.columnsToGenerate.tick();
+
+            getWorldServer().profiler.endStartSection("sortToSend");
+            this.cubesToSendToClients.tick();
+            this.columnsToSendToClients.tick();
+            this.watchersToAddPlayersTo.tick();
+
+            getWorldServer().profiler.endStartSection("generate");
+            boolean concurrent = cubeCache.concurrentGenerationActive();
+            generationBudget.reset(System.nanoTime(), TimeUnit.MILLISECONDS.toNanos(concurrent
+                            ? CubicChunksConfig.concurrentGenerationTickMillis : CubicChunksConfig.maxCubeGenerationTimeMillis),
+                    CubicChunksConfig.maxGeneratedCubesPerTick);
+            // Watchers make delivery requests: generation goes to the workers and is installed when ready.
+            generateColumns(canGenerateChunkPredicate);
+            generateCubes(canGenerateChunkPredicate, concurrent);
+            getWorldServer().profiler.endStartSection("send");
+            TickDiagnostics.enter(TickDiagnostics.Phase.SEND);
+            try {
+                sendColumnsToClients();
+                sendCubesToClients();
+                addPlayersToWatchers();
+            } finally {
+                TickDiagnostics.exit();
+            }
+            getWorldServer().profiler.endStartSection("unload");
+            TickDiagnostics.enter(TickDiagnostics.Phase.UNLOAD_SAVE);
+            try {
+                unloadIfNoPlayers();
+            } finally {
+                TickDiagnostics.exit();
+            }
+            getWorldServer().profiler.endStartSection("sendCubes");//unload
+            TickDiagnostics.enter(TickDiagnostics.Phase.SEND);
+            try {
+                sender.send();
+            } finally {
+                TickDiagnostics.exit();
+            }
+            if (deliveryMode.prefetch()) prepareAhead(canGenerateChunkPredicate, currentTime);
+            if (deliveryMode.incremental()) maintain();
+            getWorldServer().profiler.endStartSection("prepareRegions");
+            TickDiagnostics.enter(TickDiagnostics.Phase.REGION_PREPARATION);
+            try {
+                prepareRegions(canGenerateChunkPredicate);
+            } finally {
+                TickDiagnostics.exit();
+            }
+            getWorldServer().profiler.endSection();//prepareRegions
+            getWorldServer().profiler.endSection();//playerCubeMapTick
         } finally {
             TickDiagnostics.exit();
         }
-    }
-
-    private void tickMap() {
-        getWorldServer().profiler.startSection("playerCubeMapTick");
-        boolean spectatorsGenerateChunks = getWorldServer().getGameRules().getBoolean("spectatorsGenerateChunks");
-        Predicate<EntityPlayerMP> canGenerateChunkPredicate = player -> player != null && (spectatorsGenerateChunks ||!player.isSpectator());
-
-        long currentTime = this.getWorldServer().getTotalWorldTime();
-
-        TickDiagnostics.enter(TickDiagnostics.Phase.ARRIVALS);
-        try {
-            arrivals.tick(currentTime);
-        } finally {
-            TickDiagnostics.exit();
-        }
-
-        getWorldServer().profiler.startSection("addPendingPlayers");
-        addPendingPlayers();
-        getWorldServer().profiler.endStartSection("tickEntries");
-        updateWatchers(currentTime);
-        getWorldServer().profiler.endStartSection("sortTickableTracker");
-        tickableCubeTracker.tick();
-
-        getWorldServer().profiler.endStartSection("sortToGenerate");
-        surfaceBands.tick();
-        this.cubesToGenerate.tick();
-        this.columnsToGenerate.tick();
-
-        getWorldServer().profiler.endStartSection("sortToSend");
-        this.cubesToSendToClients.tick();
-        this.columnsToSendToClients.tick();
-        this.watchersToAddPlayersTo.tick();
-
-        getWorldServer().profiler.endStartSection("generate");
-        boolean concurrent = cubeCache.concurrentGenerationActive();
-        generationBudget.reset(System.nanoTime(), TimeUnit.MILLISECONDS.toNanos(concurrent
-                        ? CubicChunksConfig.concurrentGenerationTickMillis : CubicChunksConfig.maxCubeGenerationTimeMillis),
-                CubicChunksConfig.maxGeneratedCubesPerTick);
-        // Watchers make delivery requests: generation goes to the workers and is installed when ready.
-        generateColumns(canGenerateChunkPredicate);
-        generateCubes(canGenerateChunkPredicate, concurrent);
-        getWorldServer().profiler.endStartSection("send");
-        TickDiagnostics.enter(TickDiagnostics.Phase.SEND);
-        try {
-            sendColumnsToClients();
-            sendCubesToClients();
-            addPlayersToWatchers();
-        } finally {
-            TickDiagnostics.exit();
-        }
-        getWorldServer().profiler.endStartSection("unload");
-        TickDiagnostics.enter(TickDiagnostics.Phase.UNLOAD_SAVE);
-        try {
-            unloadIfNoPlayers();
-        } finally {
-            TickDiagnostics.exit();
-        }
-        getWorldServer().profiler.endStartSection("sendCubes");//unload
-        TickDiagnostics.enter(TickDiagnostics.Phase.SEND);
-        try {
-            sender.send();
-        } finally {
-            TickDiagnostics.exit();
-        }
-        if (deliveryMode.prefetch()) prepareAhead(canGenerateChunkPredicate, currentTime);
-        if (deliveryMode.incremental()) maintain();
-        getWorldServer().profiler.endStartSection("prepareRegions");
-        TickDiagnostics.enter(TickDiagnostics.Phase.REGION_PREPARATION);
-        try {
-            prepareRegions(canGenerateChunkPredicate);
-        } finally {
-            TickDiagnostics.exit();
-        }
-        getWorldServer().profiler.endSection();//prepareRegions
-        getWorldServer().profiler.endSection();//playerCubeMapTick
     }
 
     private void addPendingPlayers() {
