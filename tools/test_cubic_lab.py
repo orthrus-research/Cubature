@@ -164,16 +164,18 @@ class LabControlTest(unittest.TestCase):
             profiles.validate_jvm_inputs({})
 
     def test_native_capture_requires_effective_heap_and_collector_on_both_sides(self):
-        server = {'runtime': {'maxHeapBytes': 8 * 1024**3, 'garbageCollectors': ['ZGC Minor Cycles', 'ZGC Major Cycles']}}
+        # The default profile is the shipping G1 profile on the 8 GiB floor.
+        self.assertEqual(profiles.jvm_profile()['collector'], 'G1')
+        server = {'runtime': {'maxHeapBytes': 8 * 1024**3, 'garbageCollectors': ['G1 Young Generation', 'G1 Old Generation']}}
         client = json.loads(json.dumps(server))
         profiles.validate_jvm_capture(server, client)
         for record in [server, client]:
             record['runtime']['maxHeapBytes'] = 6 * 1024**3
             with self.assertRaisesRegex(RuntimeError, 'heap'): profiles.validate_jvm_capture(server, client)
             record['runtime']['maxHeapBytes'] = 8 * 1024**3
-            record['runtime']['garbageCollectors'] = ['G1 Young Generation']
+            record['runtime']['garbageCollectors'] = ['ZGC Minor Cycles']
             with self.assertRaisesRegex(RuntimeError, 'collector'): profiles.validate_jvm_capture(server, client)
-            record['runtime']['garbageCollectors'] = ['ZGC Minor Cycles', 'ZGC Major Cycles']
+            record['runtime']['garbageCollectors'] = ['G1 Young Generation', 'G1 Old Generation']
 
     def test_old_java_lab_is_not_java26_qualification(self):
         with self.assertRaisesRegex(RuntimeError, 'newly prepared'):

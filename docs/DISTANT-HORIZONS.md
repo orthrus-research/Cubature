@@ -187,6 +187,7 @@ merges disjoint historical depth slices. Full underground browsing, unbounded
 vertical worlds, 3D biome inputs, shaders and broad dynamic-light workloads are
 not qualified by this surface integration.
 
-Native qualification uses Java 26.0.2.1, formal Cleanroom 0.7.9-alpha, 8 GiB/ZGC
-per JVM and actual server horizontal/vertical and client horizontal/vertical
+Native qualification used Java 26.0.2.1, formal Cleanroom 0.7.9-alpha, 8 GiB/ZGC
+per JVM (newly prepared lab instances now default to G1 with the shipping flags on
+8 GiB) and actual server horizontal/vertical and client horizontal/vertical
 distances 12. Cleanroom is the only build target. No isolated test suite or performance improvement is claimed.

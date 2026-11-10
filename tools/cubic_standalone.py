@@ -68,7 +68,7 @@ def prepare(args):
     player_uuid = str(uuid.UUID(bytes=hashlib.md5(('OfflinePlayer:' + lab_process.PLAYER).encode()).digest(), version=3))
     lab_files.write_json(server / 'ops.json', [{'uuid': player_uuid, 'name': lab_process.PLAYER, 'level': 4,
                                          'bypassesPlayerLimit': False}])
-    profile = lab_profiles.jvm_profile(os.environ.get(lab_profiles.VARIANT_ENVIRONMENT, 'zgc'))
+    profile = lab_profiles.jvm_profile(os.environ.get(lab_profiles.VARIANT_ENVIRONMENT, lab_profiles.DEFAULT_VARIANT))
     lab_profiles.configure_jvm(server, profile)
     runtime = lab_instance.prepare_client(server, client, files['prism'], root, donor['java'], donor['release'])
     # Freeze installer output and client libraries; no Riven configs, scripts or lab mod are copied.

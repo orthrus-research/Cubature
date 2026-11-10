@@ -23,9 +23,11 @@ G1_EXPERIMENTS = {
 HEAP_MIB = {'g1-ship12': 12288}
 # Environment variable that selects a variant for a newly prepared standalone instance.
 VARIANT_ENVIRONMENT = 'CUBATURE_LAB_JVM'
+# Newly prepared instances measure what ships: G1 with the shipping flags on the 8 GiB floor.
+DEFAULT_VARIANT = 'g1-ship8'
 
 
-def jvm_profile(variant='zgc'):
+def jvm_profile(variant=DEFAULT_VARIANT):
     if variant not in JVM_VARIANTS: raise ValueError('Unknown JVM experiment')
     maximum = HEAP_MIB.get(variant, 8192)
     initial = 1024 if '-' not in variant else maximum
