@@ -126,9 +126,11 @@ class LabControlTest(unittest.TestCase):
                 root=Path(temporary); profiles.configure_jvm(root, profile)
                 manifest={'server':str(root),'jvmProfile':profile}
                 profiles.validate_jvm_inputs(manifest)
-                capture={'runtime':{'maxHeapBytes':8*1024**3,'garbageCollectors':[profile['collector']+' Young Generation']}}
+                capture={'runtime':{'maxHeapBytes':profile['maxHeapMiB']*1024**2,'garbageCollectors':[profile['collector']+' Young Generation']}}
                 profiles.validate_jvm_capture(capture,capture,manifest)
-                self.assertEqual(profile['initialHeapMiB'],1024 if '-' not in variant else 8192)
+                self.assertEqual(profile['initialHeapMiB'],1024 if '-' not in variant else profile['maxHeapMiB'])
+                self.assertIn(f"-Xmx{profile['maxHeapMiB'] // 1024}G", profile['arguments'])
+                self.assertEqual(profile['maxHeapMiB'], 12288 if variant == 'g1-ship12' else 8192)
                 self.assertEqual('-XX:+AlwaysPreTouch' in profile['arguments'],variant.endswith('-pretouch'))
 
     def test_cube_experiment_inputs_are_fresh_and_detect_configuration_drift(self):

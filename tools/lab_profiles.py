@@ -9,22 +9,35 @@ DELIVERY_MODES = ('BASELINE', 'MAINTENANCE', 'SAVE', 'PREFETCH')
 JVM_ARGUMENTS = ['-Xms1G', '-Xmx8G', '-XX:+UseZGC']
 
 
-JVM_VARIANTS = ['zgc', 'zgc-fixed', 'zgc-pretouch', 'g1', 'g1-fixed', 'g1-pretouch', 'g1-diag']
+JVM_VARIANTS = ['zgc', 'zgc-fixed', 'zgc-pretouch', 'g1', 'g1-fixed', 'g1-pretouch', 'g1-diag',
+                'g1-p50', 'g1-egc', 'g1-ship8', 'g1-ship12']
+G1_LOG = '-Xlog:gc*,gc+heap=debug:file=gc.log:time,uptime,level,tags'
+# G1 shipping candidates, each with the GC log: the shipping flags on the 8 GiB floor and on 12 GiB.
+SHIPPING_G1 = ['-XX:G1HeapRegionSize=4m', '-XX:MaxGCPauseMillis=50', '-XX:+ExplicitGCInvokesConcurrent']
+G1_EXPERIMENTS = {
+    'g1-p50': ['-XX:MaxGCPauseMillis=50'],
+    'g1-egc': ['-XX:+ExplicitGCInvokesConcurrent'],
+    'g1-ship8': SHIPPING_G1,
+    'g1-ship12': SHIPPING_G1,
+}
+HEAP_MIB = {'g1-ship12': 12288}
 # Environment variable that selects a variant for a newly prepared standalone instance.
 VARIANT_ENVIRONMENT = 'CUBATURE_LAB_JVM'
 
 
 def jvm_profile(variant='zgc'):
     if variant not in JVM_VARIANTS: raise ValueError('Unknown JVM experiment')
-    initial = 1024 if '-' not in variant else 8192
+    maximum = HEAP_MIB.get(variant, 8192)
+    initial = 1024 if '-' not in variant else maximum
     collector = 'G1' if variant.startswith('g1') else 'ZGC'
-    arguments = [f'-Xms{initial}M', '-Xmx8G', '-XX:+UseG1GC' if collector == 'G1' else '-XX:+UseZGC']
+    arguments = [f'-Xms{initial}M', f'-Xmx{maximum // 1024}G', '-XX:+UseG1GC' if collector == 'G1' else '-XX:+UseZGC']
     # Keep the established default manifest/argfile representation stable.
     if variant == 'zgc': arguments = list(JVM_ARGUMENTS)
     if variant.endswith('-pretouch'): arguments.append('-XX:+AlwaysPreTouch')
     # G1 with a GC log beside each process: heap after every collection, for memory budgets.
-    if variant == 'g1-diag': arguments.append('-Xlog:gc*,gc+heap=debug:file=gc.log:time,uptime,level,tags')
-    return {'initialHeapMiB': initial, 'maxHeapMiB': 8192, 'collector': collector, 'arguments': arguments}
+    if variant == 'g1-diag' or variant in G1_EXPERIMENTS: arguments.append(G1_LOG)
+    arguments.extend(G1_EXPERIMENTS.get(variant, []))
+    return {'initialHeapMiB': initial, 'maxHeapMiB': maximum, 'collector': collector, 'arguments': arguments}
 
 
 def configure_jvm(server, profile=None):
@@ -37,7 +50,7 @@ def configure_jvm(server, profile=None):
 def validate_jvm_inputs(manifest):
     profile = manifest.get('jvmProfile')
     if profile not in [jvm_profile(variant) for variant in JVM_VARIANTS]:
-        raise RuntimeError('Native testing requires a reviewed equal-8-GiB JVM profile; prepare a fresh instance')
+        raise RuntimeError('Native testing requires a reviewed equal-heap JVM profile; prepare a fresh instance')
     path = Path(manifest['server']) / 'user_jvm_args.txt'
     arguments = [line.strip() for line in path.read_text().splitlines()
                  if line.strip() and not line.lstrip().startswith('#')]
@@ -46,11 +59,12 @@ def validate_jvm_inputs(manifest):
 
 
 def validate_jvm_capture(server, client, manifest=None):
-    collector = (manifest or {}).get('jvmProfile', jvm_profile())['collector']
+    profile = (manifest or {}).get('jvmProfile', jvm_profile())
+    collector = profile['collector']
     for side, capture in [('server', server), ('client', client)]:
         runtime = capture.get('runtime', {})
-        if runtime.get('maxHeapBytes') != 8192 * 1024 * 1024:
-            raise RuntimeError('Effective ' + side + ' heap differs from 8 GiB')
+        if runtime.get('maxHeapBytes') != profile['maxHeapMiB'] * 1024 * 1024:
+            raise RuntimeError('Effective ' + side + ' heap differs from ' + str(profile['maxHeapMiB']) + ' MiB')
         collectors = runtime.get('garbageCollectors', [])
         if not collectors or not all(name.startswith(collector) for name in collectors):
             raise RuntimeError('Effective ' + side + ' collector differs from ' + collector + ': ' + str(collectors))
