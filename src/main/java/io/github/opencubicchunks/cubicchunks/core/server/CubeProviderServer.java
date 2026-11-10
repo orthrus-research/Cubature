@@ -37,6 +37,7 @@ import io.github.opencubicchunks.cubicchunks.core.server.chunkio.AsyncBatchingCu
 import io.github.opencubicchunks.cubicchunks.core.server.chunkio.ICubeIO;
 import io.github.opencubicchunks.cubicchunks.core.server.chunkio.async.forge.AsyncWorldIOExecutor;
 import io.github.opencubicchunks.cubicchunks.api.worldgen.CubePrimer;
+import io.github.opencubicchunks.cubicchunks.api.worldgen.ICubeClassification;
 import io.github.opencubicchunks.cubicchunks.api.world.ICube;
 import io.github.opencubicchunks.cubicchunks.api.worldgen.ICubeGenerator;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubeProviderServer;
@@ -531,13 +532,26 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
             return cube;
         }
         if (cube == null) {
-            if (timing != Timing.NOW && pollCube(cubeX, cubeY, cubeZ, timing) != ICubeGenerator.GeneratorReadyState.READY) {
-                return emptyCube;
-            }
-            // generate the Cube
-            cube = generateCube(cubeX, cubeY, cubeZ, column, timing == Timing.NOW).orElse(null);
-            if (cube == null) {
-                return emptyCube;
+            if (cubeGen instanceof ICubeClassification classified
+                    && classified.cubeClass(cubeX, cubeY, cubeZ) == ICubeClassification.CubeClass.EMPTY) {
+                if (concurrentGeneration != null) concurrentGeneration.retireCube(cubeX, cubeY, cubeZ);
+                TickDiagnostics.enter(TickDiagnostics.Phase.CUBE_CONSTRUCT);
+                try {
+                    cube = new Cube(column, cubeY);
+                    cube.markDirty();
+                    onCubeLoaded(cube, column);
+                } finally {
+                    TickDiagnostics.exit();
+                }
+            } else {
+                if (timing != Timing.NOW && pollCube(cubeX, cubeY, cubeZ, timing) != ICubeGenerator.GeneratorReadyState.READY) {
+                    return emptyCube;
+                }
+                // generate the Cube
+                cube = generateCube(cubeX, cubeY, cubeZ, column, timing == Timing.NOW).orElse(null);
+                if (cube == null) {
+                    return emptyCube;
+                }
             }
             if (req == Requirement.GENERATE) {
                 return cube;

@@ -129,6 +129,11 @@ public final class ConcurrentGeneration {
         return cubes.take(new CubePos(cubeX, cubeY, cubeZ));
     }
 
+    /** Retires obsolete cube output without waiting for or interrupting generation workers. */
+    public void retireCube(int cubeX, int cubeY, int cubeZ) {
+        cubes.retire(new CubePos(cubeX, cubeY, cubeZ));
+    }
+
     public void close() {
         if (arrivals != null) arrivals.close();
         cubes.close();
@@ -138,6 +143,6 @@ public final class ConcurrentGeneration {
 
     private void report(Throwable failure) {
         if (reported.compareAndSet(false, true))
-            CubicChunks.LOGGER.warn("Cubature concurrent generation failed; the server thread regenerates synchronously", failure);
+            CubicChunks.LOGGER.warn("Cubature concurrent generation failed", failure);
     }
 }

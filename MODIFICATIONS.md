@@ -15,6 +15,9 @@ published before the job's independent duration is recorded and its report is fr
 On November 10, 2026, initial sky light and surface tracking return early for a cube without
 storage that lies above every staged column top in a sky-lit world: its 4,096 sky checks
 changed nothing, and the column's dirtying, staging removal and surface notifications still run.
+A missing cube that a generator classifies EMPTY is installed as an all-air cube on the server
+thread without a worker task or primer, marked modified as a generated cube is; a worker task
+already running for it is retired, and its late result is dropped.
 
 The lab fetcher publishes verified dependencies through short, unique temporary basenames beside
 their destinations, so cached and downloaded libraries fit legacy Windows path limits.

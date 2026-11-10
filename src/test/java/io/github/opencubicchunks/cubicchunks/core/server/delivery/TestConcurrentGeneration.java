@@ -8,15 +8,19 @@ import io.github.opencubicchunks.cubicchunks.api.worldgen.ICubeGenerator.Generat
 import io.github.opencubicchunks.cubicchunks.api.worldgen.IRetainedColumnPreparation;
 import io.github.opencubicchunks.cubicchunks.core.CubicChunksConfig;
 import net.minecraft.entity.EnumCreatureType;
+import net.minecraft.init.Bootstrap;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.biome.Biome;
 import net.minecraft.world.chunk.Chunk;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -25,6 +29,8 @@ import static org.junit.Assert.*;
 public class TestConcurrentGeneration {
     private int threads;
     private ConcurrentGeneration generation;
+
+    @BeforeClass public static void bootstrap() { Bootstrap.register(); }
 
     @Before public void oneWorker() {
         threads = CubicChunksConfig.concurrentGenerationThreads;
@@ -89,6 +95,49 @@ public class TestConcurrentGeneration {
         RetainedGenerator generator = new RetainedGenerator();
         assertNull(ConcurrentGeneration.create(generator, "disabled-test"));
         assertEquals(0, generator.retained.get());
+    }
+
+    @Test public void retiringACubeBehindColumnPreparationSkipsOnlyThatCubeAndAllowsFreshDemand() throws InterruptedException {
+        BlockingGenerator generator = new BlockingGenerator();
+        generation = ConcurrentGeneration.create(generator, "retirement-test");
+        try {
+            assertEquals(GeneratorReadyState.WAITING, generation.pollColumn(1, 2, true));
+            assertTrue(generator.started.await(10, TimeUnit.SECONDS));
+            assertEquals(GeneratorReadyState.WAITING, generation.pollCube(4, 5, 6, true));
+            generation.retireCube(4, 5, 6);
+            generation.retireCube(4, 5, 6);
+            assertEquals(GeneratorReadyState.WAITING, generation.pollCube(4, 5, 6, true));
+            assertEquals(GeneratorReadyState.WAITING, generation.pollColumn(2, 2, true));
+            generator.release.countDown();
+            assertTrue(generator.followingColumn.await(10, TimeUnit.SECONDS));
+            assertEquals(GeneratorReadyState.READY, generation.pollColumn(2, 2, false));
+            assertEquals(0, generator.cubes.get());
+            assertNull(generation.takeCube(4, 5, 6));
+            assertEquals(2, generator.prepared.get());
+            assertEquals(GeneratorReadyState.WAITING, generation.pollCube(4, 5, 6, true));
+            assertEquals(GeneratorReadyState.READY, generation.pollCube(4, 5, 6, false));
+            assertNotNull(generation.takeCube(4, 5, 6));
+            assertEquals(1, generator.cubes.get());
+            assertEquals(2, generator.prepared.get());
+        } finally { generator.release.countDown(); }
+    }
+
+    private static final class BlockingGenerator extends PreparingGenerator {
+        final CountDownLatch started = new CountDownLatch(1), release = new CountDownLatch(1), followingColumn = new CountDownLatch(1);
+        final AtomicInteger cubes = new AtomicInteger();
+        @Override public void prepareColumn(int x, int z) {
+            super.prepareColumn(x, z);
+            if (x == 1) {
+                started.countDown();
+                try {
+                    if (!release.await(10, TimeUnit.SECONDS)) throw new AssertionError("column was not released");
+                } catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new IllegalStateException(e); }
+            } else followingColumn.countDown();
+        }
+        @Override public Optional<CubePrimer> tryGenerateCube(int x, int y, int z, CubePrimer primer, boolean force) {
+            cubes.incrementAndGet();
+            return Optional.of(primer);
+        }
     }
 
     private static final class RetainedGenerator extends PreparingGenerator implements IRetainedColumnPreparation {
