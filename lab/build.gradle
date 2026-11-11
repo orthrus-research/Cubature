@@ -50,8 +50,8 @@ tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
 jar {
     archiveClassifier = "${targetLoader}-dev"
     manifest {
-        attributes('FMLCorePlugin': 'io.github.opencubicchunks.cubicchunks.lab.LabCorePlugin',
-            'FMLCorePluginContainsFMLMod': 'true', 'Implementation-Version': project.version)
+        attributes('MixinConnector': 'io.github.opencubicchunks.cubicchunks.lab.LabMixinConnector',
+            'Implementation-Version': project.version)
         attributes('ModType': 'CRL')
     }
     from('../license.txt') { into 'META-INF/licenses/cubicchunks-lab' }
