@@ -1,6 +1,6 @@
 plugins {
     id 'java'
-    id 'xyz.wagyourtail.unimined' version '1.4.43-kappa'
+    id 'com.cleanroommc.cleanroomgradle'
 }
 
 group = 'cc.orthrus.cubature'
@@ -44,9 +44,6 @@ repositories {
 configurations {
     embeddedLibraries
     implementation.extendsFrom(embeddedLibraries)
-    modImplementation
-    modCompileOnly
-    compileOnly.extendsFrom(modCompileOnly)
 }
 // Distant Horizons and Demonica are compile-only inputs, never bundled. With a Riven workspace (RIVEN_WORKSPACE, else
 // the sibling ../Riven) they come from its dev/pins; elsewhere tools/fetch_build_inputs.py downloads and verifies them
@@ -61,8 +58,9 @@ def extractCeleritas = tasks.register('extractCeleritas', Copy) {
     into layout.buildDirectory.dir('celeritas')
 }
 dependencies {
+    implementation cleanroom.userdev(cleanroom_version)
     // DH stays upstream on disk; Cubature supplies optional runtime transformations.
-    modCompileOnly files(new File(buildInputs, 'DistantHorizons-3.3.3-1.12.2-forge.jar'))
+    compileOnly deobf(files(new File(buildInputs, 'DistantHorizons-3.3.3-1.12.2-forge.jar')))
     compileOnly fileTree(layout.buildDirectory.dir('celeritas')) { include '*.jar' }.builtBy(extractCeleritas)
     buildSupportCompileOnly 'com.google.code.findbugs:jsr305:3.0.2'
     compileOnly 'com.google.code.findbugs:jsr305:3.0.2'
@@ -71,21 +69,20 @@ dependencies {
     embeddedLibraries('io.github.opencubicchunks:regionlib:0.78.0-20210527.114505-2') { transitive = false }
     testImplementation 'junit:junit:4.13.2'
 }
-unimined.minecraft {
-    version '1.12.2'
-    mappings { mcp('stable', '39-1.12') }
-    cleanroom { loader cleanroom_version }
-    defaultRemapJar = false
-    mods { remap(configurations.modCompileOnly) }
-    remap(tasks.named('jar').get()) {
-        mixinRemap { enableBaseMixin(); enableMixinExtra() }
-    }
-    runs.all {
-        javaVersion = JavaVersion.toVersion(25)
-        workingDir = file("run/${targetLoader}/${name}")
-        jvmArgs += ['-Xms1G', '-Xmx4G', '-Dfml.coreMods.load=io.github.opencubicchunks.cubicchunks.core.asm.coremod.CubicChunksCoreMod']
-        doFirst { workingDir.mkdirs() }
-    }
+// CleanMix emits shadow and overwrite member mappings separately from the injection refmap.
+// Merge them with the loader mappings so the production JAR renames both sets.
+def mixinMappings = layout.buildDirectory.file('generated/mixin/mcp2srg.tsrg')
+tasks.named('compileJava', JavaCompile) {
+    outputs.file(mixinMappings)
+    // MixinWorld_SlowCollisionCheck constrains its overwrite to Forge minor 23; the coremod supplies it at runtime.
+    options.compilerArgs += ['-AmergeBehaviour=merge', "-AoutTsrgFile=${mixinMappings.get().asFile.absolutePath}",
+                             '-Atokens=MC_FORGE=23']
+    doFirst { mixinMappings.get().asFile.parentFile.mkdirs() }
+}
+tasks.named('reobfJar') {
+    dependsOn tasks.compileJava
+    map.setFrom(mixinMappings)
+    archiveClassifier = targetLoader
 }
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
@@ -120,9 +117,7 @@ jar {
                    'ForceLoadAsMod': 'true')
         attributes('ModType': 'CRL')
     }
-    finalizedBy tasks.named('remapJar')
 }
-tasks.named('remapJar') { archiveClassifier = targetLoader }
 
 // Source recipients need the same component terms and modification notices as binary recipients.
 ['jar', 'sourcesJar'].each { taskName ->
@@ -163,13 +158,14 @@ tasks.register('heightMapAllocationDiagnostic', JavaExec) {
     javaLauncher = tasks.named('test').get().javaLauncher
 }
 
-tasks.register('verifyRemappedJar') {
+tasks.register('verifyReobfJar') {
     description = 'Check distributable class versions, embedded libraries, API names and Mixin resources.'
     group = 'verification'
-    dependsOn tasks.named('remapJar')
-    inputs.file(tasks.named('remapJar').flatMap { it.archiveFile })
+    dependsOn tasks.named('reobfJar')
+    inputs.files(tasks.named('reobfJar').map { it.outputs.files })
+    inputs.file(mixinMappings)
     doLast {
-        def artifact = tasks.named('remapJar').get().archiveFile.get().asFile
+        def artifact = tasks.named('reobfJar').get().outputs.files.singleFile
         new java.util.zip.ZipFile(artifact).withCloseable { archive ->
             def entries = archive.entries().toList()
             def names = entries.collect { it.name } as Set
@@ -204,12 +200,26 @@ tasks.register('verifyRemappedJar') {
             }
             def refmap = json.parse(archive.getInputStream(archive.getEntry('cubicchunks.mixins.refmap.json')))
             assert refmap.mappings && refmap.mappings.size() > 50: 'Empty or incomplete Mixin refmap'
+            // A valid refmap does not prove that shadow and overwrite members in the packaged classes were renamed.
+            def members = mixinMappings.get().asFile.readLines('UTF-8')
+                    .findAll { it.startsWith('io/github/opencubicchunks/') }
+                    .collect { it.trim().split(/\s+/) }
+                    .findAll { it.length == 3 || it.length == 4 }
+            assert members.size() > 100: 'No shadow or overwrite member mappings were emitted'
+            members.groupBy { it[0] }.each { owner, mapped ->
+                def node = new org.objectweb.asm.tree.ClassNode()
+                new org.objectweb.asm.ClassReader(archive.getInputStream(archive.getEntry(owner + '.class'))).accept(node, 0)
+                mapped.each { m ->
+                    assert m.length == 3 ? node.fields.any { it.name == m[2] }
+                            : node.methods.any { it.name == m[3] && it.desc == m[2] }: "Unmapped Mixin member: ${m.join(' ')}"
+                }
+            }
             def api = new org.objectweb.asm.tree.ClassNode()
             new org.objectweb.asm.ClassReader(archive.getInputStream(archive.getEntry('io/github/opencubicchunks/cubicchunks/api/world/IColumn.class'))).accept(api, 0)
             assert api.methods.any { it.name == 'getHeightValue' && it.desc == '(II)I' }: 'Remapping changed the public IColumn API'
             assert !api.methods.any { it.name == 'func_76611_b' }: 'Vanilla name leaked into IColumn API'
-            logger.lifecycle("Verified ${artifact.name}: ${ownClasses.size()} mod/API classes, Java ${expectedMajor - 44}, four Mixin configs, ${refmap.mappings.size()} refmap classes.")
+            logger.lifecycle("Verified ${artifact.name}: ${ownClasses.size()} mod/API classes, Java ${expectedMajor - 44}, four Mixin configs, ${refmap.mappings.size()} refmap classes, ${members.size()} renamed Mixin members.")
         }
     }
 }
-tasks.named('check') { dependsOn tasks.named('verifyRemappedJar') }
+tasks.named('check') { dependsOn tasks.named('verifyReobfJar') }

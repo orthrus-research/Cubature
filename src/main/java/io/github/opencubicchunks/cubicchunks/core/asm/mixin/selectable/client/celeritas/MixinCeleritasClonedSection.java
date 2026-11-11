@@ -35,7 +35,7 @@ public abstract class MixinCeleritasClonedSection {
     }
 
     // The constructor asks the column for its tile entities twice: an emptiness check, then the section filter.
-    @Redirect(method = "<init>", at = @At(value = "INVOKE",
+    @Redirect(method = "<init>", remap = false, at = @At(value = "INVOKE", remap = true,
             target = "Lnet/minecraft/world/chunk/Chunk;getTileEntityMap()Ljava/util/Map;"), require = 2, allow = 2)
     private Map<BlockPos, TileEntity> cubicchunks$cubeTileEntities(Chunk column, World world, int x, int y, int z) {
         return CeleritasCompat.cubic(world) ? CeleritasCompat.tileEntities(world, x, y, z) : column.getTileEntityMap();

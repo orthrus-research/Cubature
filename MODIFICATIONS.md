@@ -47,6 +47,8 @@ read. New saves omit the tag; vanilla ignores it in existing ones.
 Also on November 10, 2026, upstream's ForgeGradle build was removed: the root and API Gradle
 scripts, properties and wrappers, and the two `buildSrc` submodules pointing at CubicGradle. The
 Unimined project in `cleanroom/` compiles the same sources and is the only build.
+On November 11, 2026, that project moved from Unimined to CleanroomGradle so it compiles against
+Cleanroom 0.7.14-alpha, which publishes no Unimined userdev. Sources and artifact names are unchanged.
 Also on November 10, 2026, entity chunk-loading tickets keep their entity's cube. Forge saves the
 column its entity is stored in; upstream's `entityCubeY` came from a ticket field nothing set,
 was written only when the ticket also forced cubes, and was dropped on load, so a cubic world

@@ -1,12 +1,13 @@
 # Cleanroom and Java 25 development
 
-This fork targets Minecraft 1.12.2 on Cleanroom 0.6.13-alpha / JDK 25, run on Java 25 or 26,
+This fork targets Minecraft 1.12.2 on Cleanroom 0.7.14-alpha / JDK 25, run on Java 25 or 26,
 with the upstream CubicChunks API and source tree, including the earlier asynchronous
 completion ownership fix. The Forge 14.23.5.2860 / Java 8 fallback was retired on
 October 30, 2026, so the source may use any Java 25 API.
 
-The `cleanroom/` project uses the Cleanroom Unimined conventions and is the only build; upstream's
-ForgeGradle project was removed on November 10, 2026. Build with a JDK 25 launcher:
+The `cleanroom/` project uses CleanroomGradle and is the only build; upstream's ForgeGradle project
+was removed on November 10, 2026, and the Unimined build that compiled against Cleanroom 0.6.13-alpha
+on November 11, 2026. Build with a JDK 25 launcher:
 
 ```sh
 cd cleanroom
@@ -17,7 +18,7 @@ Use `gradlew.bat` on Windows. The remapped runtime JAR is under
 `cleanroom/build/cleanroom/libs`. The
 `*-dev.jar` files are development outputs, not native runtime artifacts.
 
-The port does not bundle Mixin into Cleanroom. Minecraft mods belong in remapped mod configurations; ordinary
+The port does not bundle Mixin into Cleanroom. Minecraft mods are compile-only `deobf(...)` inputs; ordinary
 Java libraries remain separate. Native world mutation, lighting, event
 publication and saving keep their existing thread ownership.
 
