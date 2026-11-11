@@ -56,7 +56,6 @@ import javax.annotation.ParametersAreNonnullByDefault;
 public class MixinViewFrustum_VertViewDistance {
 
     @Shadow @Final protected World world;
-    @Shadow @Final protected RenderGlobal renderGlobal;
     private int renderDistance = 16;
 
     //this one can fail, there is safe default

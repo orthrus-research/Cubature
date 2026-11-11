@@ -48,15 +48,10 @@ import javax.annotation.ParametersAreNonnullByDefault;
 @Mixin(World.class)
 public abstract class MixinWorld_HeightLimits implements ICubicWorld {
 
-    @Final @Shadow public WorldProvider provider;
 
-    @Shadow public abstract boolean isValid(BlockPos pos);
 
-    @Shadow public abstract boolean isBlockLoaded(BlockPos pos);
 
-    @Shadow public abstract IBlockState getBlockState(BlockPos pos);
 
-    @Shadow public abstract int getLightFor(EnumSkyBlock type, BlockPos pos);
 
     // I don't know why but this is what the code is transformed into:
     /*

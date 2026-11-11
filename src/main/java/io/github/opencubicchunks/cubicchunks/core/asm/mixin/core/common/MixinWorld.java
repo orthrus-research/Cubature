@@ -87,17 +87,13 @@ import javax.annotation.ParametersAreNonnullByDefault;
 public abstract class MixinWorld implements ICubicWorldInternal {
 
     // these have to be here because of mixin limitation, they are used by MixinWorldServer
-    @Shadow public abstract ISaveHandler getSaveHandler();
     @Shadow public abstract boolean isAreaLoaded(BlockPos blockpos1, BlockPos blockpos2);
     @Shadow public abstract boolean isAreaLoaded(BlockPos center, int radius);
 
     @Shadow protected IChunkProvider chunkProvider;
     @Shadow @Final @Mutable public WorldProvider provider;
     @Shadow @Final public Random rand;
-    @Shadow @Final public boolean isRemote;
     @Shadow @Final public Profiler profiler;
-    @Shadow @Final @Mutable protected ISaveHandler saveHandler;
-    @Shadow protected boolean findingSpawnPoint;
     @Shadow protected WorldInfo worldInfo;
     @Shadow protected int updateLCG;
 
@@ -108,7 +104,6 @@ public abstract class MixinWorld implements ICubicWorldInternal {
     protected int minHeight = 0, maxHeight = 256;
     private int minGenerationHeight = 0, maxGenerationHeight = 256;
 
-    @Shadow public abstract boolean isValid(BlockPos pos);
 
     @Shadow public abstract GameRules getGameRules();
 
@@ -140,9 +135,7 @@ public abstract class MixinWorld implements ICubicWorldInternal {
 
     @Shadow public abstract Chunk getChunk(BlockPos pos);
 
-    @Shadow public abstract boolean canSeeSky(BlockPos pos);
 
-    @Shadow public abstract void setLightFor(EnumSkyBlock type, BlockPos pos, int lightValue);
 
     // Used by MixinWorldServer.
     @Shadow public abstract boolean spawnEntity(Entity entityIn);

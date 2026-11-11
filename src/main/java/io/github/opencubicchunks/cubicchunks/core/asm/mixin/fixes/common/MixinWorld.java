@@ -47,9 +47,7 @@ import net.minecraft.world.chunk.Chunk;
 @Mixin(World.class)
 public abstract class MixinWorld implements ICubicWorld {
 
-    @Shadow public abstract WorldBorder getWorldBorder();
 
-    @Shadow public abstract boolean isInsideWorldBorder(Entity entity);
 
     // note: markAndNotifyBlock has @Nullable on chunk, this will never be null here,
     // because this isgit lo the chunk on which isPopulated is called

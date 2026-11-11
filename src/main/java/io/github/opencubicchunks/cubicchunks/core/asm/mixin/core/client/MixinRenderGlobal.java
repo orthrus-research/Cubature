@@ -72,9 +72,7 @@ public class MixinRenderGlobal {
 
     @Nullable private BlockPos position;
 
-    @Shadow private int renderDistanceChunks;
 
-    @Shadow private ViewFrustum viewFrustum;
 
     @Shadow private WorldClient world;
 

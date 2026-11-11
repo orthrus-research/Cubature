@@ -52,7 +52,6 @@ import javax.annotation.ParametersAreNonnullByDefault;
 @Mixin(World.class)
 public abstract class MixinWorld_Tick implements ICubicWorld {
 
-    @Shadow @Final public boolean isRemote;
 
     private int updateEntity_entityPosY;
     private int updateEntity_entityPosX;

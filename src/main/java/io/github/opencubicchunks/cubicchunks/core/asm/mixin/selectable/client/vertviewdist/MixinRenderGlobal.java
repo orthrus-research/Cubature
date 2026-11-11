@@ -47,8 +47,6 @@ import javax.annotation.Nullable;
 @Mixin(value = RenderGlobal.class, priority = 2000)
 public abstract class MixinRenderGlobal {
     @Shadow
-    private ViewFrustum viewFrustum;
-    @Shadow
     @Final
     private Minecraft mc;
     @Shadow

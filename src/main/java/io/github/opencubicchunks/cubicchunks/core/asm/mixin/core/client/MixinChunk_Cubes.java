@@ -53,9 +53,7 @@ import net.minecraft.world.chunk.Chunk;
 @Mixin(Chunk.class)
 public abstract class MixinChunk_Cubes implements IColumn {
 
-    @Shadow public abstract ExtendedBlockStorage[] getBlockStorageArray();
 
-    @Shadow @Final private ExtendedBlockStorage[] storageArrays;
     /*
      * WARNING: WHEN YOU RENAME ANY OF THESE 3 FIELDS RENAME CORRESPONDING
      * FIELDS IN "cubicchunks.asm.mixin.core.common.MixinChunk_Cubes" and

@@ -80,7 +80,6 @@ public abstract class MixinChunk_Column {
 
     @Shadow @Final private World world;
 
-    @Shadow public boolean unloadQueued;
 
     @Shadow @Final private int[] heightMap;
 

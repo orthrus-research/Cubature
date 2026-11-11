@@ -110,8 +110,6 @@ public abstract class MixinWorldServer extends MixinWorld implements ICubicWorld
 
     @Shadow @Mutable @Final private PlayerChunkMap playerChunkMap;
     @Shadow @Mutable @Final private WorldEntitySpawner entitySpawner;
-    @Shadow @Mutable @Final private EntityTracker entityTracker;
-    @Shadow public boolean disableLevelSaving;
     private Map<Chunk, Set<ICube>> forcedChunksCubes;
     private XYZMap<ICube> forcedCubes;
     private XZMap<IColumn> forcedColumns;
@@ -128,7 +126,6 @@ public abstract class MixinWorldServer extends MixinWorld implements ICubicWorld
     @Shadow @Mutable @Final private Set<NextTickListEntry> pendingTickListEntriesHashSet;
     @Shadow @Mutable @Final private List<NextTickListEntry> pendingTickListEntriesThisTick;
 
-    @Shadow public abstract PlayerChunkMap getPlayerChunkMap();
 
     @Shadow protected abstract boolean canAddEntity(Entity entityIn);
 

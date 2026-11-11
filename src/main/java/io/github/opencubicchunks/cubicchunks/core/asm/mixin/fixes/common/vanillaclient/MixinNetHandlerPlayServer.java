@@ -66,9 +66,7 @@ public class MixinNetHandlerPlayServer {
 
     @Shadow public EntityPlayerMP player;
 
-    @Shadow private Vec3d targetPos;
 
-    @Shadow private int teleportId;
 
     @Inject(method = "processPlayerDigging",
             at = @At(value = "INVOKE", shift = At.Shift.AFTER,

@@ -110,7 +110,6 @@ public abstract class MixinChunk_Cubes {
     @Shadow @Final private ExtendedBlockStorage[] storageArrays;
     @Shadow @Final public static ExtendedBlockStorage NULL_BLOCK_STORAGE;
 
-    @Shadow private boolean hasEntities;
     @Shadow @Final public int x;
     @Shadow @Final public int z;
     @Shadow @Final private ClassInheritanceMultiMap<Entity>[] entityLists;

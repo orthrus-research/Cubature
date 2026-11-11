@@ -71,15 +71,12 @@ import javax.annotation.ParametersAreNonnullByDefault;
 @Mixin(World.class)
 public abstract class MixinWorld_HeightLimits implements ICubicWorld {
 
-    @Shadow private int skylightSubtracted;
 
     @Shadow @Final public boolean isRemote;
 
-    @Shadow @Final public WorldProvider provider;
 
     @Shadow public abstract Chunk getChunk(BlockPos pos);
 
-    @Shadow public abstract IBlockState getBlockState(BlockPos pos);
 
     @Shadow public abstract boolean isBlockLoaded(BlockPos pos);
 
