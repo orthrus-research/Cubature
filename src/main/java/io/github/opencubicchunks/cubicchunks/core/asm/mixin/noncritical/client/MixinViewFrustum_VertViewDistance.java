@@ -24,6 +24,8 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.noncritical.client;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import io.github.opencubicchunks.cubicchunks.api.util.Coords;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
 import io.github.opencubicchunks.cubicchunks.core.CubicChunksConfig;
@@ -42,7 +44,6 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.ModifyConstant;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
-import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import javax.annotation.ParametersAreNonnullByDefault;
@@ -97,13 +98,13 @@ public class MixinViewFrustum_VertViewDistance {
         return maxY - ((ICubicWorld) world).getMinHeight();
     }
 
-    @Redirect(method = "getRenderChunk", at = @At(value = "INVOKE", target = "Lnet/minecraft/util/math/BlockPos;getY()I"))
-    private int modifyMaxYForUpdate(BlockPos instance) {
+    @WrapOperation(method = "getRenderChunk", at = @At(value = "INVOKE", target = "Lnet/minecraft/util/math/BlockPos;getY()I"))
+    private int modifyMaxYForUpdate(BlockPos instance, Operation<Integer> original) {
         if (((ICubicWorld) world).isCubicWorld()) {
-            return instance.getY();
+            return original.call(instance);
         }
         // vanilla case: support extended height
-        return instance.getY() - ((ICubicWorld) world).getMinHeight();
+        return original.call(instance) - ((ICubicWorld) world).getMinHeight();
     }
 
     @ModifyConstant(method = "setCountChunksXYZ", constant = @Constant(intValue = 16))

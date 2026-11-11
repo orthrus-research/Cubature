@@ -24,6 +24,8 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.fixes.common;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import io.github.opencubicchunks.cubicchunks.api.util.CubePos;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
 import mcp.MethodsReturnNonnullByDefault;
@@ -41,7 +43,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Constant;
 import org.spongepowered.asm.mixin.injection.Group;
 import org.spongepowered.asm.mixin.injection.ModifyConstant;
-import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.Slice;
 
 import javax.annotation.ParametersAreNonnullByDefault;
@@ -88,7 +89,7 @@ public abstract class MixinBlockFalling_HeightLimits extends Block {
         return ((ICubicWorld) worldIn).getMinHeight();
     }
 
-    @Redirect(method = "checkFallable",
+    @WrapOperation(method = "checkFallable",
             at = @At(
                     value = "INVOKE",
                     target = "Lnet/minecraft/world/World;getBlockState(Lnet/minecraft/util/math/BlockPos;)Lnet/minecraft/block/state/IBlockState;"
@@ -102,23 +103,23 @@ public abstract class MixinBlockFalling_HeightLimits extends Block {
                     to = @At(value = "TAIL")
             ),
             require = 2)
-    private IBlockState checkCanFallThroughGetBlockState(World world, BlockPos pos, World worldIn, BlockPos origPos) {
+    private IBlockState checkCanFallThroughGetBlockState(World world, BlockPos pos, Operation<IBlockState> original, World worldIn, BlockPos origPos) {
         if (pos == origPos) {
             // this means a getBlockState that is actually used to do something
-            return world.getBlockState(pos);
+            return original.call(world, pos);
         }
         if (!((ICubicWorld) worldIn).isCubicWorld() || world.isBlockLoaded(pos.down(), false)) {
-            return world.getBlockState(pos);
+            return original.call(world, pos);
         }
         // a state that nothing can fall through
         return Blocks.BEDROCK.getDefaultState();
     }
 
-    @Redirect(method = "checkFallable",
+    @WrapOperation(method = "checkFallable",
             at = @At(value = "INVOKE", target = "Lnet/minecraft/world/World;isAirBlock(Lnet/minecraft/util/math/BlockPos;)Z"), require = 2)
-    private boolean checkIsAirBlock(World worldIn, BlockPos pos) {
+    private boolean checkIsAirBlock(World worldIn, BlockPos pos, Operation<Boolean> original) {
         if (!((ICubicWorld) worldIn).isCubicWorld() || worldIn.isBlockLoaded(pos.down(), false)) {
-            return worldIn.isAirBlock(pos);
+            return original.call(worldIn, pos);
         }
         return false;
     }

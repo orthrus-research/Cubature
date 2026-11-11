@@ -24,6 +24,8 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.noncritical.common;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
 import mcp.MethodsReturnNonnullByDefault;
 import net.minecraft.block.BlockPistonBase;
@@ -34,7 +36,6 @@ import net.minecraft.world.World;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Group;
-import org.spongepowered.asm.mixin.injection.Redirect;
 
 import javax.annotation.ParametersAreNonnullByDefault;
 
@@ -44,18 +45,17 @@ import javax.annotation.ParametersAreNonnullByDefault;
 public class MixinBlockPistonBase_HeightFix {
 
     @Group(min = 4, max = 4)
-    @Redirect(
+    @WrapOperation(
             method = "canPush",
             at = @At(value = "INVOKE", target = "Lnet/minecraft/util/math/BlockPos;getY()I")
     )
-    private static int getBlockYRedirect(BlockPos pos, IBlockState blockStateIn, World worldIn, BlockPos posArg, EnumFacing facing,
-            boolean destroyBlocks, EnumFacing p_185646_5_) {
+    private static int getBlockYRedirect(BlockPos pos, Operation<Integer> original, IBlockState blockStateIn, World worldIn, BlockPos posArg, EnumFacing facing, boolean destroyBlocks, EnumFacing p_185646_5_) {
         // keep the old way here because mixin intentionally won't support replacing == 0 and != 0 to avoid issues with booleans
 
         ICubicWorld world = (ICubicWorld) worldIn;
         // if it's out of bounds - return current value, it's gongto be out of vanilla bounds check
-        if (pos.getY() < world.getMinHeight() || pos.getY() >= world.getMaxHeight()) {
-            return pos.getY();
+        if (original.call(pos) < world.getMinHeight() || original.call(pos) >= world.getMaxHeight()) {
+            return original.call(pos);
         }
         // if it's inside world bounds - return constant so teh check succeeds
         return 64;

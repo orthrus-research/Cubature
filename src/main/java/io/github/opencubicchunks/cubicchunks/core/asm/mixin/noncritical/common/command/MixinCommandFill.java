@@ -24,6 +24,8 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.noncritical.common.command;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import io.github.opencubicchunks.cubicchunks.core.world.cube.Cube;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
 import io.github.opencubicchunks.cubicchunks.core.world.cube.Cube;
@@ -40,7 +42,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Constant;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyConstant;
-import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.Slice;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.LocalCapture;
@@ -93,11 +94,11 @@ public class MixinCommandFill {
         maxY = maxPos.getY();
     }
 
-    @Redirect(method = "execute",
+    @WrapOperation(method = "execute",
             at = @At(value = "INVOKE", target = "Lnet/minecraft/world/World;isBlockLoaded(Lnet/minecraft/util/math/BlockPos;)Z"))
-    private boolean isBlockLoadedCheckForHeightRangeRedirect(World world, BlockPos pos) {
+    private boolean isBlockLoadedCheckForHeightRangeRedirect(World world, BlockPos pos, Operation<Boolean> original) {
         if (!((ICubicWorld) world).isCubicWorld()) {
-            return world.isBlockLoaded(pos);
+            return original.call(world, pos);
         }
         if (minY == null) {
             assert maxY == null;
@@ -105,7 +106,7 @@ public class MixinCommandFill {
             return ((ICubicWorld) world).isBlockColumnLoaded(pos);
         }
         for (int blockY = minY; blockY <= maxY; blockY += Cube.SIZE) {
-            if (!world.isBlockLoaded(new BlockPos(pos.getX(), blockY, pos.getZ()))) {
+            if (!original.call(world, new BlockPos(pos.getX(), blockY, pos.getZ()))) {
                 return false;
             }
         }

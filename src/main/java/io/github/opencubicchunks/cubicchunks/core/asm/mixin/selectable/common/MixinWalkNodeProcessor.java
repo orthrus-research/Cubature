@@ -24,6 +24,8 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.selectable.common;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -32,7 +34,6 @@ import javax.annotation.ParametersAreNonnullByDefault;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
-import org.spongepowered.asm.mixin.injection.Redirect;
 
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
 import mcp.MethodsReturnNonnullByDefault;
@@ -50,8 +51,8 @@ import net.minecraft.world.World;
 @Mixin(WalkNodeProcessor.class)
 public abstract class MixinWalkNodeProcessor extends NodeProcessor {
 
-    @Redirect(method = "getSafePoint", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/World;collidesWithAnyBlock(Lnet/minecraft/util/math/AxisAlignedBB;)Z"), require = 2)
-    private boolean collidesWithAnyBlockRedirect(World worldIn, AxisAlignedBB aabb) {
+    @WrapOperation(method = "getSafePoint", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/World;collidesWithAnyBlock(Lnet/minecraft/util/math/AxisAlignedBB;)Z"), require = 2)
+    private boolean collidesWithAnyBlockRedirect(World worldIn, AxisAlignedBB aabb, Operation<Boolean> original) {
         if (((ICubicWorld) worldIn).isCubicWorld()) {
             List<AxisAlignedBB> aabbList = new ArrayList<AxisAlignedBB>();
             double minX = aabb.minX;
@@ -75,7 +76,7 @@ public abstract class MixinWalkNodeProcessor extends NodeProcessor {
             }
             return false;
         }
-        return worldIn.collidesWithAnyBlock(aabb);
+        return original.call(worldIn, aabb);
     }
 
     @ModifyVariable(method = "getPathNodeType(Lnet/minecraft/world/IBlockAccess;IIILnet/minecraft/entity/EntityLiving;IIIZZ)Lnet/minecraft/pathfinding/PathNodeType;", at = @At("HEAD"))

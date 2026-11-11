@@ -24,6 +24,8 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.noncritical.client;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import io.github.opencubicchunks.cubicchunks.api.util.Coords;
 import io.github.opencubicchunks.cubicchunks.api.world.IColumn;
 import io.github.opencubicchunks.cubicchunks.api.world.ICube;
@@ -42,7 +44,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Constant;
 import org.spongepowered.asm.mixin.injection.Group;
 import org.spongepowered.asm.mixin.injection.ModifyConstant;
-import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.Slice;
 
 import javax.annotation.ParametersAreNonnullByDefault;
@@ -87,13 +88,13 @@ public class MixinGuiOverlayDebug {
         return ((ICubicWorld) mc.world).getMaxHeight();
     }
 
-    @Redirect(method = "call", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/chunk/Chunk;getBiome(Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/world/biome/BiomeProvider;)Lnet/minecraft/world/biome/Biome;"))
-    private Biome getBiome(Chunk chunk, BlockPos pos, BiomeProvider provider) {
+    @WrapOperation(method = "call", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/chunk/Chunk;getBiome(Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/world/biome/BiomeProvider;)Lnet/minecraft/world/biome/Biome;"))
+    private Biome getBiome(Chunk chunk, BlockPos pos, BiomeProvider provider, Operation<Biome> original) {
         if (((ICubicWorld) chunk.getWorld()).isCubicWorld()) {
             ICube cube = ((IColumn) chunk).getCube(Coords.blockToCube(pos.getY()));
             return cube.getBiome(pos);
         } else {
-            return chunk.getBiome(pos, provider);
+            return original.call(chunk, pos, provider);
         }
     }
 }

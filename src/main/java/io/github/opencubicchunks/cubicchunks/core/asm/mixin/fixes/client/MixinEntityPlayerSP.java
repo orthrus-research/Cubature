@@ -24,6 +24,8 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.fixes.client;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.mojang.authlib.GameProfile;
 import io.github.opencubicchunks.cubicchunks.core.asm.MixinUtils;
 import mcp.MethodsReturnNonnullByDefault;
@@ -35,7 +37,6 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Constant;
 import org.spongepowered.asm.mixin.injection.ModifyConstant;
-import org.spongepowered.asm.mixin.injection.Redirect;
 
 import javax.annotation.ParametersAreNonnullByDefault;
 
@@ -53,9 +54,9 @@ public class MixinEntityPlayerSP extends AbstractClientPlayer {
         return this.posY;
     }
 
-    @Redirect(method = "onUpdate",
+    @WrapOperation(method = "onUpdate",
             at = @At(target = "Lnet/minecraft/world/World;isBlockLoaded(Lnet/minecraft/util/math/BlockPos;)Z", value = "INVOKE"))
-    private boolean canEntityUpdate_isBlockLoadedRedirect(World world, BlockPos pos) {
+    private boolean canEntityUpdate_isBlockLoadedRedirect(World world, BlockPos pos, Operation<Boolean> original) {
         return MixinUtils.canTickPosition(world, pos);
     }
 }

@@ -24,6 +24,8 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.core.common;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import static io.github.opencubicchunks.cubicchunks.api.util.Coords.blockToCube;
 import static io.github.opencubicchunks.cubicchunks.api.util.Coords.blockToLocal;
 
@@ -399,11 +401,11 @@ public abstract class MixinChunk_Cubes {
         }
     }
 
-    @Redirect(method = "setBlockState", at = @At(value = "INVOKE",
+    @WrapOperation(method = "setBlockState", at = @At(value = "INVOKE",
             target = "Lnet/minecraft/world/chunk/Chunk;getLightFor(Lnet/minecraft/world/EnumSkyBlock;Lnet/minecraft/util/math/BlockPos;)I"))
-    private int setBlockState_CubicChunks_noGetLightFor(Chunk instance, EnumSkyBlock type, BlockPos pos) {
+    private int setBlockState_CubicChunks_noGetLightFor(Chunk instance, EnumSkyBlock type, BlockPos pos, Operation<Integer> original) {
         if (!isColumn) {
-            return instance.getLightFor(type, pos);
+            return original.call(instance, type, pos);
         }
         return 0;
     }
@@ -656,15 +658,15 @@ public abstract class MixinChunk_Cubes {
         }
     }
 
-    @Redirect(method = "addEntity",
+    @WrapOperation(method = "addEntity",
             at = @At(
                     value = "INVOKE",
                     target = "Lnet/minecraft/util/ClassInheritanceMultiMap;add(Ljava/lang/Object;)Z"
             ),
             require = 1)
-    private boolean addEntity_getEntityList(ClassInheritanceMultiMap<Object> obj, Object entity) {
+    private boolean addEntity_getEntityList(ClassInheritanceMultiMap<Object> obj, Object entity, Operation<Boolean> original) {
         if (!isColumn) {
-            return obj.add(entity);
+            return original.call(obj, entity);
         }
         assert obj == null;
         return true; // ignored
@@ -717,15 +719,15 @@ public abstract class MixinChunk_Cubes {
         }
     }
 
-    @Redirect(method = "removeEntityAtIndex",
+    @WrapOperation(method = "removeEntityAtIndex",
             at = @At(
                     value = "INVOKE",
                     target = "Lnet/minecraft/util/ClassInheritanceMultiMap;remove(Ljava/lang/Object;)Z"
             ),
             require = 1)
-    private boolean removeEntityAtIndex_getEntityList(ClassInheritanceMultiMap<Object> obj, Object entity) {
+    private boolean removeEntityAtIndex_getEntityList(ClassInheritanceMultiMap<Object> obj, Object entity, Operation<Boolean> original) {
         if (!isColumn) {
-            return obj.remove(entity);
+            return original.call(obj, entity);
         }
         assert obj == null;
         return true; // ignored

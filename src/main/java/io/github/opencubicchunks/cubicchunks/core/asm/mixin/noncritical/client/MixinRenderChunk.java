@@ -24,6 +24,8 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.noncritical.client;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import io.github.opencubicchunks.cubicchunks.core.client.RenderCubeCache;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
 import mcp.MethodsReturnNonnullByDefault;
@@ -36,7 +38,6 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
@@ -55,8 +56,8 @@ public abstract class MixinRenderChunk {
     private void onConstruct(World worldIn, RenderGlobal renderGlobalIn, int indexIn, CallbackInfo ci) {
         this.initModelviewMatrix();
     }
-    @Redirect(method = "setPosition", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/chunk/RenderChunk;initModelviewMatrix()V"))
-    private void noop(RenderChunk instance) {
+    @WrapOperation(method = "setPosition", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/chunk/RenderChunk;initModelviewMatrix()V"))
+    private void noop(RenderChunk instance, Operation<Void> original) {
     }
 
     @Inject(method = "createRegionRenderCache", at = @At(value = "HEAD"), remap = false, cancellable = true)

@@ -24,6 +24,8 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.core.common;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import static io.github.opencubicchunks.cubicchunks.api.util.Coords.cubeToMinBlock;
 
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
@@ -34,7 +36,6 @@ import net.minecraft.world.World;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Redirect;
 
 /**
  * In a cubic world, an entity spawns where its block is loaded, not wherever its column is.
@@ -46,13 +47,13 @@ public abstract class MixinWorld_SpawnEntity implements ICubicWorld {
 
     @Shadow public abstract boolean isBlockLoaded(BlockPos pos, boolean allowEmpty);
 
-    @Redirect(method = "spawnEntity", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/World;isChunkLoaded(IIZ)Z"))
-    private boolean spawnEntity_isChunkLoaded(World world, int chunkX, int chunkZ, boolean allowEmpty, Entity ent) {
+    @WrapOperation(method = "spawnEntity", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/World;isChunkLoaded(IIZ)Z"))
+    private boolean spawnEntity_isChunkLoaded(World world, int chunkX, int chunkZ, boolean allowEmpty, Operation<Boolean> original, Entity ent) {
         assert this == (Object) world;
         if (isCubicWorld()) {
             return this.isBlockLoaded(new BlockPos(cubeToMinBlock(chunkX), ent.posY, cubeToMinBlock(chunkZ)), allowEmpty);
         } else {
-            return this.isChunkLoaded(chunkX, chunkZ, allowEmpty);
+            return original.call(world, chunkX, chunkZ, allowEmpty);
         }
     }
 }

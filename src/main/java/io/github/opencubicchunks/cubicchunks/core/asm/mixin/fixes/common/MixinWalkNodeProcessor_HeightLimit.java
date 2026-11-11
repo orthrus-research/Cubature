@@ -24,6 +24,8 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.fixes.common;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
 import io.github.opencubicchunks.cubicchunks.api.world.IMinMaxHeight;
 import mcp.MethodsReturnNonnullByDefault;
@@ -37,7 +39,6 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Constant;
 import org.spongepowered.asm.mixin.injection.ModifyConstant;
-import org.spongepowered.asm.mixin.injection.Redirect;
 
 import javax.annotation.ParametersAreNonnullByDefault;
 
@@ -52,13 +53,13 @@ public abstract class MixinWalkNodeProcessor_HeightLimit extends NodeProcessor {
     }
 
     // redirect getBlockState and check if the block is loaded
-    @Redirect(method = "getStart", at = @At(value = "INVOKE",
+    @WrapOperation(method = "getStart", at = @At(value = "INVOKE",
             target = "Lnet/minecraft/world/IBlockAccess;getBlockState(Lnet/minecraft/util/math/BlockPos;)Lnet/minecraft/block/state/IBlockState;"))
-    private IBlockState getLoadedBlockState_getStart(IBlockAccess access, BlockPos pos) {
+    private IBlockState getLoadedBlockState_getStart(IBlockAccess access, BlockPos pos, Operation<IBlockState> original) {
         if (!entity.world.isBlockLoaded(pos)) {
             return Blocks.BEDROCK.getDefaultState();
         }
-        return access.getBlockState(pos);
+        return original.call(access, pos);
     }
 
 

@@ -24,6 +24,8 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.fixes.common;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import io.github.opencubicchunks.cubicchunks.core.asm.mixin.ICubicWorldInternal;
 import net.minecraft.entity.boss.EntityDragon;
 import net.minecraft.entity.boss.dragon.phase.PhaseHoldingPattern;
@@ -36,7 +38,6 @@ import net.minecraft.world.WorldServer;
 import net.minecraft.world.end.DragonFightManager;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Redirect;
 
 // attempt at a workaround for some parts of end not working correctly in cubic end (for hybrid world)
 @Mixin(value = {
@@ -48,17 +49,17 @@ import org.spongepowered.asm.mixin.injection.Redirect;
         DragonFightManager.class}
 )
 public class MixinCubicEndWorkaround {
-    @Redirect(method = "*", at = @At(value = "INVOKE",
+    @WrapOperation(method = "*", at = @At(value = "INVOKE",
             target = "Lnet/minecraft/world/WorldServer;getTopSolidOrLiquidBlock(Lnet/minecraft/util/math/BlockPos;)Lnet/minecraft/util/math/BlockPos;"),
             require = 0)
-    private BlockPos getTopSolidOrLiquidBlockRedirect(WorldServer world, BlockPos pos) {
+    private BlockPos getTopSolidOrLiquidBlockRedirect(WorldServer world, BlockPos pos, Operation<BlockPos> original) {
         return ((ICubicWorldInternal) world).getTopSolidOrLiquidBlockVanilla(pos);
     }
 
-    @Redirect(method = "*", at = @At(value = "INVOKE",
+    @WrapOperation(method = "*", at = @At(value = "INVOKE",
             target = "Lnet/minecraft/world/World;getTopSolidOrLiquidBlock(Lnet/minecraft/util/math/BlockPos;)Lnet/minecraft/util/math/BlockPos;"),
             require = 0)
-    private BlockPos getTopSolidOrLiquidBlockRedirect(World world, BlockPos pos) {
+    private BlockPos getTopSolidOrLiquidBlockRedirect(World world, BlockPos pos, Operation<BlockPos> original) {
         return ((ICubicWorldInternal) world).getTopSolidOrLiquidBlockVanilla(pos);
     }
 

@@ -24,6 +24,8 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.fixes.common;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import mcp.MethodsReturnNonnullByDefault;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
@@ -61,11 +63,11 @@ public abstract class MixinEntityLivingBase extends Entity {
         return ((ICubicWorld) world).getMinHeight();
     }
 
-    @Redirect(method = "attemptTeleport", at = @At(value = "INVOKE", target = "Lnet/minecraft/util/math/BlockPos;getY()I"))
-    private int isBlockLoadedTeleportCheck(BlockPos blockPos) {
+    @WrapOperation(method = "attemptTeleport", at = @At(value = "INVOKE", target = "Lnet/minecraft/util/math/BlockPos;getY()I"))
+    private int isBlockLoadedTeleportCheck(BlockPos blockPos, Operation<Integer> original) {
         // in this check:
         // while (!flag1 && blockpos.getY() > 0)
         // return very high Y if the block isn't loaded to avoid potentially infinite loop
-        return world.isBlockLoaded(blockPos.down()) ? blockPos.getY() : (Integer.MIN_VALUE + 1);
+        return world.isBlockLoaded(blockPos.down()) ? original.call(blockPos) : (Integer.MIN_VALUE + 1);
     }
 }

@@ -24,6 +24,8 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.core.client;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import io.github.opencubicchunks.cubicchunks.core.world.EntityContainer;
 import io.github.opencubicchunks.cubicchunks.core.world.cube.BlankCube;
 import io.github.opencubicchunks.cubicchunks.api.world.ICube;
@@ -48,7 +50,6 @@ import org.spongepowered.asm.mixin.injection.Constant;
 import org.spongepowered.asm.mixin.injection.Group;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyConstant;
-import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.Slice;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.LocalCapture;
@@ -110,14 +111,14 @@ public class MixinRenderGlobal {
      * Then chunk.getEntityLists is redirected to a method that returns a 1-element array.
      */
     @Group(name = "renderEntitiesFix")
-    @Redirect(method = "renderEntities", at = @At(value = "INVOKE", target = "Lnet/minecraft/util/math/BlockPos;getY()I"), require = 1)
-    private int getRenderChunkYPos(BlockPos pos) {
+    @WrapOperation(method = "renderEntities", at = @At(value = "INVOKE", target = "Lnet/minecraft/util/math/BlockPos;getY()I"), require = 1)
+    private int getRenderChunkYPos(BlockPos pos, Operation<Integer> original) {
         //position is null when it's not cubic chunks renderer
         if (this.position != null) {
             return 0;//must be 0 (or anything between 0 and 15)
         }
         // vanilla case: minHeight is zero normally, subtracting minHeight for extended height support
-        return pos.getY() - ((ICubicWorld) world).getMinHeight();
+        return original.call(pos) - ((ICubicWorld) world).getMinHeight();
     }
 
     /*
@@ -126,12 +127,12 @@ public class MixinRenderGlobal {
      */
     @SuppressWarnings("unchecked")
     @Group(name = "renderEntitiesFix")
-    @Redirect(method = "renderEntities",
+    @WrapOperation(method = "renderEntities",
             at = @At(value = "INVOKE", target = "Lnet/minecraft/world/chunk/Chunk;getEntityLists()[Lnet/minecraft/util/ClassInheritanceMultiMap;"),
             require = 1)
-    private ClassInheritanceMultiMap<Entity>[] getEntityList(Chunk chunk) {
+    private ClassInheritanceMultiMap<Entity>[] getEntityList(Chunk chunk, Operation<ClassInheritanceMultiMap<Entity>[]> original) {
         if (position == null) {
-            return chunk.getEntityLists(); //TODO: is this right?
+            return original.call(chunk); //TODO: is this right?
         }
 
         ICube cube = ((IColumn) chunk).getCube(Coords.blockToCube(position.getY()));

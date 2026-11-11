@@ -24,6 +24,8 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.core.common;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import io.github.opencubicchunks.cubicchunks.api.util.Coords;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
 import io.github.opencubicchunks.cubicchunks.core.asm.mixin.ICubicWorldInternal;
@@ -47,10 +49,10 @@ import javax.annotation.ParametersAreNonnullByDefault;
 @ParametersAreNonnullByDefault
 @Mixin(PlayerList.class)
 public abstract class MixinPlayerList_LogoutAndRespawn {
-    @Redirect(method = "playerLoggedOut",
+    @WrapOperation(method = "playerLoggedOut",
             at = @At(value = "INVOKE", target = "Lnet/minecraft/world/chunk/Chunk;markDirty()V", ordinal = 0),
             require = 1)
-    private void setChunkModifiedOnPlayerLoggedOut(Chunk chunkIn, EntityPlayerMP playerIn) {
+    private void setChunkModifiedOnPlayerLoggedOut(Chunk chunkIn, Operation<Void> original, EntityPlayerMP playerIn) {
         ICubicWorldInternal world = (ICubicWorldInternal) playerIn.getServerWorld();
         if (world.isCubicWorld()) {
             world.getCubeFromCubeCoords(playerIn.chunkCoordX, playerIn.chunkCoordY, playerIn.chunkCoordZ).markDirty();

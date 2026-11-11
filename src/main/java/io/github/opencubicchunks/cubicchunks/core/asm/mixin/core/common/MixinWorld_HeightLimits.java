@@ -24,6 +24,8 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.core.common;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import static io.github.opencubicchunks.cubicchunks.api.util.Coords.blockToCube;
 import static io.github.opencubicchunks.cubicchunks.api.util.Coords.cubeToMinBlock;
 
@@ -216,25 +218,25 @@ public abstract class MixinWorld_HeightLimits implements ICubicWorld {
         }
     }
 
-    @Redirect(method = "updateEntityWithOptionalForce",
+    @WrapOperation(method = "updateEntityWithOptionalForce",
             at = @At(value = "INVOKE", target = "Lnet/minecraft/world/World;isChunkLoaded(IIZ)Z", ordinal = 0))
-    private boolean updateEntityWithOptionalForce_isChunkLoaded0(World world, int chunkX, int chunkZ, boolean allowEmpty, Entity ent, boolean force) {
+    private boolean updateEntityWithOptionalForce_isChunkLoaded0(World world, int chunkX, int chunkZ, boolean allowEmpty, Operation<Boolean> original, Entity ent, boolean force) {
         assert this == (Object) world;
         if (isCubicWorld()) {
             return this.isBlockLoaded(new BlockPos(cubeToMinBlock(chunkX), cubeToMinBlock(ent.chunkCoordY), cubeToMinBlock(chunkZ)), allowEmpty);
         } else {
-            return this.isChunkLoaded(chunkX, chunkZ, allowEmpty);
+            return original.call(world, chunkX, chunkZ, allowEmpty);
         }
     }
 
-    @Redirect(method = "updateEntityWithOptionalForce",
+    @WrapOperation(method = "updateEntityWithOptionalForce",
             at = @At(value = "INVOKE", target = "Lnet/minecraft/world/World;isChunkLoaded(IIZ)Z", ordinal = 1))
-    private boolean updateEntityWithOptionalForce_isChunkLoaded1(World world, int chunkX, int chunkZ, boolean allowEmpty, Entity ent, boolean force) {
+    private boolean updateEntityWithOptionalForce_isChunkLoaded1(World world, int chunkX, int chunkZ, boolean allowEmpty, Operation<Boolean> original, Entity ent, boolean force) {
         assert this == (Object) world;
         if (isCubicWorld()) {
             return this.isBlockLoaded(new BlockPos(cubeToMinBlock(chunkX), ent.posY, cubeToMinBlock(chunkZ)), allowEmpty);
         } else {
-            return this.isChunkLoaded(chunkX, chunkZ, allowEmpty);
+            return original.call(world, chunkX, chunkZ, allowEmpty);
         }
     }
 
@@ -256,13 +258,13 @@ public abstract class MixinWorld_HeightLimits implements ICubicWorld {
         updateEntities_enityChunkBlockY = cubeToMinBlock(entity.chunkCoordY);
     }
 
-    @Redirect(method = "updateEntities", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/World;isChunkLoaded(IIZ)Z", ordinal = 1))
-    private boolean updateEntities_isChunkLoaded(World world, int chunkX, int chunkZ, boolean allowEmpty) {
+    @WrapOperation(method = "updateEntities", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/World;isChunkLoaded(IIZ)Z", ordinal = 1))
+    private boolean updateEntities_isChunkLoaded(World world, int chunkX, int chunkZ, boolean allowEmpty, Operation<Boolean> original) {
         assert this == (Object) world;
         if (isCubicWorld()) {
             return this.isBlockLoaded(new BlockPos(cubeToMinBlock(chunkX), updateEntities_enityChunkBlockY, cubeToMinBlock(chunkZ)), allowEmpty);
         } else {
-            return this.isChunkLoaded(chunkX, chunkZ, allowEmpty);
+            return original.call(world, chunkX, chunkZ, allowEmpty);
         }
     }
     

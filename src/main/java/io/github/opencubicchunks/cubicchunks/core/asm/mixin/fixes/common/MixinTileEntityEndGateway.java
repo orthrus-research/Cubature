@@ -24,6 +24,8 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.fixes.common;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import io.github.opencubicchunks.cubicchunks.core.world.cube.Cube;
 import io.github.opencubicchunks.cubicchunks.api.world.IColumn;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
@@ -37,7 +39,6 @@ import net.minecraft.world.chunk.Chunk;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Redirect;
 
 import javax.annotation.ParametersAreNonnullByDefault;
 
@@ -46,20 +47,20 @@ import javax.annotation.ParametersAreNonnullByDefault;
 @Mixin(TileEntityEndGateway.class)
 public class MixinTileEntityEndGateway {
 
-    @Redirect(method = "findExitPortal", at = @At(value = "INVOKE",
+    @WrapOperation(method = "findExitPortal", at = @At(value = "INVOKE",
             target = "Lnet/minecraft/world/chunk/Chunk;getTopFilledSegment()I"))
-    private int getChunkTopFilledSegmentExitFromPortal(Chunk chunk) {
-        int top = chunk.getTopFilledSegment();
+    private int getChunkTopFilledSegmentExitFromPortal(Chunk chunk, Operation<Integer> original) {
+        int top = original.call(chunk);
         if (top < 0) {
             return 0;
         }
         return top;
     }
 
-    @Redirect(method = "findSpawnpointInChunk", at = @At(value = "INVOKE",
+    @WrapOperation(method = "findSpawnpointInChunk", at = @At(value = "INVOKE",
             target = "Lnet/minecraft/world/chunk/Chunk;getTopFilledSegment()I"))
-    private static int getChunkTopFilledSegmentFindSpawnpoint(Chunk chunk) {
-        int top = chunk.getTopFilledSegment();
+    private static int getChunkTopFilledSegmentFindSpawnpoint(Chunk chunk, Operation<Integer> original) {
+        int top = original.call(chunk);
         if (top < 0) {
             return 0;
         }

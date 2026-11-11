@@ -24,11 +24,12 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.fixes.common;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import io.github.opencubicchunks.cubicchunks.api.world.ICube;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Redirect;
 
 import io.github.opencubicchunks.cubicchunks.api.util.Coords;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
@@ -52,10 +53,8 @@ public abstract class MixinWorld implements ICubicWorld {
 
     // note: markAndNotifyBlock has @Nullable on chunk, this will never be null here,
     // because this isgit lo the chunk on which isPopulated is called
-    @Redirect(method = "markAndNotifyBlock", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/chunk/Chunk;isPopulated()Z"))
-    private boolean markNotifyBlock_CubeCheck(Chunk _this,
-            BlockPos pos, Chunk chunk, IBlockState oldstate,
-            IBlockState newState, int flags) {
+    @WrapOperation(method = "markAndNotifyBlock", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/chunk/Chunk;isPopulated()Z"))
+    private boolean markNotifyBlock_CubeCheck(Chunk _this, Operation<Boolean> original, BlockPos pos, Chunk chunk, IBlockState oldstate, IBlockState newState, int flags) {
         if (!this.isCubicWorld()) {
             // vanilla compatibility
             return chunk.isPopulated();

@@ -24,6 +24,8 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.fixes.common;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.item.ItemChorusFruit;
@@ -34,7 +36,6 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Constant;
 import org.spongepowered.asm.mixin.injection.ModifyConstant;
-import org.spongepowered.asm.mixin.injection.Redirect;
 import java.util.Random;
 
 @Mixin(ItemChorusFruit.class)
@@ -45,8 +46,8 @@ public abstract class MixinItemChorusFruit {
         return (double)((ICubicWorld) worldIn).getMinHeight();
     }
     
-    @Redirect(method = "onItemUseFinish", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/World;getActualHeight()I"))
-    private int getMaxHeight(World world) {
-        return ((ICubicWorld)world).isCubicWorld() ? world.getHeight() : world.getActualHeight();
+    @WrapOperation(method = "onItemUseFinish", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/World;getActualHeight()I"))
+    private int getMaxHeight(World world, Operation<Integer> original) {
+        return ((ICubicWorld)world).isCubicWorld() ? world.getHeight() : original.call(world);
     }
 }

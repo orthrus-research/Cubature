@@ -49,6 +49,8 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.noncritical.client;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
 import net.minecraft.client.renderer.chunk.ChunkRenderWorker;
 import net.minecraft.util.EnumFacing;
@@ -57,26 +59,25 @@ import net.minecraft.world.World;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Redirect;
 
 @Mixin(ChunkRenderWorker.class)
 public abstract class MixinRenderWorker {
 
-    @Redirect(method = "processTask", at = @At(value = "INVOKE",
+    @WrapOperation(method = "processTask", at = @At(value = "INVOKE",
             target = "Lnet/minecraft/client/renderer/chunk/ChunkRenderWorker;isChunkExisting(Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/world/World;)Z",
             ordinal = 0))
-    private boolean onIsChunkExisting(ChunkRenderWorker chunkRenderWorker, BlockPos pos, World world) {
+    private boolean onIsChunkExisting(ChunkRenderWorker chunkRenderWorker, BlockPos pos, World world, Operation<Boolean> original) {
         BlockPos.MutableBlockPos p = (BlockPos.MutableBlockPos) pos;
         if (((ICubicWorld) world).isCubicWorld()) {
-            if (!this.isChunkExisting(p.move(EnumFacing.EAST, 16).move(EnumFacing.DOWN, 16), world)) {
+            if (!original.call(chunkRenderWorker, p.move(EnumFacing.EAST, 16).move(EnumFacing.DOWN, 16), world)) {
                 return false;
             }
-            if (!this.isChunkExisting(p.move(EnumFacing.UP, 32), world)) {
+            if (!original.call(chunkRenderWorker, p.move(EnumFacing.UP, 32), world)) {
                 return false;
             }
             p.move(EnumFacing.DOWN, 16).move(EnumFacing.WEST, 16);
         }
-        return this.isChunkExisting(p, world);
+        return original.call(chunkRenderWorker, p, world);
     }
 
     /**
