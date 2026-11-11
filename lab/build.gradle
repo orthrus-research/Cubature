@@ -1,6 +1,6 @@
 plugins {
     id 'java'
-    id 'xyz.wagyourtail.unimined' version '1.4.43-kappa'
+    id 'com.cleanroommc.cleanroomgradle'
 }
 group = 'io.github.opencubicchunks'
 version = '0.1.0'
@@ -11,7 +11,7 @@ file('../cleanroom/gradle.properties').withInputStream { cubicProperties.load(it
 def cubicJar = file(providers.gradleProperty('cubicArtifact').getOrElse(
         "../cleanroom/build/${targetLoader}/libs/Cubature-${cubicProperties.cubic_version}-${targetLoader}.jar"))
 if (!cubicJar.isFile()) throw new GradleException('Build the matching Cubature artifact under cleanroom/ first, or select -PcubicArtifact=<frozen.jar>')
-// A content-addressed module keeps Unimined remapping fresh as the local fork changes.
+// A content-addressed module keeps the deobfuscated copy fresh as the local fork changes.
 def inputVersion = targetLoader + '-' + java.security.MessageDigest.getInstance('SHA-256').digest(cubicJar.bytes).encodeHex().toString()
 def inputRepository = file('.gradle/lab-mod-inputs')
 def inputJar = new File(inputRepository, "local/cubicchunks/CubicChunks/${inputVersion}/CubicChunks-${inputVersion}.jar")
@@ -23,18 +23,28 @@ repositories {
     maven { url = inputRepository; content { includeGroup 'local.cubicchunks' }; metadataSources { artifact() } }
     mavenCentral(); maven { url = 'https://curse.cleanroommc.com' }; maven { url = 'https://maven.cleanroommc.com' }
 }
-configurations { modCompileOnly; compileOnly.extendsFrom(modCompileOnly); modImplementation }
+// The Mixin annotation processor resolves the Distant Horizons classes the lod and delivery traces target.
+// Same input as cleanroom/build.gradle: Riven's dev/pins, else the fetched cleanroom/build-inputs.
+def rivenPins = new File(providers.environmentVariable('RIVEN_WORKSPACE').getOrElse(file('../../Riven').path), 'dev/pins')
+def buildInputs = file(providers.gradleProperty('cubicBuildInputs')
+        .getOrElse(rivenPins.isDirectory() ? rivenPins.path : '../cleanroom/build-inputs'))
 dependencies {
-    modCompileOnly "local.cubicchunks:CubicChunks:${inputVersion}"
+    implementation cleanroom.userdev(cleanroom_version)
+    compileOnly deobf("local.cubicchunks:CubicChunks:${inputVersion}")
+    compileOnly deobf(files(new File(buildInputs, 'DistantHorizons-3.3.3-1.12.2-forge.jar')))
     testImplementation 'junit:junit:4.13.2'
 }
-unimined.minecraft {
-    version '1.12.2'
-    mappings { mcp('stable', '39-1.12') }
-    cleanroom { loader cleanroom_version }
-    mods { remap(configurations.modCompileOnly) }
-    defaultRemapJar = false
-    remap(tasks.named('jar').get()) { mixinRemap { enableBaseMixin(); enableMixinExtra() } }
+// CleanMix emits shadow member mappings separately from the injection refmap; the reobf map needs both.
+def mixinMappings = layout.buildDirectory.file('generated/mixin/mcp2srg.tsrg')
+tasks.named('compileJava', JavaCompile) {
+    outputs.file(mixinMappings)
+    options.compilerArgs += ['-AmergeBehaviour=merge', "-AoutTsrgFile=${mixinMappings.get().asFile.absolutePath}"]
+    doFirst { mixinMappings.get().asFile.parentFile.mkdirs() }
+}
+tasks.named('reobfJar') {
+    dependsOn tasks.compileJava
+    map.setFrom(mixinMappings)
+    archiveClassifier = targetLoader
 }
 tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
 jar {
@@ -45,9 +55,7 @@ jar {
         attributes('ModType': 'CRL')
     }
     from('../license.txt') { into 'META-INF/licenses/cubicchunks-lab' }
-    finalizedBy tasks.named('remapJar')
 }
-tasks.named('remapJar') { archiveClassifier = targetLoader }
 tasks.named('test') {
     useJUnit()
     classpath += sourceSets.main.compileClasspath
