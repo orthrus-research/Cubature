@@ -51,7 +51,6 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Group;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.ModifyConstant;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.Slice;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -103,10 +102,8 @@ public abstract class MixinWorld_HeightLimits implements ICubicWorld {
      * @return light value at the given position
      *
      * @author Barteks2x
-     * @reason Replace {@link World#getLight(BlockPos)} with method that works outside of 0..255 height range. It would
-     * be possible to fix it using @Redirect and @ModifyConstant but this way is much cleaner, especially for simple
-     * method. A @{@link ModifyConstant} wouldn't work because it can't replace comparison to 0. This is because there
-     * is a special instruction to compare something to 0, so the constant is never used.
+     * @reason Replace {@link World#getLight(BlockPos)} with a method that works outside of the 0..255 height range.
+     * The method is short, so replacing it whole is clearer than modifying each of its bounds.
      * <p>
      * Note: The getLight method is used in parts of game logic and entity rendering code. Doesn't directly affect block
      * rendering.

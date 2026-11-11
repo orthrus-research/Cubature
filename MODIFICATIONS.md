@@ -81,6 +81,12 @@ optimisation, the fast collision check and the vanilla chunk-cache biome lookup,
 when a choice was changed, are gone. An existing file is ignored.
 Also on November 11, 2026, the fixes for a cubic End were removed: the dragon's vanilla top-block
 lookup and the End gateway's exit search. The End is excluded from cubic worlds by default.
+Also on November 11, 2026, the Mixin injectors were rewritten for CleanMix and MixinExtras:
+redirects became `@WrapOperation`, constant modifications became `@ModifyExpressionValue`, and
+array accesses and comparisons with zero are targeted through MixinExtras Expressions. Mixin
+configurations are registered by a CleanMix connector. Two behaviours changed with the rewrite,
+both upstream slips: in a cubic world a lily pad could stay on any block, and the huge mushroom
+skipped its obstruction check below Y 0. Both now behave as their height checks intend.
 Also on November 10, 2026, initial sky light and surface tracking return early for a cube without
 storage that lies above every staged column top in a sky-lit world: its 4,096 sky checks
 changed nothing, and the column's dirtying, staging removal and surface notifications still run.
