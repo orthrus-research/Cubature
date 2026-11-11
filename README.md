@@ -82,8 +82,8 @@ cd cleanroom
 ./gradlew build
 ```
 
-The build writes `Cubature-*-cleanroom.jar` with a sources JAR and the component license texts. The root Gradle build is upstream's legacy ForgeGradle setup, not
-the supported build. `tools/build_cubature.py` runs the tests and builds the optional measurement
+The build writes `Cubature-*-cleanroom.jar` with a sources JAR and the component license texts. It
+is the only build. `tools/build_cubature.py` runs the tests and builds the optional measurement
 lab (`lab/`) against the exact artifact; see [docs/cleanroom-port.md](docs/cleanroom-port.md) and
 the [lab guide](lab/README.md). [CONTRIBUTING.md](CONTRIBUTING.md) lists the checks a change must
 pass.

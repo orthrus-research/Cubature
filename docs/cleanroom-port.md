@@ -5,9 +5,8 @@ with the upstream CubicChunks API and source tree, including the earlier asynchr
 completion ownership fix. The Forge 14.23.5.2860 / Java 8 fallback was retired on
 October 30, 2026, so the source may use any Java 25 API.
 
-The isolated `cleanroom/` project uses the Cleanroom Unimined conventions.
-The repository's original ForgeGradle project is preserved. Build with a
-JDK 25 launcher:
+The `cleanroom/` project uses the Cleanroom Unimined conventions and is the only build; upstream's
+ForgeGradle project was removed on November 10, 2026. Build with a JDK 25 launcher:
 
 ```sh
 cd cleanroom

@@ -43,6 +43,9 @@ handler, a watcher player entry, the generic `WatchersSortingList` with its test
 tick-storage cache, a BetterPortals accessor on the column watcher, debug dumps, and setters and
 overloads without callers. The structure-start Mixin still writes its unused `ChunkY` tag, so saved
 structure data is unchanged.
+Also on November 10, 2026, upstream's ForgeGradle build was removed: the root and API Gradle
+scripts, properties and wrappers, and the two `buildSrc` submodules pointing at CubicGradle. The
+Unimined project in `cleanroom/` compiles the same sources and is the only build.
 Also on November 10, 2026, compatibility code for mods and platforms outside Cubature's runtime
 (official Cleanroom with Distant Horizons, and Demonica with its bundled Celeritas) was removed:
 Forge+Bukkit hybrid mixins and the hybrid check, OptiFine's render mixins, interfaces and version
