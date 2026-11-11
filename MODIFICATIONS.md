@@ -79,6 +79,8 @@ Each choice is now fixed at what had been its default: cube arrays in the chunk 
 height-aware collision check and the vertical render distance stay; the path-navigator
 optimisation, the fast collision check and the vanilla chunk-cache biome lookup, which only applied
 when a choice was changed, are gone. An existing file is ignored.
+Also on November 11, 2026, the fixes for a cubic End were removed: the dragon's vanilla top-block
+lookup and the End gateway's exit search. The End is excluded from cubic worlds by default.
 Also on November 10, 2026, initial sky light and surface tracking return early for a cube without
 storage that lies above every staged column top in a sky-lit world: its 4,096 sky checks
 changed nothing, and the column's dirtying, staging removal and surface notifications still run.

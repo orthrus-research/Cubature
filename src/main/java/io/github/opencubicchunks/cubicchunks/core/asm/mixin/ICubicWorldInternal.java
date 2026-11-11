@@ -82,23 +82,6 @@ public interface ICubicWorldInternal extends ICubicWorld {
     @Override
     Cube getCubeFromBlockCoords(BlockPos pos);
 
-    default BlockPos getTopSolidOrLiquidBlockVanilla(BlockPos pos) {
-        Chunk chunk = ((World) this).getChunk(pos);
-
-        BlockPos current = new BlockPos(pos.getX(), chunk.getTopFilledSegment() + 16, pos.getZ());
-        while (current.getY() >= 0) {
-            BlockPos next = current.down();
-            IBlockState state = chunk.getBlockState(next);
-
-            if (state.getMaterial().blocksMovement() && !state.getBlock().isLeaves(state, (World) this, next) && !state.getBlock().isFoliage((World) this, next)) {
-                break;
-            }
-            current = next;
-        }
-
-        return current;
-    }
-
     interface Server extends ICubicWorldInternal, ICubicWorldServer {
 
         /**
