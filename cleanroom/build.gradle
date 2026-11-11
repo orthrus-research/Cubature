@@ -186,7 +186,7 @@ tasks.register('verifyReobfJar') {
             }
             def json = new groovy.json.JsonSlurper()
             def configs = entries.findAll { it.name.startsWith('cubicchunks.mixins.') && it.name.endsWith('.json') && !it.name.contains('refmap') }
-            assert configs.size() == 4: 'Expected the four Mixin configurations'
+            assert configs.size() == 14: 'Expected the four Mixin configurations and the ten selectable ones'
             configs.each { entry ->
                 def config = json.parse(archive.getInputStream(entry))
                 assert names.contains(config.refmap): "Missing refmap ${config.refmap}"
@@ -217,7 +217,7 @@ tasks.register('verifyReobfJar') {
             new org.objectweb.asm.ClassReader(archive.getInputStream(archive.getEntry('io/github/opencubicchunks/cubicchunks/api/world/IColumn.class'))).accept(api, 0)
             assert api.methods.any { it.name == 'getHeightValue' && it.desc == '(II)I' }: 'Remapping changed the public IColumn API'
             assert !api.methods.any { it.name == 'func_76611_b' }: 'Vanilla name leaked into IColumn API'
-            logger.lifecycle("Verified ${artifact.name}: ${ownClasses.size()} mod/API classes, Java ${expectedMajor - 44}, four Mixin configs, ${refmap.mappings.size()} refmap classes, ${members.size()} renamed Mixin members.")
+            logger.lifecycle("Verified ${artifact.name}: ${ownClasses.size()} mod/API classes, Java ${expectedMajor - 44}, ${configs.size()} Mixin configs, ${refmap.mappings.size()} refmap classes, ${members.size()} renamed Mixin members.")
         }
     }
 }

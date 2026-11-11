@@ -28,186 +28,115 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.List;
-import java.util.Set;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import javax.annotation.Nonnull;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.objectweb.asm.tree.ClassNode;
-import org.spongepowered.asm.mixin.extensibility.IMixinConfigPlugin;
-import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
 
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonWriter;
-import it.unimi.dsi.fastutil.objects.Object2BooleanLinkedOpenHashMap;
-import it.unimi.dsi.fastutil.objects.Object2BooleanMap;
 
 /**
- * This Mixin configuration plugin class launched from cubicchunks.mixin.selectable.json.
- * Note, that this plugin is not working in JUnit tests due to missing field of 
- * FMLInjectionData required for MinecraftForge configuration used here.
- * Therefore two Mixin classes with an injection in a same method and with a same priority will cause Mixin to fail. */
-public class CubicChunksMixinConfig implements IMixinConfigPlugin {
+ * The restart-time choices in {@code config/cubicchunks_mixin_config.json}, and the selectable Mixin
+ * configurations those choices and the installed renderer enable. Plain Java: {@link CubicChunksMixinConnector}
+ * reads it before Minecraft classes load, and the file is read once, on the first question.
+ */
+public final class CubicChunksMixinConfig {
 
     @Nonnull
     public static Logger LOGGER = LogManager.getLogger("CubicChunksMixinConfig");
-    private final Object2BooleanMap<String> modDependencyConditions = new Object2BooleanLinkedOpenHashMap<String>();
+    private static boolean loaded;
 
-    @Override
-    public void onLoad(String mixinPackage) {
+    private CubicChunksMixinConfig() {
+    }
+
+    /** Each selectable configuration and whether it applies, in registration order, for the configured choices. */
+    public static Map<String, Boolean> selectableConfigurations(boolean celeritas, boolean demonica) {
+        return selectableConfigurations(celeritas, demonica, BoolOptions.OPTIMIZE_PATH_NAVIGATOR.getValue(),
+                BoolOptions.USE_CUBE_ARRAYS_INSIDE_CHUNK_CACHE.getValue(), BoolOptions.USE_FAST_COLLISION_CHECK.getValue(),
+                BoolOptions.VERT_RENDER_DISTANCE.getValue());
+    }
+
+    static Map<String, Boolean> selectableConfigurations(boolean celeritas, boolean demonica, boolean pathNavigator,
+            boolean cubeArrays, boolean fastCollision, boolean verticalRenderDistance) {
+        Map<String, Boolean> configurations = new LinkedHashMap<>();
+        String prefix = "cubicchunks.mixins.selectable.";
+        configurations.put(prefix + "json", true);
         // Celeritas (alone or bundled in Demonica) overwrites RenderGlobal.setupTerrain and draws terrain with its own
-        // section renderer, so the vanilla terrain-path mixins below have nothing to hook. Checked as a resource so no
-        // Celeritas class loads this early.
-        boolean celeritas = CubicChunksMixinConfig.class.getClassLoader()
-                .getResource("org/taumc/celeritas/mixin/core/terrain/RenderGlobalMixin.class") != null;
-        LOGGER.info(celeritas ? "Celeritas detected, vanilla terrain renderer mixins disabled" : "No Celeritas detected");
-
-        modDependencyConditions.defaultReturnValue(true);
-        modDependencyConditions.put(
-                "io.github.opencubicchunks.cubicchunks.core.asm.mixin.selectable.client.MixinRenderGlobalVanillaTerrain",
-                !celeritas);
-        modDependencyConditions.put(
-                "io.github.opencubicchunks.cubicchunks.core.asm.mixin.selectable.client.vertviewdist.MixinRenderGlobalVanillaTerrain",
-                !celeritas && BoolOptions.VERT_RENDER_DISTANCE.getValue());
-        modDependencyConditions.put(
-                "io.github.opencubicchunks.cubicchunks.core.asm.mixin.selectable.client.vertviewdist.MixinRenderGlobal",
-                !celeritas);
-        // In their place, Celeritas is taught the cubic height and reads sections and entities from cubes.
-        for (String mixin : new String[] {"MixinCeleritasChunkEvents", "MixinCeleritasClonedSection", "MixinCeleritasEntityGatherer",
-                "MixinCeleritasRenderSectionManager", "MixinCeleritasSectionManager", "MixinCeleritasWorldRenderer",
-                "MixinCeleritasWorldSlice"}) {
-            modDependencyConditions.put(
-                    "io.github.opencubicchunks.cubicchunks.core.asm.mixin.selectable.client.celeritas." + mixin, celeritas);
-        }
+        // section renderer, so the vanilla terrain-path mixins have nothing to hook. In their place, Celeritas is
+        // taught the cubic height and reads sections and entities from cubes.
+        configurations.put(prefix + "celeritas.json", celeritas);
         // Demonica's Iris pipeline reports the vanilla floor and the biome at Y 0 to shader packs; its include
         // graph reads the pack files that complementaryCaveFog patches.
-        boolean demonica = CubicChunksMixinConfig.class.getClassLoader()
-                .getResource("net/coderbot/iris/uniforms/IrisExclusiveUniforms$WorldInfoUniforms.class") != null;
-        for (String mixin : new String[] {"MixinDemonicaWorldInfo", "MixinDemonicaBiomeUniforms", "MixinDemonicaIncludeGraph"}) {
-            modDependencyConditions.put(
-                    "io.github.opencubicchunks.cubicchunks.core.asm.mixin.selectable.client.demonica." + mixin, demonica);
-        }
+        configurations.put(prefix + "demonica.json", demonica);
+        configurations.put(prefix + "vanillaterrain.json", !celeritas);
+        configurations.put(prefix + "pathnavigator.json", pathNavigator);
+        configurations.put(prefix + "chunkcache-cubic.json", cubeArrays);
+        configurations.put(prefix + "chunkcache-vanilla.json", !cubeArrays);
+        configurations.put(prefix + "collision-fast.json", fastCollision);
+        configurations.put(prefix + "collision-slow.json", !fastCollision);
+        configurations.put(prefix + "vertviewdist.json", verticalRenderDistance);
+        configurations.put(prefix + "vertviewdist-vanillaterrain.json", verticalRenderDistance && !celeritas);
+        return configurations;
+    }
 
+    private static synchronized void load() {
+        if (loaded) {
+            return;
+        }
+        loaded = true;
         File folder = new File(".", "config");
         folder.mkdirs();
         File configFile = new File(folder, "cubicchunks_mixin_config.json");
         LOGGER.info("Loading configuration file " + configFile.getAbsolutePath());
         try {
             if (!configFile.exists())
-                this.writeConfigToJson(configFile);
-            this.readConfigFromJson(configFile);
+                writeConfigToJson(configFile);
+            readConfigFromJson(configFile);
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    @Override
-    public String getRefMapperConfig() {
-        return null;
-    }
-
-    @Override
-    public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
-        return this.shouldApplyMixin(mixinClassName);
-    }
-
-    public boolean shouldApplyMixin(String mixinClassName) {
-        for (BoolOptions configOption : BoolOptions.values()) {
-            for (String mixinClassNameOnTrue : configOption.mixinClassNamesOnTrue) {
-                if (mixinClassName.equals(mixinClassNameOnTrue)) {
-                    boolean load = configOption.value && modDependencyConditions.getBoolean(mixinClassName);
-                    LOGGER.debug("shouldApplyMixin({}) = {} from {}.mixinClassNamesOnTrue", mixinClassName, load, configOption);
-                    return load;
-                }
-            }
-
-            for (String mixinClassNameOnFalse : configOption.mixinClassNamesOnFalse) {
-                if (mixinClassName.equals(mixinClassNameOnFalse)) {
-                    boolean load = !configOption.value && modDependencyConditions.getBoolean(mixinClassName);
-                    LOGGER.debug("shouldApplyMixin({}) = {} from {}.mixinClassNamesOnFalse", mixinClassName, load, configOption);
-                    return load;
-                }
-            }
-        }
-        boolean load =  modDependencyConditions.getBoolean(mixinClassName);
-        LOGGER.debug("shouldApplyMixin({}) = {} from modDependencyConditions", mixinClassName, load);
-        return load;
-    }
-
-    @Override
-    public void acceptTargets(Set<String> myTargets, Set<String> otherTargets) {
-    }
-
-    @Override
-    public List<String> getMixins() {
-        return null;
-    }
-
-    @Override
-    public void preApply(String targetClassName, ClassNode targetClass, String mixinClassName, IMixinInfo mixinInfo) {
-    }
-
-    @Override
-    public void postApply(String targetClassName, ClassNode targetClass, String mixinClassName, IMixinInfo mixinInfo) {
-    }
-
     public enum BoolOptions {
-        OPTIMIZE_PATH_NAVIGATOR(false, 
-                new String[] {},
-                new String[] {"io.github.opencubicchunks.cubicchunks.core.asm.mixin.selectable.common.MixinPathNavigate",
-                        "io.github.opencubicchunks.cubicchunks.core.asm.mixin.selectable.common.MixinWalkNodeProcessor"},
+        OPTIMIZE_PATH_NAVIGATOR(false,
                 "Enabling this option will optimize work of vanilla path navigator."
                         + "Using this option in some cases turn entity AI a little dumber."
                         + " Mob standing in a single axis aligned line with player in a middle of a"
                         + " chunk will not try to seek path to player outside of chunks if direct path is blocked."
                         + " You need to restart Minecraft to apply changes."),
-        USE_CUBE_ARRAYS_INSIDE_CHUNK_CACHE(true, 
-                new String[] {"io.github.opencubicchunks.cubicchunks.core.asm.mixin.selectable.client.MixinChunkCache_Vanilla"},
-                new String[] {"io.github.opencubicchunks.cubicchunks.core.asm.mixin.selectable.common.MixinChunkCache",
-                        "io.github.opencubicchunks.cubicchunks.core.asm.mixin.selectable.client.MixinChunkCache_Cubic"},
+        USE_CUBE_ARRAYS_INSIDE_CHUNK_CACHE(true,
                 "Enabling this option will mix cube array into chunk cache"
                         + " for using in entity path navigator."
                         + " Potentially this will slightly reduce server tick time"
                         + " in presence of huge amount of living entities."
                         + " You need to restart Minecraft to apply changes."),
-        USE_FAST_COLLISION_CHECK(false, 
-                new String[] {"io.github.opencubicchunks.cubicchunks.core.asm.mixin.selectable.common.MixinWorld_SlowCollisionCheck"},
-                new String[] {"io.github.opencubicchunks.cubicchunks.core.asm.mixin.selectable.common.MixinWorld_CollisionCheck"},
+        USE_FAST_COLLISION_CHECK(false,
                 "Enabling this option allow using fast collision check."
                         + " Fast collision check can reduce server lag."
                         + " You need to restart Minecraft to apply changes."),
         VERT_RENDER_DISTANCE(true,
-                new String[] {},
-                new String[] {"io.github.opencubicchunks.cubicchunks.core.asm.mixin.selectable.client.vertviewdist.MixinEntityRenderer",
-                        "io.github.opencubicchunks.cubicchunks.core.asm.mixin.selectable.client.vertviewdist.MixinRenderGlobal",
-                        "io.github.opencubicchunks.cubicchunks.core.asm.mixin.selectable.client.vertviewdist.MixinRenderGlobalVanillaTerrain"},
                 "Enabling this option will make the vertical view distance slider affect clientside vertical render distance." +
                         " When disabled, only serverside load distance is affected.");
 
-        private final boolean defaultValue;
-        // Load this Mixin class only if option is false.
-        private final String[] mixinClassNamesOnFalse;
-        // Load this Mixin class only if option is true.
-        private final String[] mixinClassNamesOnTrue;
         private final String description;
         private boolean value;
 
-        private BoolOptions(boolean defaultValue1, String[] mixinClassNamesOnFalse1, String[] mixinClassNamesOnTrue1, String description1) {
-            defaultValue = defaultValue1;
-            mixinClassNamesOnFalse = mixinClassNamesOnFalse1;
-            mixinClassNamesOnTrue = mixinClassNamesOnTrue1;
+        private BoolOptions(boolean defaultValue, String description1) {
             description = description1;
             value = defaultValue;
         }
 
         public boolean getValue() {
+            load();
             return value;
         }
     }
 
-    private void writeConfigToJson(File configFile) throws IOException {
+    private static void writeConfigToJson(File configFile) throws IOException {
         JsonWriter writer = new JsonWriter(new FileWriter(configFile));
         writer.setIndent(" ");
         writer.beginArray();
@@ -222,8 +151,8 @@ public class CubicChunksMixinConfig implements IMixinConfigPlugin {
         writer.endArray();
         writer.close();
     }
-    
-    private void readConfigFromJson(File configFile) throws IOException {
+
+    private static void readConfigFromJson(File configFile) throws IOException {
         int expectingOptionsNumber = BoolOptions.values().length;
         JsonReader reader = new JsonReader(new FileReader(configFile));
         reader.beginArray();
@@ -245,6 +174,6 @@ public class CubicChunksMixinConfig implements IMixinConfigPlugin {
         reader.endArray();
         reader.close();
         if (expectingOptionsNumber != 0)
-            this.writeConfigToJson(configFile);
+            writeConfigToJson(configFile);
     }
 }
