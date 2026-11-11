@@ -46,9 +46,8 @@ public abstract class MixinBiomeTemperatureConfig {
      * @author Barteks2x
      * @reason Configure how it changes with height
      */
-    @SuppressWarnings("OverwriteModifiers")
     @Overwrite
-    public float getTemperature(BlockPos pos) { // this must be non-final for galacticraft compatibility https://github.com/SpongePowered/Mixin/issues/347
+    public final float getTemperature(BlockPos pos) {
         if (pos.getY() > CubicChunksConfig.biomeTemperatureCenterY) {
             float noise = (float) (TEMPERATURE_NOISE.getValue((double) ((float) pos.getX() / 8.0F), (double) ((float) pos.getZ() / 8.0F)) * 4.0D);
             int y = Math.min(pos.getY(), CubicChunksConfig.biomeTemperatureScaleMaxY);
