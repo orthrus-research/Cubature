@@ -1091,17 +1091,6 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
         }
     }
 
-    /**
-     * Return iterator over 'CubeWatchers' of all cubes loaded
-     * by players. Iterator first element defined by seed.
-     * 
-     * @param seed seed for random iterator
-     * @return cube watcher iterator
-     */
-    public Iterator<CubeWatcher> getRandomWrappedCubeWatcherIterator(int seed) {
-        return this.cubeWatchers.randomWrappedIterator(seed);
-    }
-    
     public static class TickableChunkContainer {
 
         private final ObjectArrayList<ICube> cubes = ObjectArrayList.wrap(new ICube[64*1024]);

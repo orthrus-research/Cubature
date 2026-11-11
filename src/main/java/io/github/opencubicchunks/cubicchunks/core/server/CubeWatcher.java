@@ -46,7 +46,6 @@ import io.github.opencubicchunks.cubicchunks.core.world.cube.Cube;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import mcp.MethodsReturnNonnullByDefault;
 import net.minecraft.block.state.IBlockState;
-import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.network.Packet;
 import net.minecraft.tileentity.TileEntity;
@@ -408,35 +407,8 @@ public class CubeWatcher implements ITicket, ICubeWatcher, BucketSorterEntry {
         return false;
     }
 
-    private double getDistanceSq(CubePos cubePos, Entity entity) {
-        double blockX = cubePos.getXCenter();
-        double blockY = cubePos.getYCenter();
-        double blockZ = cubePos.getZCenter();
-        double dx = blockX - entity.posX;
-        double dy = blockY - entity.posY;
-        double dz = blockZ - entity.posZ;
-        return dx * dx + dy * dy + dz * dz;
-    }
-
     @Override @Nullable public Cube getCube() {
         return this.cube;
-    }
-
-    double getClosestPlayerDistance() {
-        double min = Double.MAX_VALUE;
-
-        for (EntityPlayerMP entry : this.players.elements()) {
-            if (entry == null) {
-                break;
-            }
-            double dist = getDistanceSq(cubePos, entry);
-
-            if (dist < min) {
-                min = dist;
-            }
-        }
-
-        return min;
     }
 
     private long getWorldTime() {

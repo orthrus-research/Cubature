@@ -64,9 +64,4 @@ public abstract class MixinWorldClient extends MixinWorld implements ICubicWorld
     @Override public CubeProviderClient getCubeCache() {
         return (CubeProviderClient) this.clientChunkProvider;
     }
-    
-    @Override public void setHeightBounds(int minHeight1, int maxHeight1) {
-        this.minHeight = minHeight1;
-        this.maxHeight = maxHeight1;
-    }
 }

@@ -45,7 +45,6 @@ import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.world.ChunkWatchEvent;
 
 import java.util.BitSet;
-import java.util.List;
 
 import javax.annotation.Nonnull;
 import javax.annotation.ParametersAreNonnullByDefault;
@@ -241,11 +240,6 @@ public class ColumnWatcher extends PlayerChunkMapEntry implements XZAddressable,
             playerCubeMap.addToUpdateEntry(this);
         }
         this.dirtyColumns.set(AddressTools.getLocalAddress(localX, localZ));
-    }
-
-    // BetterPortals: keep compatibility
-    @Deprecated private List<EntityPlayerMP> getPlayers() {
-        return self().getPlayerList();
     }
 
     private long[] bucketDataEntry = null;

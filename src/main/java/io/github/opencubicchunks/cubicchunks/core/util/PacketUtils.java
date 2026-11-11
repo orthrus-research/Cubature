@@ -24,17 +24,9 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.util;
 
-import io.github.opencubicchunks.cubicchunks.core.network.AbstractClientMessageHandler;
 import io.github.opencubicchunks.cubicchunks.api.util.CubePos;
-import io.github.opencubicchunks.cubicchunks.core.network.AbstractClientMessageHandler;
 import io.netty.buffer.ByteBuf;
-import net.minecraft.client.Minecraft;
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.network.ThreadQuickExitException;
-import net.minecraft.util.IThreadListener;
 import net.minecraft.util.math.BlockPos;
-import net.minecraftforge.fml.common.network.simpleimpl.IMessage;
-import net.minecraftforge.fml.common.network.simpleimpl.MessageContext;
 
 public class PacketUtils {
 
@@ -45,10 +37,6 @@ public class PacketUtils {
         writeSignedVarInt(buf, pos.getX());
         writeSignedVarInt(buf, pos.getY());
         writeSignedVarInt(buf, pos.getZ());
-    }
-
-    public static BlockPos readBlockPos(ByteBuf buf) {
-        return new BlockPos(readSignedVarInt(buf), readSignedVarInt(buf), readSignedVarInt(buf));
     }
 
     public static void write(ByteBuf buf, CubePos pos) {

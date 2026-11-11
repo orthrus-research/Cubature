@@ -43,10 +43,6 @@ public class MixinWorldEntitySpawner implements IWorldEntitySpawner.Handler {
         this.customSpawner = spawner;
     }
 
-    @Override @Nullable public IWorldEntitySpawner getEntitySpawner() {
-        return this.customSpawner;
-    }
-
     @Inject(method = "findChunksForSpawning", cancellable = true, at = @At("HEAD"))
     private void onSpawnMobs(WorldServer world, boolean hostileEnable,
             boolean peacefulEnable, boolean spawnOnSetTickRate, CallbackInfoReturnable<Integer> cir) {

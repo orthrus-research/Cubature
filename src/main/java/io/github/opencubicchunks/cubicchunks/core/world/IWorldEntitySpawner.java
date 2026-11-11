@@ -40,6 +40,5 @@ public interface IWorldEntitySpawner {
      */
     interface Handler {
         void setEntitySpawner(@Nullable IWorldEntitySpawner spawner);
-        @Nullable IWorldEntitySpawner getEntitySpawner();
     }
 }

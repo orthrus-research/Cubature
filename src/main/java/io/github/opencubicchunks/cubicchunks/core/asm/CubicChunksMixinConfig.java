@@ -207,21 +207,6 @@ public class CubicChunksMixinConfig implements IMixinConfigPlugin {
         }
     }
 
-    public static String getNicelyFormattedName(String name) {
-        StringBuffer out = new StringBuffer();
-        char char_ = '_';
-        char prevchar = 0;
-        for (char c : name.toCharArray()) {
-            if (c != char_ && prevchar != char_) {
-                out.append(String.valueOf(c).toLowerCase());
-            } else if (c != char_) {
-                out.append(String.valueOf(c));
-            }
-            prevchar = c;
-        }
-        return out.toString();
-    }
-    
     private void writeConfigToJson(File configFile) throws IOException {
         JsonWriter writer = new JsonWriter(new FileWriter(configFile));
         writer.setIndent(" ");

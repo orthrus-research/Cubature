@@ -26,7 +26,6 @@ package io.github.opencubicchunks.cubicchunks.core.util;
 
 import io.github.opencubicchunks.cubicchunks.api.util.Bits;
 import mcp.MethodsReturnNonnullByDefault;
-import net.minecraft.util.math.BlockPos;
 
 import javax.annotation.ParametersAreNonnullByDefault;
 
@@ -73,10 +72,6 @@ public class AddressTools {
      */
     public static int getLocalZ(int localAddress) {
         return Bits.unpackUnsigned(localAddress, 4, 4);
-    }
-
-    public static int getLocalAddress(BlockPos pos) {
-        return getLocalAddress(pos.getX(), pos.getY(), pos.getZ());
     }
 
     public static int getBiomeAddress3d(int biomeLocalX, int biomeLocalY, int biomeLocalZ) {

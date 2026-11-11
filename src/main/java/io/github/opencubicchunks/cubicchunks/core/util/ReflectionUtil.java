@@ -47,14 +47,6 @@ public class ReflectionUtil {
         return (T) in;
     }
 
-    public static <T> Class<? extends T> getClassOrDefault(String name, Class<? extends T> cl) {
-        try {
-            return cast(Class.forName(name));
-        } catch (ClassNotFoundException ex) {
-            return cl;
-        }
-    }
-
     public static MethodHandle constructHandle(Class<?> owner, Class<?>... args) {
         try {
             Constructor<?> constr = owner.getDeclaredConstructor(args);

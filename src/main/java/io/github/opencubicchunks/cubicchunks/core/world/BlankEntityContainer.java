@@ -53,11 +53,6 @@ public class BlankEntityContainer extends EntityContainer {
     }
 
     @Override
-    public void clear() {
-        // no-op
-    }
-
-    @Override
     public Collection<Entity> getEntities() {
         return Collections.emptyList();
     }

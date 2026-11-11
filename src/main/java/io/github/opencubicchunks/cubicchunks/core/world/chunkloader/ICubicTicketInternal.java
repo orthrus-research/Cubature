@@ -32,8 +32,6 @@ import mcp.MethodsReturnNonnullByDefault;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.math.ChunkPos;
 
-import java.util.HashMap;
-import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 
@@ -62,8 +60,6 @@ public interface ICubicTicketInternal extends ICubicTicket, ITicket {
     void setPlayer(String player);
 
     void setEntityChunkX(int chunkX);
-
-    void setEntityChunkY(int cubeY);
 
     void setEntityChunkZ(int chunkZ);
 

@@ -52,10 +52,6 @@ public abstract class MixinPlayerList implements ICubicPlayerList {
         return verticalViewDistance < 0 ? viewDistance : verticalViewDistance;
     }
 
-    @Override public int getRawVerticalViewDistance() {
-        return verticalViewDistance;
-    }
-
     @Override public void setVerticalViewDistance(int dist) {
         this.verticalViewDistance = dist;
 

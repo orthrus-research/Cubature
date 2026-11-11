@@ -29,18 +29,14 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
-import java.util.TreeSet;
 import java.util.function.BiConsumer;
 
-import com.google.common.base.Preconditions;
 import io.github.opencubicchunks.cubicchunks.api.util.CubePos;
 import io.github.opencubicchunks.cubicchunks.api.world.ICube;
-import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
 import io.github.opencubicchunks.cubicchunks.api.worldgen.populator.ICubicPopulator;
 
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.World;
-import net.minecraft.world.biome.Biome;
 
 public class CubeGeneratorsRegistry {
 
@@ -51,35 +47,6 @@ public class CubeGeneratorsRegistry {
 
     private static final Collection<BiConsumer<? super World, ? super LoadingData<CubePos>>> cubeLoadingCallbacksView = Collections.unmodifiableCollection(cubeLoadingCallbacks);
     private static final Collection<BiConsumer<? super World, ? super LoadingData<ChunkPos>>> columnLoadingCallbacksView = Collections.unmodifiableCollection(columnLoadingCallbacks);
-
-    private static final TreeSet<GeneratorWrapper> sortedGeneratorList = new TreeSet<>();
-
-    /**
-     * Register a world generator - something that inserts new block types into the world on population stage
-     *
-     * @param populator the generator
-     * @param weight a weight to assign to this generator. Heavy weights tend to sink to the bottom of
-     * list of world generators (i.e. they run later)
-     */
-    public static void register(ICubicPopulator populator, int weight) {
-        Preconditions.checkNotNull(populator);
-        sortedGeneratorList.add(new GeneratorWrapper(populator, weight));
-    }
-
-    /**
-     * Callback hook for cube gen - if your mod wishes to add extra mod related
-     * generation to the world call this
-     *
-     * @param random the cube specific {@link Random}.
-     * @param pos is position of the populated cube
-     * @param world The {@link ICubicWorld} we're generating for
-     * @param biome The biome we are generating in
-     */
-    public static void generateWorld(World world, Random random, CubePos pos, Biome biome) {
-        for (GeneratorWrapper wrapper : sortedGeneratorList) {
-            wrapper.populator.generate(world, random, pos, biome);
-        }
-    }
 
     /**
      * Populators added here will be launched prior to any other. It is
@@ -124,46 +91,5 @@ public class CubeGeneratorsRegistry {
 
     public static Collection<BiConsumer<? super World, ? super LoadingData<ChunkPos>>> getColumnAsyncLoadingCallbacks() {
         return columnLoadingCallbacksView;
-    }
-
-    private static class GeneratorWrapper implements Comparable<GeneratorWrapper> {
-
-        private final ICubicPopulator populator;
-        private final int weight;
-
-        public GeneratorWrapper(ICubicPopulator populator, int weight) {
-            this.populator = populator;
-            this.weight = weight;
-        }
-
-        @Override public boolean equals(Object o) {
-            if (this == o) {
-                return true;
-            }
-            if (!(o instanceof GeneratorWrapper)) {
-                return false;
-            }
-
-            GeneratorWrapper that = (GeneratorWrapper) o;
-
-            if (weight != that.weight) {
-                return false;
-            }
-            if (!populator.equals(that.populator)) {
-                return false;
-            }
-
-            return true;
-        }
-
-        @Override public int hashCode() {
-            int result = populator.hashCode();
-            result = 31 * result + weight;
-            return result;
-        }
-
-        @Override public int compareTo(GeneratorWrapper o) {
-            return Integer.compare(weight, o.weight);
-        }
     }
 }

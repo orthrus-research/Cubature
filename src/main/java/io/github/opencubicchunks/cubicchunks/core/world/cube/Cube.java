@@ -53,7 +53,6 @@ import io.github.opencubicchunks.cubicchunks.core.world.EntityContainer;
 import io.github.opencubicchunks.cubicchunks.core.world.IColumnInternal;
 import io.github.opencubicchunks.cubicchunks.core.world.chunkloader.ICubicTicketInternal;
 import mcp.MethodsReturnNonnullByDefault;
-import net.minecraft.block.Block;
 import net.minecraft.block.material.Material;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.entity.Entity;
@@ -326,24 +325,6 @@ public class Cube implements ICube {
     @Override
     public void setLightFor(EnumSkyBlock lightType, BlockPos pos, int light) {
         column.setLightFor(lightType, pos, light);
-    }
-
-    /**
-     * Create a tile entity at the given position if the block is able to hold one
-     *
-     * @param pos position where the tile entity should be placed
-     * @return the created tile entity, or <code>null</code> if the block at that position does not provide tile
-     * entities
-     */
-    @Nullable
-    private TileEntity createTileEntity(BlockPos pos) {
-        IBlockState blockState = getBlockState(pos);
-        Block block = blockState.getBlock();
-
-        if (block.hasTileEntity(blockState)) {
-            return block.createTileEntity((World) this.world, blockState);
-        }
-        return null;
     }
 
     @Override

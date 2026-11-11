@@ -30,8 +30,6 @@ import io.github.opencubicchunks.cubicchunks.core.util.AddressTools;
 import io.github.opencubicchunks.cubicchunks.core.world.cube.Cube;
 import mcp.MethodsReturnNonnullByDefault;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.EnumSkyBlock;
-import net.minecraft.world.chunk.storage.ExtendedBlockStorage;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -51,8 +49,6 @@ import javax.annotation.ParametersAreNonnullByDefault;
 public class CubeMap implements Iterable<Cube> {
 
     @Nonnull private final List<Cube> cubes = new ArrayList<>();
-
-    @Nonnull private ExtendedBlockStorage[] toBlockTick = new ExtendedBlockStorage[0];
 
     /**
      * Removes the cube at {@code cubeY}
@@ -144,45 +140,6 @@ public class CubeMap implements Iterable<Cube> {
      */
     public boolean isEmpty() {
         return cubes.isEmpty();
-    }
-
-    /**
-     * @return An array of EBSs from cubes that need ticking
-     */
-    public ExtendedBlockStorage[] getStoragesToTick() {
-        if (!isToTickValid()) {
-            int count = 0;
-            for (Cube cube : cubes) {
-                if (cube.getStorage() != null && cube.getTickets().shouldTick()) {
-                    count++;
-                }
-            }
-
-            toBlockTick = new ExtendedBlockStorage[count];
-            count = 0;
-            for (Cube cube : cubes) {
-                if (cube.getStorage() != null && cube.getTickets().shouldTick()) {
-                    toBlockTick[count++] = cube.getStorage();
-                }
-            }
-        }
-
-        return toBlockTick;
-    }
-
-    private boolean isToTickValid() {
-        int index = 0;
-        for (Cube cube : cubes) {
-            if (cube.getStorage() != null && cube.getTickets().shouldTick()) {
-                if (index >= toBlockTick.length) {
-                    return false;
-                }
-                if (toBlockTick[index++] != cube.getStorage()) {
-                    return false;
-                }
-            }
-        }
-        return index == toBlockTick.length; // did we check everything there was in toBlockTick?
     }
 
     /**

@@ -38,7 +38,6 @@ import io.github.opencubicchunks.cubicchunks.core.server.chunkio.ICubeIO;
 import io.github.opencubicchunks.cubicchunks.core.server.chunkio.async.forge.AsyncWorldIOExecutor;
 import io.github.opencubicchunks.cubicchunks.api.worldgen.CubePrimer;
 import io.github.opencubicchunks.cubicchunks.api.worldgen.ICubeClassification;
-import io.github.opencubicchunks.cubicchunks.api.world.ICube;
 import io.github.opencubicchunks.cubicchunks.api.worldgen.ICubeGenerator;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubeProviderServer;
 import io.github.opencubicchunks.cubicchunks.api.util.Box;
@@ -877,31 +876,6 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
     private ICubeGenerator.GeneratorReadyState pollColumn(int columnX, int columnZ, Timing timing) {
         return concurrentGeneration == null ? cubeGen.pollAsyncColumnGenerator(columnX, columnZ)
                 : concurrentGeneration.pollColumn(columnX, columnZ, timing == Timing.SCHEDULE);
-    }
-
-    public String dumpLoadedCubes() {
-        StringBuilder sb = new StringBuilder(10000).append("\n");
-        for (Chunk chunk : this.loadedChunks.values()) {
-            if (chunk == null) {
-                sb.append("column = null\n");
-                continue;
-            }
-            sb.append("Column[").append(chunk.x).append(", ").append(chunk.z).append("] {");
-            boolean isFirst = true;
-            for (ICube cube : ((IColumn) chunk).getLoadedCubes()) {
-                if (!isFirst) {
-                    sb.append(", ");
-                }
-                isFirst = false;
-                if (cube == null) {
-                    sb.append("cube = null");
-                    continue;
-                }
-                sb.append("Cube[").append(cube.getY()).append("]");
-            }
-            sb.append("\n");
-        }
-        return sb.toString();
     }
 
     @Override @Nonnull public ICubeIO getCubeIO() {

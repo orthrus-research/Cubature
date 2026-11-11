@@ -379,18 +379,6 @@ public class AsyncWorldIOExecutor {
         AsyncTaskCompletion.cancelIfUnneeded(cubeTasks, key, task, cubeThreadPool);
     }
 
-    /**
-     * Notify the loader that this column isn't needed anymore
-     *
-     * @param world The world
-     * @param x column x position
-     * @param z column z postion
-     * @param runnable The runnable that should be dropped
-     */
-    public static void dropQueuedColumnLoad(World world, int x, int z, Consumer<Chunk> runnable) {
-        dropQueuedColumnLoad(world, x, z, (Object) runnable);
-    }
-
     /** Cancel the vanilla asynchronous loadChunk request using its original Runnable. */
     public static void dropQueuedColumnLoad(World world, int x, int z, Runnable runnable) {
         dropQueuedColumnLoad(world, x, z, (Object) runnable);
@@ -411,39 +399,6 @@ public class AsyncWorldIOExecutor {
         }
 
         // Each cube owns its dependency subscription; other cube consumers keep their parent alive.
-    }
-
-    /** All-world process/server stop only. Per-world storage disposal uses shutdownWorldBlocking. */
-    public static void shutdownNowBlocking() {
-        // best effort wait for up to 10 seconds each
-        // Cancel dependency-waiting/queued work, then stop cubes before disposing their parent storage.
-        List<AsyncCubeIOProvider> stoppingCubeTasks = new ArrayList<>(cubeTasks.values());
-        List<Runnable> neverStartedCubes = new ArrayList<>();
-        completions.close();
-        for (AsyncCubeIOProvider task : stoppingCubeTasks) {
-            if (task.cancelBeforeStart(cubeThreadPool)) neverStartedCubes.add(task);
-        }
-        for (AsyncColumnIOProvider task : columnTasks.values()) task.cancelBeforeStart(columnThreadPool);
-        cubeThreadPool.shutdownNow();
-        cubeTasks.clear();
-        boolean interrupted = false;
-        try {
-            cubeThreadPool.awaitTermination(10, TimeUnit.SECONDS);
-        } catch (InterruptedException ignored) {
-            interrupted = true;
-        }
-        columnThreadPool.shutdownNow();
-        columnTasks.clear();
-        try {
-            columnThreadPool.awaitTermination(10, TimeUnit.SECONDS);
-        } catch (InterruptedException ignored) {
-            interrupted = true;
-        }
-        AsyncTaskCompletion.cleanupStoppedTasks(stoppingCubeTasks, neverStartedCubes);
-        // A reader outliving this all-world best-effort stop keeps its column pin until actual stop.
-        // initialize for next use
-        initExecutors();
-        if (interrupted) Thread.currentThread().interrupt();
     }
 
     /**

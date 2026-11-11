@@ -30,6 +30,19 @@ The selectable `MixinWorldServer_UpdateBlocks`, which redirected `randomTickSpee
 `WorldServer.updateBlocks` for cubic worlds, is removed: cubic worlds cancel that method at its head,
 so the redirect never acted, and as a `@Redirect` it would have collided with another mod's redirect
 of the same call in non-cubic worlds.
+Also on November 10, 2026, upstream code that nothing in Cubature, its lab, Riven or OrthLib calls
+was removed. From the API: the cube population and ore, decoration and structure-initialization
+events, which nothing posted; `CubicPopulatorList` and `WorldGenEntitySpawner`; the cubic structure
+framework (`ICubicStructureGenerator`, `ICubicFeatureGenerator`, `CubicFeatureGenerator`,
+`CubicFeatureData`); and `CubeGeneratorsRegistry.register` with `generateWorld`, whose populators
+nothing ran. The vanilla-compatibility populator list and the asynchronous loading callbacks stay.
+From the core: the field-based block-state containers and their state classes, the old sky-light
+update queue and selector, the light block-access interface, a newer server height map draft, the
+global generator configuration, the debug tracer, the mapping table, an abstract server message
+handler, a watcher player entry, the generic `WatchersSortingList` with its test, the column's
+tick-storage cache, a BetterPortals accessor on the column watcher, debug dumps, and setters and
+overloads without callers. The structure-start Mixin still writes its unused `ChunkY` tag, so saved
+structure data is unchanged.
 Also on November 10, 2026, compatibility code for mods and platforms outside Cubature's runtime
 (official Cleanroom with Distant Horizons, and Demonica with its bundled Celeritas) was removed:
 Forge+Bukkit hybrid mixins and the hybrid check, OptiFine's render mixins, interfaces and version

@@ -34,9 +34,7 @@ import io.github.opencubicchunks.cubicchunks.api.world.ICubeProvider;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorldServer;
 import io.github.opencubicchunks.cubicchunks.core.client.CubeProviderClient;
-import io.github.opencubicchunks.cubicchunks.core.lighting.FirstLightProcessor;
 import io.github.opencubicchunks.cubicchunks.core.lighting.ILightingManager;
-import io.github.opencubicchunks.cubicchunks.core.lighting.LightingManager;
 import io.github.opencubicchunks.cubicchunks.core.server.CubeProviderServer;
 import io.github.opencubicchunks.cubicchunks.core.server.SpawnCubes;
 import io.github.opencubicchunks.cubicchunks.core.server.VanillaNetworkHandler;
@@ -150,8 +148,6 @@ public interface ICubicWorldInternal extends ICubicWorld {
         void initCubicWorldClient(IntRange heightRange, IntRange generationRange);
 
         CubeProviderClient getCubeCache();
-
-        void setHeightBounds(int minHeight, int maxHeight);
     }
 
     interface CompatGenerationScope extends AutoCloseable {

@@ -84,10 +84,6 @@ public class ServerHeightMap implements IHeightMap {
     }
 
 
-    private static int getOpacity(int segmentIndex) {
-        return (segmentIndex + 1) % 2;
-    }
-
     private static int getLastSegmentIndex(int[] segments) {
         for (int i = segments.length - 1; i >= 0; i--) {
             if (segments[i] != NONE_SEGMENT) {
@@ -313,32 +309,6 @@ public class ServerHeightMap implements IHeightMap {
                 }
             }
         }
-    }
-
-
-    // Debug -----------------------------------------------------------------------------------------------------------
-
-    public String dump(int localX, int localZ) {
-        int i = getIndex(localX, localZ);
-
-        StringBuilder buf = new StringBuilder();
-        buf.append("range=[");
-        buf.append(this.ymin[i]);
-        buf.append(",");
-        buf.append(this.ymax.get(i));
-        buf.append("], segments(p,o)=");
-
-        if (this.segments[i] != null) {
-            for (int pos : this.segments[i]) {
-                int opacity = getOpacity(i);
-                buf.append("(");
-                buf.append(pos);
-                buf.append(",");
-                buf.append(opacity);
-                buf.append(")");
-            }
-        }
-        return buf.toString();
     }
 
 }

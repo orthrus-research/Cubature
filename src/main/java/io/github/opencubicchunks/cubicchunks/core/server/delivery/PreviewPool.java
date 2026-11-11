@@ -131,10 +131,6 @@ public final class PreviewPool implements Executor {
         worstP95 = 0;
     }
 
-    public int permits() {
-        return permits.permits();
-    }
-
     /** Stops the threads; running tiles see the interrupt and fail. */
     public void close() {
         threads.shutdownNow();

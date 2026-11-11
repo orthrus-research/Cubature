@@ -76,10 +76,6 @@ public class EntityContainer {
         return this.entities;
     }
 
-    public void clear() {
-        this.entities.clear();
-    }
-
     public Collection<Entity> getEntities() {
         return Collections.unmodifiableCollection(this.entities);
     }
