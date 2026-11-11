@@ -24,6 +24,9 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.core.common;
 
+import org.spongepowered.asm.mixin.Unique;
+import io.github.opencubicchunks.cubicchunks.core.world.RandomTickListeners;
+import io.github.opencubicchunks.cubicchunks.api.world.ICubicRandomTickListener;
 import static io.github.opencubicchunks.cubicchunks.api.util.Coords.cubeToMinBlock;
 import static io.github.opencubicchunks.cubicchunks.core.util.ReflectionUtil.cast;
 
@@ -102,6 +105,8 @@ import javax.annotation.ParametersAreNonnullByDefault;
 @Mixin(WorldServer.class)
 @Implements(@Interface(iface = ICubicWorldServer.class, prefix = "world$"))
 public abstract class MixinWorldServer extends MixinWorld implements ICubicWorldInternal.Server {
+
+    @Unique private final RandomTickListeners cubicchunks$randomTickListeners = new RandomTickListeners();
 
     @Shadow @Mutable @Final private PlayerChunkMap playerChunkMap;
     @Shadow @Mutable @Final private WorldEntitySpawner entitySpawner;
@@ -255,6 +260,23 @@ public abstract class MixinWorldServer extends MixinWorld implements ICubicWorld
         CubicChunkManager.unforceChunk(ticket, chunk);
     }
 
+    @Override
+    public void addRandomTickListener(ICubicRandomTickListener listener) {
+        requireServerThread();
+        cubicchunks$randomTickListeners.add(listener);
+    }
+
+    @Override
+    public boolean removeRandomTickListener(ICubicRandomTickListener listener) {
+        requireServerThread();
+        return cubicchunks$randomTickListeners.remove(listener);
+    }
+
+    private void requireServerThread() {
+        if (!((WorldServer) (Object) this).getMinecraftServer().isCallingFromMinecraftThread())
+            throw new IllegalStateException("Random-tick listeners change only on the server thread");
+    }
+
 
     @Override
     public CompatGenerationScope doCompatibilityGeneration() {
@@ -325,11 +347,54 @@ public abstract class MixinWorldServer extends MixinWorld implements ICubicWorld
         this.profiler.startSection("tickBlocks");
         ExtendedBlockStorage ebs = cube.getStorage();
         if (ebs != Chunk.NULL_BLOCK_STORAGE && ebs.needsRandomTick()) {
-            for (int i = 0; i < tickSpeed; ++i) {
-                tickNextBlock(chunkBlockX, chunkBlockZ, ebs);
+            ICubicRandomTickListener[] listeners = cubicchunks$randomTickListeners.current();
+            if (listeners.length == 0) {
+                for (int i = 0; i < tickSpeed; ++i) {
+                    tickNextBlock(chunkBlockX, chunkBlockZ, ebs);
+                }
+            } else {
+                tickCubeWithListeners(listeners, tickSpeed, cube, chunkBlockX, chunkBlockZ, ebs);
             }
         }
         this.profiler.endSection();
+    }
+
+    /** The same draws in the same order as tickNextBlock, with the listeners asked about the cube and each draw. */
+    private void tickCubeWithListeners(ICubicRandomTickListener[] listeners, int tickSpeed, ICube cube, int chunkBlockX, int chunkBlockZ,
+            ExtendedBlockStorage ebs) {
+        World world = (World) (Object) this;
+        boolean admitted;
+        TickDiagnostics.enter(TickDiagnostics.Phase.TICK_LISTENERS);
+        try {
+            admitted = RandomTickListeners.admit(listeners, world, cube);
+        } finally {
+            TickDiagnostics.exit();
+        }
+        if (!admitted) {
+            return;
+        }
+        for (int i = 0; i < tickSpeed; ++i) {
+            this.updateLCG = this.updateLCG * 3 + 1013904223;
+            int rand = this.updateLCG >> 2;
+            int localX = rand & 15;
+            int localZ = rand >> 8 & 15;
+            int localY = rand >> 16 & 15;
+            IBlockState state = ebs.get(localX, localY, localZ);
+            BlockPos pos = new BlockPos(localX + chunkBlockX, localY + ebs.getYLocation(), localZ + chunkBlockZ);
+            boolean tick;
+            TickDiagnostics.enter(TickDiagnostics.Phase.TICK_LISTENERS);
+            try {
+                tick = RandomTickListeners.draw(listeners, world, cube, pos, state);
+            } finally {
+                TickDiagnostics.exit();
+            }
+            Block block = state.getBlock();
+            this.profiler.startSection("randomTick");
+            if (tick && block.getTickRandomly()) {
+                block.randomTick(world, pos, state, this.rand);
+            }
+            this.profiler.endSection();
+        }
     }
 
     private void tickNextBlock(int chunkBlockX, int chunkBlockZ, ExtendedBlockStorage ebs) {

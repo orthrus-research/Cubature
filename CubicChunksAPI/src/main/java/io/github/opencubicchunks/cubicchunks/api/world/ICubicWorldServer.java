@@ -85,4 +85,12 @@ public interface ICubicWorldServer extends ICubicWorld {
      */
     void unforceChunk(ForgeChunkManager.Ticket ticket, CubePos chunk);
 
+    /**
+     * Adds a listener to this world's random-tick pass, from the server thread. Listeners are called
+     * in the order they were added. Adding one already present is an error.
+     */
+    void addRandomTickListener(ICubicRandomTickListener listener);
+
+    /** Removes a listener added to this world, from the server thread; false if it was not present. */
+    boolean removeRandomTickListener(ICubicRandomTickListener listener);
 }

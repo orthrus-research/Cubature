@@ -21,6 +21,11 @@ them. The provider's per-cube tick is gone: every tick it walked every tickable 
 every loaded cube on the client) to drain a tile-entity creation queue that nothing fills, since
 tile entities queue on their column, and set a flag nothing reads. Random ticks run in the world's
 own block-tick pass and are unchanged.
+Also on November 10, 2026, the public API gained `ICubicRandomTickListener`, registered on a server
+world with `ICubicWorldServer.addRandomTickListener`. The cubic random-tick pass asks each listener
+whether to give a cube its draws, then tells it every drawn position and state, and skips a block's
+random tick when any listener declines. The cubes, their order and the drawn positions stay the
+owner's; with no listener the pass runs as before, and listener time is its own nested phase.
 Also on November 10, 2026, compatibility code for mods and platforms outside Cubature's runtime
 (official Cleanroom with Distant Horizons, and Demonica with its bundled Celeritas) was removed:
 Forge+Bukkit hybrid mixins and the hybrid check, OptiFine's render mixins, interfaces and version
