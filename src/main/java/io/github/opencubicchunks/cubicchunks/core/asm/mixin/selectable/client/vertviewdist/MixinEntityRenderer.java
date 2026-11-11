@@ -24,6 +24,8 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.selectable.client.vertviewdist;
 
+import com.llamalad7.mixinextras.expression.Definition;
+import com.llamalad7.mixinextras.expression.Expression;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
@@ -40,8 +42,11 @@ import org.spongepowered.asm.mixin.injection.At;
 public class MixinEntityRenderer {
     @Shadow @Final private Minecraft mc;
 
+    // An Expression, not a FIELD target: the refmap caps a FIELD target at its first read in each method.
+    @Definition(id = "renderDistanceChunks", field = "Lnet/minecraft/client/settings/GameSettings;renderDistanceChunks:I")
+    @Expression("?.renderDistanceChunks")
     @WrapOperation(method = {"updateRenderer", "setupCameraTransform", "renderWorldPass", "updateFogColor"},
-            at = @At(value = "FIELD", target = "Lnet/minecraft/client/settings/GameSettings;renderDistanceChunks:I"))
+            at = @At("MIXINEXTRAS:EXPRESSION"))
     private int getRenderDistance(GameSettings settings, Operation<Integer> original) {
         if (!((ICubicWorld) mc.world).isCubicWorld()) {
             return original.call(settings);

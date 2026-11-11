@@ -24,6 +24,8 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.selectable.client.vertviewdist;
 
+import com.llamalad7.mixinextras.expression.Definition;
+import com.llamalad7.mixinextras.expression.Expression;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
@@ -85,12 +87,12 @@ public abstract class MixinRenderGlobal {
         }
     }
 
+    // An Expression, not a FIELD target: the refmap caps a FIELD target at its first read in each method.
+    @Definition(id = "renderDistanceChunks", field = "Lnet/minecraft/client/renderer/RenderGlobal;renderDistanceChunks:I")
+    @Expression("this.renderDistanceChunks")
     @WrapOperation(
             method = "setupTerrain",
-            at = @At(
-                    value = "FIELD",
-                    target = "Lnet/minecraft/client/renderer/RenderGlobal;renderDistanceChunks:I"
-            ),
+            at = @At("MIXINEXTRAS:EXPRESSION"),
             slice = @Slice(
                     from = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/RenderGlobal;loadRenderers()V")
             )
