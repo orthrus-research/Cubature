@@ -61,6 +61,8 @@ public interface ICubicTicketInternal extends ICubicTicket, ITicket {
 
     void setEntityChunkX(int chunkX);
 
+    void setEntityChunkY(int cubeY);
+
     void setEntityChunkZ(int chunkZ);
 
     int getEntityChunkX();

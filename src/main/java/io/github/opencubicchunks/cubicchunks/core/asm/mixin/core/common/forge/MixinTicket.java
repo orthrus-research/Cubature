@@ -69,6 +69,10 @@ public abstract class MixinTicket implements ICubicTicketInternal {
         return entityChunkY;
     }
 
+    @Override public void setEntityChunkY(int cubeY) {
+        this.entityChunkY = cubeY;
+    }
+
     @Inject(
             method = "<init>(Ljava/lang/String;Lnet/minecraftforge/common/ForgeChunkManager$Type;Lnet/minecraft/world/World;)V", at = @At("RETURN"),
             remap = false

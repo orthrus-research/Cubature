@@ -47,6 +47,12 @@ read. New saves omit the tag; vanilla ignores it in existing ones.
 Also on November 10, 2026, upstream's ForgeGradle build was removed: the root and API Gradle
 scripts, properties and wrappers, and the two `buildSrc` submodules pointing at CubicGradle. The
 Unimined project in `cleanroom/` compiles the same sources and is the only build.
+Also on November 10, 2026, entity chunk-loading tickets keep their entity's cube. Forge saves the
+column its entity is stored in; upstream's `entityCubeY` came from a ticket field nothing set,
+was written only when the ticket also forced cubes, and was dropped on load, so a cubic world
+reloaded every entity ticket's cube Y 0 and then looked for the entity there. The ticket now saves the
+entity's `chunkCoordY` in a cubic world whether or not it forces cubes, and loading restores it.
+A ticket saved before this keeps the cube Y it stored, as before.
 Also on November 10, 2026, compatibility code for mods and platforms outside Cubature's runtime
 (official Cleanroom with Distant Horizons, and Demonica with its bundled Celeritas) was removed:
 Forge+Bukkit hybrid mixins and the hybrid check, OptiFine's render mixins, interfaces and version

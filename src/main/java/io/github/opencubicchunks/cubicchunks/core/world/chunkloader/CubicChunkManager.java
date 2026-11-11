@@ -40,25 +40,20 @@ import io.github.opencubicchunks.cubicchunks.core.world.cube.Cube;
 import it.unimi.dsi.fastutil.ints.IntArraySet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import mcp.MethodsReturnNonnullByDefault;
+import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.EntityPlayerMP;
-import net.minecraft.nbt.NBTBase;
 import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.nbt.NBTTagList;
 import net.minecraft.server.management.PlayerChunkMapEntry;
-import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.World;
 import net.minecraft.world.WorldServer;
 import net.minecraftforge.common.ForgeChunkManager;
 import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.common.util.Constants;
 import net.minecraftforge.fml.common.FMLLog;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 
 import java.lang.invoke.MethodHandle;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import javax.annotation.ParametersAreNonnullByDefault;
 
@@ -162,44 +157,14 @@ public class CubicChunkManager {
     }
 
     public static void onDeserializeTicket(NBTTagCompound ticketNBT, ForgeChunkManager.Ticket ticket) {
-        NBTTagCompound cubicNBT = ticketNBT.getCompoundTag("cubicchunks");
-        if (cubicNBT == null) {
-            return;
-        }
-        int entityCubeY = cubicNBT.getInteger("entityCubeY");
-        Map<ChunkPos, IntSet> coordsMap = new HashMap<>();
-
-        NBTTagList chunkMap = cubicNBT.getTagList("chunkMap", Constants.NBT.TAG_COMPOUND);
-        for (NBTBase entryTagBase : chunkMap) {
-            NBTTagCompound entry = (NBTTagCompound) entryTagBase;
-            int x = entry.getInteger("x");
-            int z = entry.getInteger("z");
-            IntSet cubes = new IntArraySet(entry.getIntArray("cubes"));
-            coordsMap.put(new ChunkPos(x, z), cubes);
-        }
-        // only store the cube Y coords, don't load
-        // mods will request a column to be loaded on loading callback and then we will force the cubes
-        ((ICubicTicketInternal) ticket).setAllForcedChunkCubes(coordsMap);
+        CubicTicketData.read(ticketNBT, (ICubicTicketInternal) ticket);
     }
 
     public static void onSerializeTicket(NBTTagCompound ticket, ForgeChunkManager.Ticket tick) {
-        if (((ICubicTicketInternal) tick).getAllForcedChunkCubes().isEmpty()) {
-            return;
-        }
-        NBTTagCompound cubicNBT = new NBTTagCompound();
-        cubicNBT.setInteger("entityCubeY", ((ICubicTicketInternal) tick).getEntityChunkY());
-
-        NBTTagList chunkMap = new NBTTagList();
-        ((ICubicTicketInternal) tick).getAllForcedChunkCubes().forEach((pos, cubes) -> {
-            NBTTagCompound entry = new NBTTagCompound();
-            entry.setInteger("x", pos.x);
-            entry.setInteger("z", pos.z);
-            entry.setIntArray("cubes", cubes.toIntArray());
-            chunkMap.appendTag(entry);
-        });
-        cubicNBT.setTag("chunkMap", chunkMap);
-
-        ticket.setTag("cubicchunks", cubicNBT);
+        // Forge saves the column the entity is stored in (chunkCoordX/Z); in a cubic world its cube is chunkCoordY.
+        Entity entity = tick.getType() == ForgeChunkManager.Type.ENTITY ? tick.getEntity() : null;
+        Integer entityCubeY = entity != null && ((ICubicWorld) tick.world).isCubicWorld() ? entity.chunkCoordY : null;
+        CubicTicketData.write(ticket, (ICubicTicketInternal) tick, entityCubeY);
     }
 
     public static void onLoadEntityTicketChunk(World world, ForgeChunkManager.Ticket tick) {
