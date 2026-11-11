@@ -24,18 +24,17 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.fixes.common.vanillaclient;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import io.github.opencubicchunks.cubicchunks.core.server.vanillaproxy.IPositionPacket;
 import net.minecraft.network.play.server.SPacketEffect;
 import net.minecraft.util.math.BlockPos;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Redirect;
 
 @Mixin(SPacketEffect.class)
 public class MixinSPacketEffect implements IPositionPacket {
 
-    @Shadow private BlockPos soundPos;
     private BlockPos posOffset = BlockPos.ORIGIN;
 
     @Override public void setPosOffset(BlockPos posOffset) {
@@ -46,10 +45,11 @@ public class MixinSPacketEffect implements IPositionPacket {
         return this.posOffset != BlockPos.ORIGIN;
     }
 
-    @Redirect(method = "writePacketData",
+    @WrapOperation(method = "writePacketData",
             at = @At(value = "FIELD", target = "Lnet/minecraft/network/play/server/SPacketEffect;soundPos:Lnet/minecraft/util/math/BlockPos;"))
-    private BlockPos preprocessPacket(SPacketEffect _this) {
-        return this.posOffset == BlockPos.ORIGIN ? this.soundPos : this.soundPos.add(this.posOffset);
+    private BlockPos preprocessPacket(SPacketEffect _this, Operation<BlockPos> original) {
+        BlockPos soundPos = original.call(_this);
+        return this.posOffset == BlockPos.ORIGIN ? soundPos : soundPos.add(this.posOffset);
     }
 
 }

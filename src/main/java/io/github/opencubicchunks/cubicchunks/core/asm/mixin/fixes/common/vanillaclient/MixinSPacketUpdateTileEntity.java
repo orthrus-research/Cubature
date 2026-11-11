@@ -24,20 +24,18 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.fixes.common.vanillaclient;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import io.github.opencubicchunks.cubicchunks.core.server.vanillaproxy.IPositionPacket;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.network.play.server.SPacketUpdateTileEntity;
 import net.minecraft.util.math.BlockPos;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Redirect;
 
 @Mixin(SPacketUpdateTileEntity.class)
 public class MixinSPacketUpdateTileEntity implements IPositionPacket {
 
-    @Shadow private BlockPos blockPos;
-    @Shadow private NBTTagCompound nbt;
     private BlockPos posOffset = BlockPos.ORIGIN;
 
     @Override public void setPosOffset(BlockPos posOffset) {
@@ -48,17 +46,19 @@ public class MixinSPacketUpdateTileEntity implements IPositionPacket {
         return this.posOffset != BlockPos.ORIGIN;
     }
 
-    @Redirect(method = "writePacketData", at = @At(value = "FIELD",
+    @WrapOperation(method = "writePacketData", at = @At(value = "FIELD",
             target = "Lnet/minecraft/network/play/server/SPacketUpdateTileEntity;blockPos:Lnet/minecraft/util/math/BlockPos;"))
-    private BlockPos preprocessPacket(SPacketUpdateTileEntity _this) {
-        return this.posOffset == BlockPos.ORIGIN ? this.blockPos : this.blockPos.add(this.posOffset);
+    private BlockPos preprocessPacket(SPacketUpdateTileEntity _this, Operation<BlockPos> original) {
+        BlockPos blockPos = original.call(_this);
+        return this.posOffset == BlockPos.ORIGIN ? blockPos : blockPos.add(this.posOffset);
     }
 
-    @Redirect(method = "writePacketData",
+    @WrapOperation(method = "writePacketData",
             at = @At(value = "FIELD", target = "Lnet/minecraft/network/play/server/SPacketUpdateTileEntity;nbt:Lnet/minecraft/nbt/NBTTagCompound;"))
-    private NBTTagCompound preprocessPacketNBT(SPacketUpdateTileEntity _this) {
+    private NBTTagCompound preprocessPacketNBT(SPacketUpdateTileEntity _this, Operation<NBTTagCompound> original) {
+        NBTTagCompound nbt = original.call(_this);
         if (this.hasPosOffset()) {
-            NBTTagCompound copy = this.nbt.copy();
+            NBTTagCompound copy = nbt.copy();
             if (copy.hasKey("x")) {
                 copy.setInteger("x", copy.getInteger("x") + this.posOffset.getX());
             }
@@ -70,7 +70,7 @@ public class MixinSPacketUpdateTileEntity implements IPositionPacket {
             }
             return copy;
         }
-        return this.nbt;
+        return nbt;
     }
 
 }

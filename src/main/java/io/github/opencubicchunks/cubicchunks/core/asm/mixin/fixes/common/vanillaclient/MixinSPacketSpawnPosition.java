@@ -24,19 +24,18 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.fixes.common.vanillaclient;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import io.github.opencubicchunks.cubicchunks.core.server.vanillaproxy.IPositionPacket;
 import net.minecraft.network.play.server.SPacketSpawnPosition;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.MathHelper;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Redirect;
 
 @Mixin(SPacketSpawnPosition.class)
 public class MixinSPacketSpawnPosition implements IPositionPacket {
 
-    @Shadow private BlockPos spawnBlockPos;
     private BlockPos posOffset = BlockPos.ORIGIN;
 
     @Override public void setPosOffset(BlockPos posOffset) {
@@ -47,10 +46,11 @@ public class MixinSPacketSpawnPosition implements IPositionPacket {
         return this.posOffset != BlockPos.ORIGIN;
     }
 
-    @Redirect(method = "writePacketData", at = @At(value = "FIELD",
+    @WrapOperation(method = "writePacketData", at = @At(value = "FIELD",
             target = "Lnet/minecraft/network/play/server/SPacketSpawnPosition;spawnBlockPos:Lnet/minecraft/util/math/BlockPos;"))
-    private BlockPos preprocessPacket(SPacketSpawnPosition _this) {
-        BlockPos pos = this.posOffset == BlockPos.ORIGIN ? this.spawnBlockPos : this.spawnBlockPos.add(this.posOffset);
+    private BlockPos preprocessPacket(SPacketSpawnPosition _this, Operation<BlockPos> original) {
+        BlockPos spawnBlockPos = original.call(_this);
+        BlockPos pos = this.posOffset == BlockPos.ORIGIN ? spawnBlockPos : spawnBlockPos.add(this.posOffset);
 
         int y = pos.getY();
         if (!this.hasPosOffset() //if the position isn't offset, it means the client has cubic chunks and we should always send the un-clamped Y coord

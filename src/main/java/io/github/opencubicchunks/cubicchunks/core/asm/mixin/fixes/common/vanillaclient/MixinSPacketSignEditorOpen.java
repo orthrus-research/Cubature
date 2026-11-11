@@ -24,18 +24,17 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.fixes.common.vanillaclient;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import io.github.opencubicchunks.cubicchunks.core.server.vanillaproxy.IPositionPacket;
 import net.minecraft.network.play.server.SPacketSignEditorOpen;
 import net.minecraft.util.math.BlockPos;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Redirect;
 
 @Mixin(SPacketSignEditorOpen.class)
 public class MixinSPacketSignEditorOpen implements IPositionPacket {
 
-    @Shadow private BlockPos signPosition;
     private BlockPos posOffset = BlockPos.ORIGIN;
 
     @Override public void setPosOffset(BlockPos posOffset) {
@@ -46,10 +45,11 @@ public class MixinSPacketSignEditorOpen implements IPositionPacket {
         return this.posOffset != BlockPos.ORIGIN;
     }
 
-    @Redirect(method = "writePacketData", at = @At(value = "FIELD",
+    @WrapOperation(method = "writePacketData", at = @At(value = "FIELD",
             target = "Lnet/minecraft/network/play/server/SPacketSignEditorOpen;signPosition:Lnet/minecraft/util/math/BlockPos;"))
-    private BlockPos preprocessPacket(SPacketSignEditorOpen _this) {
-        return this.posOffset == BlockPos.ORIGIN ? this.signPosition : this.signPosition.add(this.posOffset);
+    private BlockPos preprocessPacket(SPacketSignEditorOpen _this, Operation<BlockPos> original) {
+        BlockPos signPosition = original.call(_this);
+        return this.posOffset == BlockPos.ORIGIN ? signPosition : signPosition.add(this.posOffset);
     }
 
 }

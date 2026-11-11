@@ -24,20 +24,17 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.fixes.common.vanillaclient;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import io.github.opencubicchunks.cubicchunks.core.server.vanillaproxy.IPositionPacket;
 import net.minecraft.network.play.server.SPacketSoundEffect;
 import net.minecraft.util.math.BlockPos;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Redirect;
 
 @Mixin(SPacketSoundEffect.class)
 public class MixinSPacketSoundEffect implements IPositionPacket {
 
-    @Shadow private int posX;
-    @Shadow private int posY;
-    @Shadow private int posZ;
     private BlockPos posOffset = BlockPos.ORIGIN;
 
     @Override public void setPosOffset(BlockPos posOffset) {
@@ -48,18 +45,18 @@ public class MixinSPacketSoundEffect implements IPositionPacket {
         return this.posOffset != BlockPos.ORIGIN;
     }
 
-    @Redirect(method = "writePacketData", at = @At(value = "FIELD", target = "Lnet/minecraft/network/play/server/SPacketSoundEffect;posX:I"))
-    private int preprocessPacketX(SPacketSoundEffect _this) {
-        return this.posX + this.posOffset.getX();
+    @WrapOperation(method = "writePacketData", at = @At(value = "FIELD", target = "Lnet/minecraft/network/play/server/SPacketSoundEffect;posX:I"))
+    private int preprocessPacketX(SPacketSoundEffect _this, Operation<Integer> original) {
+        return original.call(_this) + this.posOffset.getX();
     }
 
-    @Redirect(method = "writePacketData", at = @At(value = "FIELD", target = "Lnet/minecraft/network/play/server/SPacketSoundEffect;posY:I"))
-    private int preprocessPacketY(SPacketSoundEffect _this) {
-        return this.posY + this.posOffset.getY();
+    @WrapOperation(method = "writePacketData", at = @At(value = "FIELD", target = "Lnet/minecraft/network/play/server/SPacketSoundEffect;posY:I"))
+    private int preprocessPacketY(SPacketSoundEffect _this, Operation<Integer> original) {
+        return original.call(_this) + this.posOffset.getY();
     }
 
-    @Redirect(method = "writePacketData", at = @At(value = "FIELD", target = "Lnet/minecraft/network/play/server/SPacketSoundEffect;posZ:I"))
-    private int preprocessPacketZ(SPacketSoundEffect _this) {
-        return this.posZ + this.posOffset.getZ();
+    @WrapOperation(method = "writePacketData", at = @At(value = "FIELD", target = "Lnet/minecraft/network/play/server/SPacketSoundEffect;posZ:I"))
+    private int preprocessPacketZ(SPacketSoundEffect _this, Operation<Integer> original) {
+        return original.call(_this) + this.posOffset.getZ();
     }
 }

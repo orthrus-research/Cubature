@@ -24,18 +24,17 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.fixes.common.vanillaclient;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import io.github.opencubicchunks.cubicchunks.core.server.vanillaproxy.IPositionPacket;
 import net.minecraft.network.play.server.SPacketSpawnPainting;
 import net.minecraft.util.math.BlockPos;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Redirect;
 
 @Mixin(SPacketSpawnPainting.class)
 public class MixinSPacketSpawnPainting implements IPositionPacket {
 
-    @Shadow private BlockPos position;
     private BlockPos posOffset = BlockPos.ORIGIN;
 
     @Override public void setPosOffset(BlockPos posOffset) {
@@ -46,10 +45,11 @@ public class MixinSPacketSpawnPainting implements IPositionPacket {
         return this.posOffset != BlockPos.ORIGIN;
     }
 
-    @Redirect(method = "writePacketData",
+    @WrapOperation(method = "writePacketData",
             at = @At(value = "FIELD", target = "Lnet/minecraft/network/play/server/SPacketSpawnPainting;position:Lnet/minecraft/util/math/BlockPos;"))
-    private BlockPos preprocessPacket(SPacketSpawnPainting _this) {
-        return this.posOffset == BlockPos.ORIGIN ? this.position : this.position.add(this.posOffset);
+    private BlockPos preprocessPacket(SPacketSpawnPainting _this, Operation<BlockPos> original) {
+        BlockPos position = original.call(_this);
+        return this.posOffset == BlockPos.ORIGIN ? position : position.add(this.posOffset);
     }
 
 }

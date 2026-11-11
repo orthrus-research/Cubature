@@ -24,22 +24,20 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.fixes.common.vanillaclient;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import io.github.opencubicchunks.cubicchunks.core.server.vanillaproxy.IPositionPacket;
 import net.minecraft.network.play.server.SPacketPlayerPosLook;
 import net.minecraft.util.math.BlockPos;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Redirect;
 
 import java.util.Set;
 
 @Mixin(SPacketPlayerPosLook.class)
 public class MixinSPacketPlayerPosLook implements IPositionPacket {
 
-    @Shadow private double x;
-    @Shadow private double y;
-    @Shadow private double z;
     @Shadow private Set<SPacketPlayerPosLook.EnumFlags> flags;
     private BlockPos posOffset = BlockPos.ORIGIN;
 
@@ -51,18 +49,21 @@ public class MixinSPacketPlayerPosLook implements IPositionPacket {
         return this.posOffset != BlockPos.ORIGIN;
     }
 
-    @Redirect(method = "writePacketData", at = @At(value = "FIELD", target = "Lnet/minecraft/network/play/server/SPacketPlayerPosLook;x:D"))
-    private double preprocessPacketX(SPacketPlayerPosLook _this) {
-        return this.flags.contains(SPacketPlayerPosLook.EnumFlags.X) ? this.x : this.x + this.posOffset.getX();
+    @WrapOperation(method = "writePacketData", at = @At(value = "FIELD", target = "Lnet/minecraft/network/play/server/SPacketPlayerPosLook;x:D"))
+    private double preprocessPacketX(SPacketPlayerPosLook _this, Operation<Double> original) {
+        double x = original.call(_this);
+        return this.flags.contains(SPacketPlayerPosLook.EnumFlags.X) ? x : x + this.posOffset.getX();
     }
 
-    @Redirect(method = "writePacketData", at = @At(value = "FIELD", target = "Lnet/minecraft/network/play/server/SPacketPlayerPosLook;y:D"))
-    private double preprocessPacketY(SPacketPlayerPosLook _this) {
-        return this.flags.contains(SPacketPlayerPosLook.EnumFlags.Y) ? this.y : this.y + this.posOffset.getY();
+    @WrapOperation(method = "writePacketData", at = @At(value = "FIELD", target = "Lnet/minecraft/network/play/server/SPacketPlayerPosLook;y:D"))
+    private double preprocessPacketY(SPacketPlayerPosLook _this, Operation<Double> original) {
+        double y = original.call(_this);
+        return this.flags.contains(SPacketPlayerPosLook.EnumFlags.Y) ? y : y + this.posOffset.getY();
     }
 
-    @Redirect(method = "writePacketData", at = @At(value = "FIELD", target = "Lnet/minecraft/network/play/server/SPacketPlayerPosLook;z:D"))
-    private double preprocessPacketZ(SPacketPlayerPosLook _this) {
-        return this.flags.contains(SPacketPlayerPosLook.EnumFlags.Z) ? this.z : this.z + this.posOffset.getZ();
+    @WrapOperation(method = "writePacketData", at = @At(value = "FIELD", target = "Lnet/minecraft/network/play/server/SPacketPlayerPosLook;z:D"))
+    private double preprocessPacketZ(SPacketPlayerPosLook _this, Operation<Double> original) {
+        double z = original.call(_this);
+        return this.flags.contains(SPacketPlayerPosLook.EnumFlags.Z) ? z : z + this.posOffset.getZ();
     }
 }

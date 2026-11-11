@@ -24,12 +24,13 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.fixes.common.vanillaclient;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import io.github.opencubicchunks.cubicchunks.core.server.vanillaproxy.IPositionPacket;
 import net.minecraft.network.play.server.SPacketEntity;
 import net.minecraft.util.math.BlockPos;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Redirect;
 
 @Mixin(SPacketEntity.S17PacketEntityLookMove.class)
 public class MixinSPacketEntityLookMove extends SPacketEntity implements IPositionPacket {
@@ -44,18 +45,18 @@ public class MixinSPacketEntityLookMove extends SPacketEntity implements IPositi
         return this.posOffset != BlockPos.ORIGIN;
     }
 
-    @Redirect(method = "writePacketData", at = @At(value = "FIELD", target = "Lnet/minecraft/network/play/server/SPacketEntity$S17PacketEntityLookMove;posX:I"))
-    private int preprocessPacketX(S17PacketEntityLookMove buf) {
-        return this.posX + this.posOffset.getX();
+    @WrapOperation(method = "writePacketData", at = @At(value = "FIELD", target = "Lnet/minecraft/network/play/server/SPacketEntity$S17PacketEntityLookMove;posX:I"))
+    private int preprocessPacketX(S17PacketEntityLookMove buf, Operation<Integer> original) {
+        return original.call(buf) + this.posOffset.getX();
     }
     
-    @Redirect(method = "writePacketData", at = @At(value = "FIELD", target = "Lnet/minecraft/network/play/server/SPacketEntity$S17PacketEntityLookMove;posY:I"))
-    private int preprocessPacketY(S17PacketEntityLookMove buf) {
-        return this.posY + this.posOffset.getY();
+    @WrapOperation(method = "writePacketData", at = @At(value = "FIELD", target = "Lnet/minecraft/network/play/server/SPacketEntity$S17PacketEntityLookMove;posY:I"))
+    private int preprocessPacketY(S17PacketEntityLookMove buf, Operation<Integer> original) {
+        return original.call(buf) + this.posOffset.getY();
     }
 
-    @Redirect(method = "writePacketData", at = @At(value = "FIELD", target = "Lnet/minecraft/network/play/server/SPacketEntity$S17PacketEntityLookMove;posZ:I"))
-    private int preprocessPacketZ(S17PacketEntityLookMove buf) {
-        return this.posZ + this.posOffset.getZ();
+    @WrapOperation(method = "writePacketData", at = @At(value = "FIELD", target = "Lnet/minecraft/network/play/server/SPacketEntity$S17PacketEntityLookMove;posZ:I"))
+    private int preprocessPacketZ(S17PacketEntityLookMove buf, Operation<Integer> original) {
+        return original.call(buf) + this.posOffset.getZ();
     }
 }

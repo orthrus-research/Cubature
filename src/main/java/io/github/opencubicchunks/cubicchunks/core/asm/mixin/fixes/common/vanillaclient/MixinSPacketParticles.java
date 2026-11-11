@@ -24,20 +24,17 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.fixes.common.vanillaclient;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import io.github.opencubicchunks.cubicchunks.core.server.vanillaproxy.IPositionPacket;
 import net.minecraft.network.play.server.SPacketParticles;
 import net.minecraft.util.math.BlockPos;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Redirect;
 
 @Mixin(SPacketParticles.class)
 public class MixinSPacketParticles implements IPositionPacket {
 
-    @Shadow private float xCoord;
-    @Shadow private float yCoord;
-    @Shadow private float zCoord;
     private BlockPos posOffset = BlockPos.ORIGIN;
 
     @Override public void setPosOffset(BlockPos posOffset) {
@@ -48,18 +45,18 @@ public class MixinSPacketParticles implements IPositionPacket {
         return this.posOffset != BlockPos.ORIGIN;
     }
 
-    @Redirect(method = "writePacketData", at = @At(value = "FIELD", target = "Lnet/minecraft/network/play/server/SPacketParticles;xCoord:F"))
-    private float preprocessPacketX(SPacketParticles _this) {
-        return this.xCoord + this.posOffset.getX();
+    @WrapOperation(method = "writePacketData", at = @At(value = "FIELD", target = "Lnet/minecraft/network/play/server/SPacketParticles;xCoord:F"))
+    private float preprocessPacketX(SPacketParticles _this, Operation<Float> original) {
+        return original.call(_this) + this.posOffset.getX();
     }
 
-    @Redirect(method = "writePacketData", at = @At(value = "FIELD", target = "Lnet/minecraft/network/play/server/SPacketParticles;yCoord:F"))
-    private float preprocessPacketY(SPacketParticles _this) {
-        return this.yCoord + this.posOffset.getY();
+    @WrapOperation(method = "writePacketData", at = @At(value = "FIELD", target = "Lnet/minecraft/network/play/server/SPacketParticles;yCoord:F"))
+    private float preprocessPacketY(SPacketParticles _this, Operation<Float> original) {
+        return original.call(_this) + this.posOffset.getY();
     }
 
-    @Redirect(method = "writePacketData", at = @At(value = "FIELD", target = "Lnet/minecraft/network/play/server/SPacketParticles;zCoord:F"))
-    private float preprocessPacketZ(SPacketParticles _this) {
-        return this.zCoord + this.posOffset.getZ();
+    @WrapOperation(method = "writePacketData", at = @At(value = "FIELD", target = "Lnet/minecraft/network/play/server/SPacketParticles;zCoord:F"))
+    private float preprocessPacketZ(SPacketParticles _this, Operation<Float> original) {
+        return original.call(_this) + this.posOffset.getZ();
     }
 }
