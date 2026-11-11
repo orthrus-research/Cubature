@@ -26,6 +26,10 @@ world with `ICubicWorldServer.addRandomTickListener`. The cubic random-tick pass
 whether to give a cube its draws, then tells it every drawn position and state, and skips a block's
 random tick when any listener declines. The cubes, their order and the drawn positions stay the
 owner's; with no listener the pass runs as before, and listener time is its own nested phase.
+The selectable `MixinWorldServer_UpdateBlocks`, which redirected `randomTickSpeed` to 0 inside
+`WorldServer.updateBlocks` for cubic worlds, is removed: cubic worlds cancel that method at its head,
+so the redirect never acted, and as a `@Redirect` it would have collided with another mod's redirect
+of the same call in non-cubic worlds.
 Also on November 10, 2026, compatibility code for mods and platforms outside Cubature's runtime
 (official Cleanroom with Distant Horizons, and Demonica with its bundled Celeritas) was removed:
 Forge+Bukkit hybrid mixins and the hybrid check, OptiFine's render mixins, interfaces and version

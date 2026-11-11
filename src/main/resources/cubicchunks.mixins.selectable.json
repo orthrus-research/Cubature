@@ -29,8 +29,7 @@
         "common.MixinPathNavigate",
         "common.MixinWalkNodeProcessor",
         "common.MixinWorld_CollisionCheck",
-        "common.MixinWorld_SlowCollisionCheck",
-        "common.MixinWorldServer_UpdateBlocks"
+        "common.MixinWorld_SlowCollisionCheck"
     ],
     "client": [
         "client.IGuiVideoSettings",
