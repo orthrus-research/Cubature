@@ -69,6 +69,11 @@ option and its horizontal-slice settings, `VanillaNetworkHandler`, the vanilla c
 packets in delivery, and the 33 packet mixins that shifted positions for such clients. The option
 was off by default and the connection check already refused those clients, so no delivery path
 changes for a client that has Cubature.
+Also on November 11, 2026, the height fixes for vanilla feature generators that only a biome
+decorator or chunk generator calls were removed (lakes, dungeons, ice spikes and paths, boulders,
+desert wells, dead bush, tall grass, flowers, double plants, shrub, swamp tree and the taiga pine),
+with four mixins on such generators that had never held code. The fixes for generators a player
+can start at any height stay: trees grown from saplings and the huge mushroom.
 Also on November 10, 2026, initial sky light and surface tracking return early for a cube without
 storage that lies above every staged column top in a sky-lit world: its 4,096 sky checks
 changed nothing, and the column's dirtying, staging removal and surface notifications still run.
