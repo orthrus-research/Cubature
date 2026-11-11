@@ -57,7 +57,7 @@ public abstract class MixinWorld_SlowCollisionCheck implements ICubicWorld {
      * @author Barteks2x
      * @reason Original of that function use constant 64 to check if chunk loaded
      **/
-    @Overwrite(constraints = "MC_FORGE(23)")
+    @Overwrite
     private boolean getCollisionBoxes(@Nullable Entity entity, AxisAlignedBB aabb, boolean flagArg, @Nullable List<AxisAlignedBB> aabbList) {
         int minX = MathHelper.floor(aabb.minX) - 1;
         int maxX = MathHelper.ceil(aabb.maxX) + 1;

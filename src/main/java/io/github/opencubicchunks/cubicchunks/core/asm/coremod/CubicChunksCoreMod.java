@@ -26,53 +26,21 @@ package io.github.opencubicchunks.cubicchunks.core.asm.coremod;
 
 import mcp.MethodsReturnNonnullByDefault;
 import net.minecraftforge.common.ForgeVersion;
-import net.minecraftforge.fml.common.Loader;
 import net.minecraftforge.fml.relauncher.IFMLLoadingPlugin;
-import org.spongepowered.asm.launch.MixinBootstrap;
-import org.spongepowered.asm.mixin.MixinEnvironment;
-import org.spongepowered.asm.mixin.Mixins;
-import org.spongepowered.asm.mixin.extensibility.IEnvironmentTokenProvider;
 
 import java.util.Map;
 
 import javax.annotation.Nullable;
 import javax.annotation.ParametersAreNonnullByDefault;
 
-// this needs to be in separate package because the package with the coremod is added to transformer exclusions
-// and we need mixins to still be transformed for runtime deobfuscation
+// Supplies the core mod container only; CubicChunksMixinConnector registers the Mixin configurations.
+// It keeps its own package because a coremod's package is added to the transformer exclusions.
 @MethodsReturnNonnullByDefault
 @ParametersAreNonnullByDefault
 // the mcVersion value is inlined at compile time, so this MC version check may still fail
 @IFMLLoadingPlugin.MCVersion(value = ForgeVersion.mcVersion)
 @IFMLLoadingPlugin.SortingIndex(value = 5000)
 public class CubicChunksCoreMod implements IFMLLoadingPlugin {
-
-    public static final class TokenProvider implements IEnvironmentTokenProvider {
-
-        @Override
-        public int getPriority() {
-            return IEnvironmentTokenProvider.DEFAULT_PRIORITY;
-        }
-
-        @Override
-        public Integer getToken(String token, MixinEnvironment env) {
-            if ("FORGE".equals(token)) {
-                return Integer.valueOf(ForgeVersion.getBuildVersion());
-            } else if ("FML".equals(token)) {
-                String fmlVersion = Loader.instance().getFMLVersionString();
-                int build = Integer.parseInt(fmlVersion.substring(fmlVersion.lastIndexOf('.') + 1));
-                return Integer.valueOf(build);
-            } else if ("MC_FORGE".equals(token)) {
-                return ForgeVersion.minorVersion;
-            }
-            return null;
-        }
-
-    }
-
-    public CubicChunksCoreMod() {
-        initMixin();
-    }
 
     @Override
     public String[] getASMTransformerClass() {
@@ -96,15 +64,5 @@ public class CubicChunksCoreMod implements IFMLLoadingPlugin {
     @Nullable @Override
     public String getAccessTransformerClass() {
         return null;
-    }
-
-    public static void initMixin() {
-        MixinBootstrap.init();
-        Mixins.addConfiguration("cubicchunks.mixins.core.json");
-        Mixins.addConfiguration("cubicchunks.mixins.fixes.json");
-        Mixins.addConfiguration("cubicchunks.mixins.selectable.json");
-        Mixins.addConfiguration("cubicchunks.mixins.noncritical.json");
-        MixinEnvironment.getDefaultEnvironment().registerTokenProviderClass(
-                "io.github.opencubicchunks.cubicchunks.core.asm.coremod.CubicChunksCoreMod$TokenProvider");
     }
 }

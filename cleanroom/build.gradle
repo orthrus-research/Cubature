@@ -74,9 +74,7 @@ dependencies {
 def mixinMappings = layout.buildDirectory.file('generated/mixin/mcp2srg.tsrg')
 tasks.named('compileJava', JavaCompile) {
     outputs.file(mixinMappings)
-    // MixinWorld_SlowCollisionCheck constrains its overwrite to Forge minor 23; the coremod supplies it at runtime.
-    options.compilerArgs += ['-AmergeBehaviour=merge', "-AoutTsrgFile=${mixinMappings.get().asFile.absolutePath}",
-                             '-Atokens=MC_FORGE=23']
+    options.compilerArgs += ['-AmergeBehaviour=merge', "-AoutTsrgFile=${mixinMappings.get().asFile.absolutePath}"]
     doFirst { mixinMappings.get().asFile.parentFile.mkdirs() }
 }
 tasks.named('reobfJar') {
@@ -114,7 +112,8 @@ jar {
                    'Implementation-Vendor': 'OpenCubicChunks contributors and Orthrus Research',
                    'FMLCorePlugin': 'io.github.opencubicchunks.cubicchunks.core.asm.coremod.CubicChunksCoreMod',
                    'FMLCorePluginContainsFMLMod': 'true',
-                   'ForceLoadAsMod': 'true')
+                   'ForceLoadAsMod': 'true',
+                   'MixinConnector': 'io.github.opencubicchunks.cubicchunks.core.asm.CubicChunksMixinConnector')
         attributes('ModType': 'CRL')
     }
 }
