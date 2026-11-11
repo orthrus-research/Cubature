@@ -19,7 +19,7 @@ public final class LabRenderDiagnostics {
     public static void beginCapture(String id) {
         if (active != null) throw new IllegalStateException("Previous renderer diagnostic capture is still active");
         boolean enabled = Boolean.getBoolean("cubiclab.renderDiagnostics");
-        if (enabled || LabUploadExperiment.selected()) active = new State(id, enabled);
+        if (enabled) active = new State(id, enabled);
     }
 
     public static void frame() {
@@ -31,7 +31,7 @@ public final class LabRenderDiagnostics {
         State state = active;
         active = null;
         if (state == null) {
-            Map<String, Object> data = new LinkedHashMap<>(); data.put("enabled", false); data.put("uploadStrategy", "original");
+            Map<String, Object> data = new LinkedHashMap<>(); data.put("enabled", false);
             return data;
         }
         state.sealed = true;
@@ -92,7 +92,6 @@ public final class LabRenderDiagnostics {
     private static final class State {
         final String id;
         final boolean enabled;
-        final long[] uploadStart = LabUploadExperiment.snapshot();
         final long[] started = new long[STAGES.length], completed = new long[STAGES.length];
         final Samples[] durations;
         final Samples queueWait, gpuDurations;
@@ -145,7 +144,7 @@ public final class LabRenderDiagnostics {
 
         synchronized Map<String, Object> summary() {
             Map<String, Object> data = new LinkedHashMap<>();
-            data.put("enabled", enabled); data.put("runId", id); data.put("uploadExperiment", LabUploadExperiment.summary(uploadStart));
+            data.put("enabled", enabled); data.put("runId", id);
             if (!enabled) return data;
             for (int i = 0; i < STAGES.length; i++) {
                 Map<String, Object> span = new LinkedHashMap<>(durations[i].summary());

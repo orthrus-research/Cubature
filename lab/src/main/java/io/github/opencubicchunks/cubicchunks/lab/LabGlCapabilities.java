@@ -10,13 +10,10 @@ final class LabGlCapabilities {
     };
     private LabGlCapabilities() { }
 
-    static boolean openGl15() { return supported(false); }
-    static boolean openGl33() { return supported(true); }
-
-    private static boolean supported(boolean version33) {
+    static boolean openGl33() {
         for (Probe probe : PROBES) {
             if (probe == null) continue;
-            int value = probe.supported(version33);
+            int value = probe.supported();
             if (value >= 0) return value == 1;
         }
         return false;
@@ -26,18 +23,18 @@ final class LabGlCapabilities {
         try {
             Class<?> type = Class.forName(name, false, LabGlCapabilities.class.getClassLoader());
             Method getter = type.getMethod("getCapabilities");
-            return new Probe(getter, getter.getReturnType().getField("OpenGL15"), getter.getReturnType().getField("OpenGL33"));
+            return new Probe(getter, getter.getReturnType().getField("OpenGL33"));
         } catch (ReflectiveOperationException | LinkageError | RuntimeException unavailable) { return null; }
     }
 
     private static final class Probe {
         final Method getter;
-        final Field openGl15, openGl33;
-        Probe(Method getter, Field openGl15, Field openGl33) { this.getter = getter; this.openGl15 = openGl15; this.openGl33 = openGl33; }
-        int supported(boolean version33) {
+        final Field openGl33;
+        Probe(Method getter, Field openGl33) { this.getter = getter; this.openGl33 = openGl33; }
+        int supported() {
             try {
                 Object current = getter.invoke(null, (Object[]) null);
-                return current == null ? -1 : (version33 ? openGl33 : openGl15).getBoolean(current) ? 1 : 0;
+                return current == null ? -1 : openGl33.getBoolean(current) ? 1 : 0;
             } catch (ReflectiveOperationException | LinkageError | RuntimeException unavailable) { return -1; }
         }
     }

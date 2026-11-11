@@ -18,7 +18,6 @@ public final class LabData {
         if (render && stages) return "diagnostic-renderer-and-stage-observer";
         if (render) return "diagnostic-renderer-profile";
         if (stages) return "diagnostic-stage-observer";
-        if ("orphan".equals(System.getProperty("cubiclab.uploadStrategy"))) return "experimental-orphan-upload";
         return "ordinary-profile-with-bounded-lab-counters";
     }
     public static void write(Path path, Object value) {

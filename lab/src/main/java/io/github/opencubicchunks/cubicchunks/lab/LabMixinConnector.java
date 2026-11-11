@@ -15,7 +15,6 @@ public final class LabMixinConnector implements IMixinConnector {
         boolean renderDiagnostics = Boolean.getBoolean("cubiclab.renderDiagnostics");
         boolean delivery = Boolean.getBoolean("cubiclab.deliveryTrace");
         boolean renderReady = Boolean.getBoolean("cubiclab.fullViewRenderReady") || delivery;
-        boolean orphanUploads = "orphan".equals(System.getProperty("cubiclab.uploadStrategy"));
         // Checked as a resource so no client class loads this early.
         boolean sdl = getClass().getClassLoader().getResource("com/cleanroommc/client/sdl/Pump.class") != null;
 
@@ -25,7 +24,7 @@ public final class LabMixinConnector implements IMixinConnector {
         ConditionalMixin.of(!System.getProperty("cubiclab.lodTrace", "").isEmpty(), "cubiclab.lod.mixins.json").register();
         ConditionalMixin.of(renderDiagnostics || renderReady, "cubiclab.render-task.mixins.json").register();
         ConditionalMixin.of(renderReady, "cubiclab.render-ready.mixins.json").register();
-        ConditionalMixin.of(renderDiagnostics || orphanUploads, "cubiclab.upload.mixins.json").register();
+        ConditionalMixin.of(renderDiagnostics, "cubiclab.upload.mixins.json").register();
         ConditionalMixin.of(renderDiagnostics, "cubiclab.render.mixins.json").register();
         ConditionalMixin.of(renderDiagnostics && sdl, "cubiclab.render-sdl.mixins.json").register();
     }
