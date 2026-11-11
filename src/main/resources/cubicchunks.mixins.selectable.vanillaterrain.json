@@ -12,7 +12,8 @@
     },
     "mixins": [],
     "client": [
-        "client.MixinRenderGlobalVanillaTerrain"
+        "client.vertviewdist.MixinRenderGlobal",
+        "client.vertviewdist.MixinRenderGlobalVanillaTerrain"
     ],
     "server": []
 }

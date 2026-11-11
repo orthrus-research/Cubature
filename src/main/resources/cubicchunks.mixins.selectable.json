@@ -23,13 +23,17 @@
         "common.MixinDistantHorizonsServeInOrder",
         "common.MixinDistantHorizonsMaterials",
         "common.MixinDistantHorizonsPropertyNames",
-        "common.MixinDistantHorizonsNoWorldMessages"
+        "common.MixinDistantHorizonsNoWorldMessages",
+        "common.MixinChunkCache",
+        "common.MixinWorld_SlowCollisionCheck"
     ],
     "client": [
         "client.IGuiVideoSettings",
         "client.MixinDistantHorizonsCullingBounds",
         "client.MixinDistantHorizonsArrivalTree",
-        "client.MixinDistantHorizonsArrivalRequests"
+        "client.MixinDistantHorizonsArrivalRequests",
+        "client.MixinChunkCache_Cubic",
+        "client.vertviewdist.MixinEntityRenderer"
     ],
     "server": []
 }

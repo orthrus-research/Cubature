@@ -30,7 +30,6 @@ import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import io.github.opencubicchunks.cubicchunks.api.util.Coords;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
 import io.github.opencubicchunks.cubicchunks.core.CubicChunksConfig;
-import io.github.opencubicchunks.cubicchunks.core.asm.CubicChunksMixinConfig;
 import mcp.MethodsReturnNonnullByDefault;
 import net.minecraft.client.renderer.RenderGlobal;
 import net.minecraft.client.renderer.ViewFrustum;
@@ -62,8 +61,7 @@ public class MixinViewFrustum_VertViewDistance {
     @Inject(method = "setCountChunksXYZ", at = @At(value = "HEAD"))
     private void onSetCountChunks(int renderDistance, CallbackInfo cbi) {
         if (((ICubicWorld) world).isCubicWorld()) {
-            this.renderDistance = (CubicChunksMixinConfig.BoolOptions.VERT_RENDER_DISTANCE.getValue() ?
-                    CubicChunksConfig.verticalCubeLoadDistance : renderDistance) * 2 + 1;
+            this.renderDistance = CubicChunksConfig.verticalCubeLoadDistance * 2 + 1;
         } else {
             ICubicWorld world = (ICubicWorld) this.world;
             // vanilla case: support extended height

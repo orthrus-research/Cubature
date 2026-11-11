@@ -186,7 +186,7 @@ tasks.register('verifyReobfJar') {
             }
             def json = new groovy.json.JsonSlurper()
             def configs = entries.findAll { it.name.startsWith('cubicchunks.mixins.') && it.name.endsWith('.json') && !it.name.contains('refmap') }
-            assert configs.size() == 14: 'Expected the four Mixin configurations and the ten selectable ones'
+            assert configs.size() == 7: 'Expected the four Mixin configurations and the three renderer-specific ones'
             configs.each { entry ->
                 def config = json.parse(archive.getInputStream(entry))
                 assert names.contains(config.refmap): "Missing refmap ${config.refmap}"

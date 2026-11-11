@@ -74,6 +74,11 @@ decorator or chunk generator calls were removed (lakes, dungeons, ice spikes and
 desert wells, dead bush, tall grass, flowers, double plants, shrub, swamp tree and the taiga pine),
 with four mixins on such generators that had never held code. The fixes for generators a player
 can start at any height stay: trees grown from saplings and the huge mushroom.
+Also on November 11, 2026, `config/cubicchunks_mixin_config.json` and its four choices were removed.
+Each choice is now fixed at what had been its default: cube arrays in the chunk cache, the
+height-aware collision check and the vertical render distance stay; the path-navigator
+optimisation, the fast collision check and the vanilla chunk-cache biome lookup, which only applied
+when a choice was changed, are gone. An existing file is ignored.
 Also on November 10, 2026, initial sky light and surface tracking return early for a cube without
 storage that lies above every staged column top in a sky-lit world: its 4,096 sky checks
 changed nothing, and the column's dirtying, staging removal and surface notifications still run.
