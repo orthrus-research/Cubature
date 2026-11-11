@@ -24,6 +24,7 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.core.client;
 
+import com.llamalad7.mixinextras.expression.Expression;
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
 import mcp.MethodsReturnNonnullByDefault;
@@ -32,8 +33,6 @@ import net.minecraft.world.World;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Constant;
-import org.spongepowered.asm.mixin.injection.ModifyConstant;
 import org.spongepowered.asm.mixin.injection.Slice;
 
 import javax.annotation.ParametersAreNonnullByDefault;
@@ -45,8 +44,9 @@ public abstract class MixinChunkCache_HeightLimits {
 
     @Shadow public World world;
 
-    @ModifyConstant(method = "getLightFor",
-            constant = @Constant(intValue = 0, expandZeroConditions = Constant.Condition.GREATER_THAN_OR_EQUAL_TO_ZERO))
+    @Expression("? >= @(0)")
+    @ModifyExpressionValue(method = "getLightFor",
+            at = @At(value = "MIXINEXTRAS:EXPRESSION"))
     private int getLightFor_getMinHeight(int orig) {
         return ((ICubicWorld) world).getMinHeight();
     }
@@ -56,8 +56,9 @@ public abstract class MixinChunkCache_HeightLimits {
         return ((ICubicWorld) world).getMaxHeight();
     }
 
-    @ModifyConstant(method = "getLightForExt",
-            constant = @Constant(intValue = 0, expandZeroConditions = Constant.Condition.GREATER_THAN_OR_EQUAL_TO_ZERO),
+    @Expression("? >= @(0)")
+    @ModifyExpressionValue(method = "getLightForExt",
+            at = @At(value = "MIXINEXTRAS:EXPRESSION"),
             slice = @Slice(
                     from = @At(value = "INVOKE:FIRST", target = "Lnet/minecraft/util/math/BlockPos;getY()I"),
                     to = @At(value = "INVOKE:FIRST",

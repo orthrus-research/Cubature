@@ -24,6 +24,7 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.core.common;
 
+import com.llamalad7.mixinextras.expression.Expression;
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
@@ -48,7 +49,6 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Constant;
 import org.spongepowered.asm.mixin.injection.Group;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyConstant;
@@ -130,9 +130,10 @@ public abstract class MixinWorld_HeightLimits implements ICubicWorld {
      * Doesn't directly affect block rendering.
      */
     @Group(name = "getLightHeightOverride", max = 4)
-    @ModifyConstant(
+    @Expression("? >= @(0)")
+    @ModifyExpressionValue(
             method = "getLight(Lnet/minecraft/util/math/BlockPos;Z)I",
-            constant = @Constant(intValue = 0, expandZeroConditions = Constant.Condition.LESS_THAN_ZERO, ordinal = 0),
+            at = @At(value = "MIXINEXTRAS:EXPRESSION", ordinal = 0),
             slice = @Slice(
                     from = @At(value = "INVOKE", target = "Lnet/minecraft/util/math/BlockPos;getY()I"),
                     to = @At(value = "INVOKE",
@@ -158,8 +159,9 @@ public abstract class MixinWorld_HeightLimits implements ICubicWorld {
      * so that getLightFor returns light at y=minHeight when below minHeight.
      */
     @Group(name = "getLightForHeightOverride", min = 2, max = 2)
-    @ModifyConstant(method = "getLightFor",
-            constant = @Constant(intValue = 0, expandZeroConditions = Constant.Condition.LESS_THAN_ZERO))
+    @Expression("? >= @(0)")
+    @ModifyExpressionValue(method = "getLightFor",
+            at = {@At(value = "MIXINEXTRAS:EXPRESSION"), @At(value = "CONSTANT", args = "intValue=0")})
     private int getLightForGetMinYReplace(int origY) {
         return this.getMinHeight();
     }
@@ -288,8 +290,9 @@ public abstract class MixinWorld_HeightLimits implements ICubicWorld {
         return getMaxHeight();
     }
 
-    @ModifyConstant(method = {"canSnowAtBody", "canBlockFreezeBody"},
-            constant = @Constant(expandZeroConditions = Constant.Condition.GREATER_THAN_OR_EQUAL_TO_ZERO),
+    @Expression("? >= @(0)")
+    @ModifyExpressionValue(method = {"canSnowAtBody", "canBlockFreezeBody"},
+            at = @At(value = "MIXINEXTRAS:EXPRESSION"),
             remap = false)
     private int canSnowAt_getMinHeight(int zero) {
         return getMinHeight();

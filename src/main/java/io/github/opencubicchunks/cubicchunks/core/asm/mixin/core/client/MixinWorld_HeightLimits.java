@@ -24,6 +24,8 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.core.client;
 
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
+import com.llamalad7.mixinextras.expression.Expression;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
 import mcp.MethodsReturnNonnullByDefault;
 import net.minecraft.block.state.IBlockState;
@@ -35,10 +37,8 @@ import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Constant;
 import org.spongepowered.asm.mixin.injection.Group;
 import org.spongepowered.asm.mixin.injection.ModifyArg;
-import org.spongepowered.asm.mixin.injection.ModifyConstant;
 import org.spongepowered.asm.mixin.injection.Slice;
 
 import javax.annotation.ParametersAreNonnullByDefault;
@@ -65,9 +65,10 @@ public abstract class MixinWorld_HeightLimits implements ICubicWorld {
     */
     // it somehow finds 3 places to modify the constant zero when there are only 2 originally
     @Group(name = "getLightFromNeighborsFor", min = 2, max = 3)
-    @ModifyConstant(
+    @Expression("? >= @(0)")
+    @ModifyExpressionValue(
             method = "getLightFromNeighborsFor",
-            constant = @Constant(intValue = 0, expandZeroConditions = Constant.Condition.LESS_THAN_ZERO),
+            at = {@At(value = "MIXINEXTRAS:EXPRESSION"), @At(value = "CONSTANT", args = "intValue=0")},
             slice = @Slice(
                     from = @At(value = "INVOKE", target = "Lnet/minecraft/util/math/BlockPos;getY()I"),
                     to = @At(value = "INVOKE", target = "Lnet/minecraft/util/math/BlockPos;getZ()I")

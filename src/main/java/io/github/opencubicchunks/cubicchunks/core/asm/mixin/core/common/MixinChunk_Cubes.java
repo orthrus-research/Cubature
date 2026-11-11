@@ -24,6 +24,7 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.core.common;
 
+import com.llamalad7.mixinextras.expression.Expression;
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
@@ -74,9 +75,7 @@ import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Constant;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.ModifyConstant;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.Slice;
@@ -435,8 +434,9 @@ public abstract class MixinChunk_Cubes {
     //                 getBlockState
     // ==============================================
 
-    @ModifyConstant(method = "getBlockState(III)Lnet/minecraft/block/state/IBlockState;",
-            constant = @Constant(expandZeroConditions = Constant.Condition.GREATER_THAN_OR_EQUAL_TO_ZERO),
+    @Expression("? >= @(0)")
+    @ModifyExpressionValue(method = "getBlockState(III)Lnet/minecraft/block/state/IBlockState;",
+            at = @At(value = "MIXINEXTRAS:EXPRESSION"),
             require = 1)
     private int getBlockState_getMinHeight(int zero) {
         return isColumn ? Integer.MIN_VALUE : getWorld().getMinHeight(); // this one is in block coords, max is in cube coords. Mojang logic.
@@ -612,8 +612,9 @@ public abstract class MixinChunk_Cubes {
     //                  addEntity
     // ==============================================
 
-    @ModifyConstant(method = "addEntity",
-            constant = @Constant(expandZeroConditions = Constant.Condition.LESS_THAN_ZERO, intValue = 0),
+    @Expression("? >= @(0)")
+    @ModifyExpressionValue(method = "addEntity",
+            at = {@At(value = "MIXINEXTRAS:EXPRESSION"), @At(value = "CONSTANT", args = "intValue=0")},
             slice = @Slice(
                     from = @At(
                             value = "INVOKE:LAST",
@@ -676,8 +677,9 @@ public abstract class MixinChunk_Cubes {
     //             removeEntityAtIndex
     // ==============================================
 
-    @ModifyConstant(method = "removeEntityAtIndex",
-            constant = @Constant(expandZeroConditions = Constant.Condition.LESS_THAN_ZERO, intValue = 0),
+    @Expression("? >= @(0)")
+    @ModifyExpressionValue(method = "removeEntityAtIndex",
+            at = {@At(value = "MIXINEXTRAS:EXPRESSION"), @At(value = "CONSTANT", args = "intValue=0")},
             require = 2,
             slice = @Slice(
                     from = @At("HEAD"),

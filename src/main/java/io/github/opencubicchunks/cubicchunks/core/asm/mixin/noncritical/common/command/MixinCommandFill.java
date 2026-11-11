@@ -24,6 +24,8 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.noncritical.common.command;
 
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
+import com.llamalad7.mixinextras.expression.Expression;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import io.github.opencubicchunks.cubicchunks.core.world.cube.Cube;
@@ -39,9 +41,7 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Constant;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.ModifyConstant;
 import org.spongepowered.asm.mixin.injection.Slice;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.LocalCapture;
@@ -64,11 +64,12 @@ public class MixinCommandFill {
         commandWorld = new WeakReference<>((ICubicWorld) sender.getEntityWorld());
     }
 
-    @ModifyConstant(
+    @Expression("? >= @(0)")
+    @ModifyExpressionValue(
             method = "execute",
-            constant = {
-                    @Constant(expandZeroConditions = Constant.Condition.GREATER_THAN_OR_EQUAL_TO_ZERO, ordinal = 0),
-                    @Constant(intValue = 256, ordinal = 0)
+            at = {
+                    @At(value = "MIXINEXTRAS:EXPRESSION", ordinal = 0),
+                    @At(value = "CONSTANT", args = "intValue=256", ordinal = 0)
             },
             slice = @Slice(from = @At(value = "CONSTANT", args = "stringValue=commands.fill.tooManyBlocks")), require = 2)
     private int execute_getMinHeight(int original) {

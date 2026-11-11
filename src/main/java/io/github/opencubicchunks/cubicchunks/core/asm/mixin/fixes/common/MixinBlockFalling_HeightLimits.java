@@ -24,6 +24,8 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.fixes.common;
 
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
+import com.llamalad7.mixinextras.expression.Expression;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import io.github.opencubicchunks.cubicchunks.api.util.CubePos;
@@ -40,9 +42,7 @@ import net.minecraft.world.World;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Constant;
 import org.spongepowered.asm.mixin.injection.Group;
-import org.spongepowered.asm.mixin.injection.ModifyConstant;
 import org.spongepowered.asm.mixin.injection.Slice;
 
 import javax.annotation.ParametersAreNonnullByDefault;
@@ -60,9 +60,10 @@ public abstract class MixinBlockFalling_HeightLimits extends Block {
 
     // First call - checking if BlockPos of block is > 0 to continue.
     @Group(name = "checkFallable_getMinY1", min = 1, max = 1)
-    @ModifyConstant(
+    @Expression("? >= @(0)")
+    @ModifyExpressionValue(
             method = "checkFallable",
-            constant = @Constant(intValue = 0, expandZeroConditions = Constant.Condition.GREATER_THAN_OR_EQUAL_TO_ZERO),
+            at = @At(value = "MIXINEXTRAS:EXPRESSION"),
             slice = @Slice(
                     from = @At(value = "INVOKE",
                             target = "Lnet/minecraft/block/BlockFalling;canFallThrough(Lnet/minecraft/block/state/IBlockState;)Z"),
@@ -76,9 +77,10 @@ public abstract class MixinBlockFalling_HeightLimits extends Block {
     // Third call - if area is not loaded call in cycle to attempt to find spot to land.
     // Forth call - check again if founded in previous cycle spot is above 0.
     @Group(name = "checkFallable_getMinY2", min = 2, max = 2)
-    @ModifyConstant(
+    @Expression("? > @(0)")
+    @ModifyExpressionValue(
             method = "checkFallable",
-            constant = @Constant(intValue = 0, expandZeroConditions = Constant.Condition.GREATER_THAN_ZERO),
+            at = @At(value = "MIXINEXTRAS:EXPRESSION"),
             slice = @Slice(
                     from = @At(value = "INVOKE:LAST",
                             target = "Lnet/minecraft/block/BlockFalling;canFallThrough(Lnet/minecraft/block/state/IBlockState;)Z"),

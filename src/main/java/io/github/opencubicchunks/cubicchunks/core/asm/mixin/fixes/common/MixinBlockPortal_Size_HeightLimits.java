@@ -24,11 +24,12 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.fixes.common;
 
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
+import com.llamalad7.mixinextras.expression.Expression;
 import javax.annotation.ParametersAreNonnullByDefault;
 
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.injection.ModifyConstant;
-import org.spongepowered.asm.mixin.injection.Constant;
+import org.spongepowered.asm.mixin.injection.At;
 
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
 import mcp.MethodsReturnNonnullByDefault;
@@ -42,7 +43,8 @@ import net.minecraft.world.World;
 @Mixin(BlockPortal.Size.class)
 public abstract class MixinBlockPortal_Size_HeightLimits {
 
-	@ModifyConstant(method = "<init>", constant = @Constant(intValue = 0, ordinal = 0, expandZeroConditions = Constant.Condition.GREATER_THAN_ZERO), require = 1)
+	@Expression("? > @(0)")
+	@ModifyExpressionValue(method = "<init>", at = @At(value = "MIXINEXTRAS:EXPRESSION", ordinal = 0), require = 1)
 	private int portalSizeClassInitReplace0(int posY, World worldIn, BlockPos origin, EnumFacing.Axis axis) {
 		return ((ICubicWorld)worldIn).getMinHeight();
 	}

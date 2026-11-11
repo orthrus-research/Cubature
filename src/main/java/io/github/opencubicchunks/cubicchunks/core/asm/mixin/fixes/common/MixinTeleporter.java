@@ -24,6 +24,8 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.fixes.common;
 
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
+import com.llamalad7.mixinextras.expression.Expression;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import mcp.MethodsReturnNonnullByDefault;
@@ -44,8 +46,6 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Constant;
-import org.spongepowered.asm.mixin.injection.ModifyConstant;
 import org.spongepowered.asm.mixin.injection.Slice;
 
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
@@ -81,11 +81,9 @@ public class MixinTeleporter {
         return original.call(orig, dx, dy, dz);
     }
 
-    @ModifyConstant(method = "placeInExistingPortal",
-                    constant = @Constant(
-                            intValue = 0,
-                            expandZeroConditions = Constant.Condition.GREATER_THAN_OR_EQUAL_TO_ZERO,
-                            ordinal = 1))
+    @Expression("? >= @(0)")
+    @ModifyExpressionValue(method = "placeInExistingPortal",
+                    at = @At(value = "MIXINEXTRAS:EXPRESSION"))
     private int getScanBottomY(int zero, Entity entity, float rotationYaw) {
         if (((ICubicWorld) world).isCubicWorld())
             return MathHelper.floor(entity.posY - 128);

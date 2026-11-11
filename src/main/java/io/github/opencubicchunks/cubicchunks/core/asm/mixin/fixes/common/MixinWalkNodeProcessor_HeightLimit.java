@@ -24,6 +24,7 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.fixes.common;
 
+import com.llamalad7.mixinextras.expression.Expression;
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
@@ -38,8 +39,6 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.IBlockAccess;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Constant;
-import org.spongepowered.asm.mixin.injection.ModifyConstant;
 
 import javax.annotation.ParametersAreNonnullByDefault;
 
@@ -48,7 +47,8 @@ import javax.annotation.ParametersAreNonnullByDefault;
 @Mixin(WalkNodeProcessor.class)
 public abstract class MixinWalkNodeProcessor_HeightLimit extends NodeProcessor {
 
-    @ModifyConstant(method = "getStart", constant = @Constant(intValue = 0, expandZeroConditions = Constant.Condition.GREATER_THAN_ZERO))
+    @Expression("? > @(0)")
+    @ModifyExpressionValue(method = "getStart", at = @At(value = "MIXINEXTRAS:EXPRESSION"))
     private int getMinHeight_GetStart(int originalY) {
         return ((ICubicWorld) this.entity.world).getMinHeight() + originalY;
     }
@@ -64,12 +64,10 @@ public abstract class MixinWalkNodeProcessor_HeightLimit extends NodeProcessor {
     }
 
 
-    @ModifyConstant(
+    @Expression("? > @(0)")
+    @ModifyExpressionValue(
             method = "getSafePoint",
-            constant = @Constant(
-                    expandZeroConditions = Constant.Condition.GREATER_THAN_ZERO,
-                    ordinal = 1
-            ))
+            at = @At(value = "MIXINEXTRAS:EXPRESSION", ordinal = 1))
     private int getMinHeight_GetSafePoint(int originalY) {
         return ((ICubicWorld) this.entity.world).getMinHeight() + originalY;
     }

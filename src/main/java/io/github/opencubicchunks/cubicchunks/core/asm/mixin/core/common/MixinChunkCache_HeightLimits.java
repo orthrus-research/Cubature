@@ -24,6 +24,7 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.core.common;
 
+import com.llamalad7.mixinextras.expression.Expression;
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
 import mcp.MethodsReturnNonnullByDefault;
@@ -32,8 +33,6 @@ import net.minecraft.world.World;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.Shadow;
-import org.spongepowered.asm.mixin.injection.Constant;
-import org.spongepowered.asm.mixin.injection.ModifyConstant;
 
 import javax.annotation.ParametersAreNonnullByDefault;
 
@@ -50,8 +49,9 @@ public class MixinChunkCache_HeightLimits {
 
     @Shadow public World world;
 
-    @ModifyConstant(method = "getBlockState",
-            constant = @Constant(intValue = 0, expandZeroConditions = Constant.Condition.GREATER_THAN_OR_EQUAL_TO_ZERO, ordinal = 0))
+    @Expression("? >= @(0)")
+    @ModifyExpressionValue(method = "getBlockState",
+            at = @At(value = "MIXINEXTRAS:EXPRESSION", ordinal = 0))
     private int getBlockState_getMinHeight(int orig) {
         return ((ICubicWorld) world).getMinHeight();
     }

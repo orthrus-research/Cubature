@@ -24,9 +24,10 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.noncritical.common;
 
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
+import com.llamalad7.mixinextras.expression.Expression;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.injection.Constant;
-import org.spongepowered.asm.mixin.injection.ModifyConstant;
+import org.spongepowered.asm.mixin.injection.At;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
 import net.minecraft.tileentity.TileEntityBeacon;
 import net.minecraft.tileentity.TileEntityLockable;
@@ -34,7 +35,8 @@ import net.minecraft.tileentity.TileEntityLockable;
 @Mixin(TileEntityBeacon.class)
 public abstract class MixinTileEntityBeacon extends TileEntityLockable {
     
-    @ModifyConstant(method = "updateSegmentColors", constant = @Constant(expandZeroConditions = Constant.Condition.LESS_THAN_ZERO))
+    @Expression("? >= @(0)")
+    @ModifyExpressionValue(method = "updateSegmentColors", at = @At(value = "MIXINEXTRAS:EXPRESSION"))
     private int updateSegmentColorsYValue(int orig) {
         return ((ICubicWorld) world).getMinHeight();
     }

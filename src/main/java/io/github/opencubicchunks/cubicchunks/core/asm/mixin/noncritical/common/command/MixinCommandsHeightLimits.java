@@ -24,6 +24,7 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.noncritical.common.command;
 
+import com.llamalad7.mixinextras.expression.Expression;
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
 import mcp.MethodsReturnNonnullByDefault;
@@ -33,9 +34,7 @@ import net.minecraft.command.ICommandSender;
 import net.minecraft.server.MinecraftServer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Constant;
 import org.spongepowered.asm.mixin.injection.Group;
-import org.spongepowered.asm.mixin.injection.ModifyConstant;
 import org.spongepowered.asm.mixin.injection.Slice;
 
 import javax.annotation.ParametersAreNonnullByDefault;
@@ -46,18 +45,20 @@ import javax.annotation.ParametersAreNonnullByDefault;
 public class MixinCommandsHeightLimits {
 
     @Group(name = "command_getMinY", min = 2, max = 2)
-    @ModifyConstant(
+    @Expression("? >= @(0)")
+    @ModifyExpressionValue(
             method = "execute",
-            constant = @Constant(expandZeroConditions = Constant.Condition.GREATER_THAN_OR_EQUAL_TO_ZERO, ordinal = 0),
+            at = @At(value = "MIXINEXTRAS:EXPRESSION", ordinal = 0),
             slice = @Slice(from = @At(value = "FIELD", target = "Lnet/minecraft/world/gen/structure/StructureBoundingBox;minY:I")))
     private int command_getMinY1(int orig, MinecraftServer server, ICommandSender sender, String[] args) {
         return ((ICubicWorld) sender.getEntityWorld()).getMinHeight();
     }
 
     @Group(name = "command_getMinY")
-    @ModifyConstant(
+    @Expression("? >= @(0)")
+    @ModifyExpressionValue(
             method = "execute",
-            constant = @Constant(expandZeroConditions = Constant.Condition.GREATER_THAN_OR_EQUAL_TO_ZERO, ordinal = 1),
+            at = @At(value = "MIXINEXTRAS:EXPRESSION", ordinal = 1),
             slice = @Slice(from = @At(value = "FIELD", target = "Lnet/minecraft/world/gen/structure/StructureBoundingBox;minY:I")))
     private int command_getMinY2(int orig, MinecraftServer server, ICommandSender sender, String[] args) {
         return ((ICubicWorld) sender.getEntityWorld()).getMinHeight();

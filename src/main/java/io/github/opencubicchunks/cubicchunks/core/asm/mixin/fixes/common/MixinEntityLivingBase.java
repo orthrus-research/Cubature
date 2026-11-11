@@ -24,6 +24,8 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.fixes.common;
 
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
+import com.llamalad7.mixinextras.expression.Expression;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import mcp.MethodsReturnNonnullByDefault;
@@ -32,6 +34,7 @@ import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.*;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
 
@@ -58,7 +61,8 @@ public abstract class MixinEntityLivingBase extends Entity {
         return this.posY;
     }
 
-    @ModifyConstant(method = "attemptTeleport", constant = @Constant(expandZeroConditions = Constant.Condition.GREATER_THAN_ZERO))
+    @Expression("? > @(0)")
+    @ModifyExpressionValue(method = "attemptTeleport", at = @At(value = "MIXINEXTRAS:EXPRESSION"))
     private int getMinHeight(int orig) {
         return ((ICubicWorld) world).getMinHeight();
     }
