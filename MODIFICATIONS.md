@@ -12,13 +12,15 @@ installation costs and no-storage counts without changing delivery admission.
 The lab's complete-tick wrapper encloses the core phase clock, so the final phase vector is
 published before the job's independent duration is recorded and its report is frozen.
 
-On November 10, 2026, the server-tick phases also separate random-tick cube selection and ticking
-and the player cube map's own bookkeeping, both inside Cubature's own methods. Phases for queued
-packet handlers with the network tick and for Forge's server and world tick events are charged only
-by the lab, which wraps those vanilla call sites; the mod itself adds no mixin to them, since other
-mods may overwrite or move them. The random-tick cube
-iterator skips its watcher scan while the map holds no non-spectator player, since every watcher
-would be rejected; force-loaded cubes still tick.
+On November 10, 2026, the server-tick phases also separate a cubic world's block ticking (column
+weather and light checks and random ticks of tickable cubes) and the player cube map's own
+bookkeeping, both inside Cubature's own methods. Phases for queued packet handlers with the network
+tick and for Forge's server and world tick events are charged only by the lab, which wraps those
+vanilla call sites; the mod itself adds no mixin to them, since other mods may overwrite or move
+them. The provider's per-cube tick is gone: every tick it walked every tickable cube watcher (and
+every loaded cube on the client) to drain a tile-entity creation queue that nothing fills, since
+tile entities queue on their column, and set a flag nothing reads. Random ticks run in the world's
+own block-tick pass and are unchanged.
 Also on November 10, 2026, compatibility code for mods and platforms outside Cubature's runtime
 (official Cleanroom with Distant Horizons, and Demonica with its bundled Celeritas) was removed:
 Forge+Bukkit hybrid mixins and the hybrid check, OptiFine's render mixins, interfaces and version

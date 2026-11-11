@@ -36,7 +36,6 @@ import net.minecraft.world.EnumSkyBlock;
 import net.minecraft.world.chunk.Chunk;
 
 import java.util.HashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
 
 import javax.annotation.Nullable;
 import javax.annotation.ParametersAreNonnullByDefault;
@@ -51,7 +50,7 @@ public class BlankCube extends Cube {
 
     public BlankCube(Chunk column) {
         super(new TicketList(null), column.getWorld(), column, new CubePos(0, 0, 0),
-                null, new BlankEntityContainer(), new HashMap<>(), new ConcurrentLinkedQueue<>(), null);
+                null, new BlankEntityContainer(), new HashMap<>(), null);
     }
 
     @Override

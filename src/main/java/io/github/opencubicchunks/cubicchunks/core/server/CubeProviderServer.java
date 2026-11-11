@@ -72,10 +72,8 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
-import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
-import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
 import javax.annotation.Detainted;
@@ -296,18 +294,6 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
         TickDiagnostics.enter(TickDiagnostics.Phase.UNLOAD_SAVE);
         try {
             autosave.tick();
-        } finally {
-            TickDiagnostics.exit();
-        }
-        TickDiagnostics.enter(TickDiagnostics.Phase.RANDOM_TICK);
-        try {
-            long i = System.currentTimeMillis();
-            Random rand = this.world.rand;
-            Iterator<Cube> watchersIterator = demand().getCubeIterator();
-            BooleanSupplier tickFaster = () -> System.currentTimeMillis() - i > 40;
-            while (watchersIterator.hasNext()) {
-                watchersIterator.next().tickCubeServer(tickFaster, rand);
-            }
         } finally {
             TickDiagnostics.exit();
         }

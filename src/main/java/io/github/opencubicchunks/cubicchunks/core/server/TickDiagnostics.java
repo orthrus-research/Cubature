@@ -9,7 +9,8 @@ import javax.annotation.Nullable;
 /** Exclusive owner-thread costs inside a complete server tick. Workers and client threads do not contribute. */
 public final class TickDiagnostics {
     /**
-     * RANDOM_TICK selects and ticks cubes near non-spectators; PLAYER_MAP is the player cube map's own
+     * BLOCK_TICKS is a cubic world's block ticking: column weather and light checks, and random ticks
+     * of the cubes players and tickets keep tickable. PLAYER_MAP is the player cube map's own
      * bookkeeping (watcher updates, priority lists, delivery loops) outside its nested phases;
      * NETWORK runs queued packet handlers and the network tick; TICK_EVENTS runs Forge's server and
      * world tick events, including any observer listening to them. Only measurement builds charge
@@ -19,7 +20,7 @@ public final class TickDiagnostics {
     public enum Phase {
         COLUMN_INSTALL, CUBE_CONSTRUCT, CUBE_POPULATE, CUBE_FIRST_LIGHT, CUBE_TRACK_SURFACE,
         LIGHT_QUEUE, SEND, PACKET_ENCODE, DH_FEED, UNLOAD_SAVE, ARRIVALS, REGION_PREPARATION,
-        RANDOM_TICK, PLAYER_MAP, NETWORK, TICK_EVENTS, OTHER
+        BLOCK_TICKS, PLAYER_MAP, NETWORK, TICK_EVENTS, OTHER
     }
 
     /** Immutable sample; durations sum to elapsedNanos, including uncategorized work as OTHER. */

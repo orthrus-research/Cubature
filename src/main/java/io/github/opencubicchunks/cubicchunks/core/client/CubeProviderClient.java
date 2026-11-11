@@ -27,7 +27,6 @@ package io.github.opencubicchunks.cubicchunks.core.client;
 import io.github.opencubicchunks.cubicchunks.api.world.CubeEvent;
 import io.github.opencubicchunks.cubicchunks.core.asm.mixin.core.client.IChunkProviderClient;
 import io.github.opencubicchunks.cubicchunks.core.world.ICubeProviderInternal;
-import io.github.opencubicchunks.cubicchunks.core.CubicChunks;
 import io.github.opencubicchunks.cubicchunks.api.util.CubePos;
 import io.github.opencubicchunks.cubicchunks.api.util.XYZMap;
 import io.github.opencubicchunks.cubicchunks.api.world.IColumn;
@@ -98,15 +97,6 @@ public class CubeProviderClient extends ChunkProviderClient implements ICubeProv
 
     @Override
     public boolean tick() {
-        long i = System.currentTimeMillis();
-        for (Cube cube : cubeMap) {
-            cube.tickCubeCommon(() -> System.currentTimeMillis() - i > 5L);
-        }
-
-        if (System.currentTimeMillis() - i > 100L) {
-            CubicChunks.LOGGER.info("Warning: Clientside chunk ticking took {} ms", System.currentTimeMillis() - i);
-        }
-
         return false;
     }
 

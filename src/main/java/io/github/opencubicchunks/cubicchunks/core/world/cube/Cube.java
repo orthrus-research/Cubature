@@ -75,9 +75,6 @@ import net.minecraftforge.event.AttachCapabilitiesEvent;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Random;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.function.BooleanSupplier;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -158,12 +155,6 @@ public class Cube implements ICube {
      */
     @Nonnull
     private final Map<BlockPos, TileEntity> tileEntityMap;
-    /**
-     * The positions of tile entities queued for creation
-     */
-    @Nonnull
-    private final ConcurrentLinkedQueue<BlockPos> tileEntityPosQueue;
-
     private final ICubeLightTrackingInfo cubeLightData;
 
     /**
@@ -172,17 +163,9 @@ public class Cube implements ICube {
     private boolean isCubeLoaded;
 
     /**
-     * Contains the current Linear Congruential Generator seed for block updates. Used with an A value of 3 and a C
-     * value of 0x3c6ef35f, producing a highly planar series of values ill-suited for choosing random blocks in a
-     * 16x16x16 field.
-     */
-    protected int updateLCG = (new Random()).nextInt();
-
-    /**
      * True only if all the blocks have been added to server height map. Always true clientside.
      */
     private boolean isSurfaceTracked = false;
-    private boolean ticked = false;
 
     /**
      * This is used as an optimization to avoid putting all the cubes to tick in a set (which turns out to be very slow because of huge amount of
@@ -212,7 +195,6 @@ public class Cube implements ICube {
 
         this.entities = new EntityContainer();
         this.tileEntityMap = new HashMap<>();
-        this.tileEntityPosQueue = new ConcurrentLinkedQueue<>();
 
         this.cubeLightData = ((ICubicWorldInternal) world).getLightingManager().createLightData(this);
 
@@ -275,12 +257,10 @@ public class Cube implements ICube {
      * @param storage block storage
      * @param entities entity container
      * @param tileEntityMap tile entity storage
-     * @param tileEntityPosQueue queue for updating tile entities
      * @param cubeLightData cube light tracking data
      */
     protected Cube(TicketList tickets, World world, Chunk column, CubePos coords, ExtendedBlockStorage storage,
-                   EntityContainer entities, Map<BlockPos, TileEntity> tileEntityMap,
-                   ConcurrentLinkedQueue<BlockPos> tileEntityPosQueue, ICubeLightTrackingInfo cubeLightData) {
+                   EntityContainer entities, Map<BlockPos, TileEntity> tileEntityMap, ICubeLightTrackingInfo cubeLightData) {
         this.tickets = tickets;
         this.world = world;
         this.column = column;
@@ -288,7 +268,6 @@ public class Cube implements ICube {
         this.storage = storage;
         this.entities = entities;
         this.tileEntityMap = tileEntityMap;
-        this.tileEntityPosQueue = tileEntityPosQueue;
         this.cubeLightData = cubeLightData;
 
         AttachCapabilitiesEvent<ICube> event = new AttachCapabilitiesEvent<>(ICube.class, this);
@@ -398,42 +377,6 @@ public class Cube implements ICube {
             tileEntityIn.validate();
             this.tileEntityMap.put(pos, tileEntityIn);
         }
-    }
-
-    /**
-     * Update light and tile entities of cube
-     *
-     * @param tryToTickFaster Whether costly calculations should be skipped in order to catch up with ticks
-     */
-    public void tickCubeCommon(BooleanSupplier tryToTickFaster) {
-        this.ticked = true;
-        while (!this.tileEntityPosQueue.isEmpty()) {
-            BlockPos blockpos = this.tileEntityPosQueue.poll();
-
-            IBlockState state = this.getBlockState(blockpos);
-            Block block = state.getBlock();
-
-            if (this.getTileEntity(blockpos, Chunk.EnumCreateEntityType.CHECK) == null &&
-                    block.hasTileEntity(state)) {
-                TileEntity tileentity = this.createTileEntity(blockpos);
-                this.world.setTileEntity(blockpos, tileentity);
-                this.world.markBlockRangeForRenderUpdate(blockpos, blockpos);
-            }
-        }
-    }
-
-    /**
-     * Tick this cube on server side. Block tick updates launched here.
-     *
-     * @param tryToTickFaster - returns true when running out of reserved tick time
-     * @param rand            - World specific Random
-     */
-    public void tickCubeServer(BooleanSupplier tryToTickFaster, Random rand) {
-        if (!isFullyPopulated) {
-            return;
-        }
-
-        tickCubeCommon(tryToTickFaster);
     }
 
     /**
@@ -767,7 +710,6 @@ public class Cube implements ICube {
         this.isFullyPopulated = true;
         this.isInitialLightingDone = true;
         this.isSurfaceTracked = true;
-        this.ticked = true;
     }
 
     @Override
@@ -847,9 +789,6 @@ public class Cube implements ICube {
         return ((ICubicWorldInternal) world).getLightingManager().hasPendingLightUpdates(this);
     }
 
-    public boolean hasBeenTicked() {
-        return ticked;
-    }
 
     @Override
     @Nullable

@@ -37,9 +37,6 @@ import static net.minecraft.util.math.MathHelper.clamp;
 
 import com.google.common.base.Predicate;
 import com.google.common.collect.AbstractIterator;
-import com.google.common.collect.ImmutableSetMultimap;
-import com.google.common.collect.Multimap;
-import com.google.common.collect.Multimaps;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
 import io.github.opencubicchunks.cubicchunks.api.util.CubePos;
@@ -67,17 +64,13 @@ import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.WorldProvider;
 import net.minecraft.world.WorldServer;
 import net.minecraft.world.chunk.Chunk;
-import net.minecraftforge.common.ForgeChunkManager;
-import net.minecraftforge.common.ForgeChunkManager.Ticket;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.Iterator;
-import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -1109,69 +1102,6 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
         return this.cubeWatchers.randomWrappedIterator(seed);
     }
     
-    private boolean hasNonSpectator() {
-        for (PlayerWrapper player : players.valueCollection())
-            if (NOT_SPECTATOR.apply(player.playerEntity)) return true;
-        return false;
-    }
-
-    @Override
-    public Iterator<Cube> getCubeIterator() {
-        WorldServer world = this.getWorldServer();
-        // A watcher's cube ticks only with a non-spectator watching it within range, and watchers
-        // hold only this map's players: with none of them, every watcher would be rejected, so the
-        // scan is skipped. Forced cubes below still tick.
-        final Iterator<CubeWatcher> iterator = hasNonSpectator()
-                ? this.tickableCubeTracker.iterator() : Collections.emptyIterator();
-        ImmutableSetMultimap<ChunkPos, Ticket> persistentChunksFor = ForgeChunkManager.getPersistentChunksFor(world);
-        world.profiler.startSection("forcedChunkLoading");
-        @SuppressWarnings("unchecked")
-        final Iterator<Cube> persistentCubesIterator = persistentChunksFor.keys().stream()
-                .filter(Objects::nonNull)
-                .map(input -> (Collection<Cube>) ((IColumn) world.getChunk(input.x, input.z)).getLoadedCubes())
-                .collect(ArrayList<Cube>::new, ArrayList::addAll, ArrayList::addAll)
-                .iterator();
-        world.profiler.endSection();
-        
-        return new AbstractIterator<Cube>() {
-
-            Iterator<Cube> persistentCubes = persistentCubesIterator;
-            
-            boolean shouldSkip(@Nullable Cube cube){
-                if (cube == null) 
-                    return true;
-                if (cube.isEmpty())
-                    return true;
-                if (!cube.isFullyPopulated())
-                    return true;
-                return false;
-            }
-
-            @Override protected Cube computeNext() {
-                while(persistentCubes != null && persistentCubes.hasNext()){
-                    Cube cube = persistentCubes.next();
-                    if (!persistentCubes.hasNext()) {
-                        persistentCubes = null;
-                    }
-                    if(shouldSkip(cube))
-                        continue;
-                    return cube;
-                }
-                
-                while (iterator.hasNext()) {
-                    CubeWatcher watcher = iterator.next();
-                    Cube cube = watcher.getCube();
-                    if(shouldSkip(cube))
-                        continue;
-                    if(!watcher.hasPlayerMatchingInRange(NOT_SPECTATOR, 128))
-                        continue;
-                    return cube;
-                }
-                return this.endOfData();
-            }
-        };
-    }
-
     public static class TickableChunkContainer {
 
         private final ObjectArrayList<ICube> cubes = ObjectArrayList.wrap(new ICube[64*1024]);

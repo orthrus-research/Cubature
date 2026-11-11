@@ -44,6 +44,7 @@ import io.github.opencubicchunks.cubicchunks.core.lighting.LightingManager;
 import io.github.opencubicchunks.cubicchunks.core.server.ChunkGc;
 import io.github.opencubicchunks.cubicchunks.core.server.CubeProviderServer;
 import io.github.opencubicchunks.cubicchunks.core.server.PlayerCubeMap;
+import io.github.opencubicchunks.cubicchunks.core.server.TickDiagnostics;
 import io.github.opencubicchunks.cubicchunks.core.server.delivery.ServerDeliveryMode;
 import io.github.opencubicchunks.cubicchunks.core.server.SpawnCubes;
 import io.github.opencubicchunks.cubicchunks.core.server.VanillaNetworkHandler;
@@ -278,35 +279,40 @@ public abstract class MixinWorldServer extends MixinWorld implements ICubicWorld
             return;
         }
         cbi.cancel();
-        this.playerCheckLight();
+        TickDiagnostics.enter(TickDiagnostics.Phase.BLOCK_TICKS);
+        try {
+            this.playerCheckLight();
 
-        int tickSpeed = this.getGameRules().getInt("randomTickSpeed");
-        boolean raining = this.isRaining();
-        boolean thundering = this.isThundering();
-        this.profiler.startSection("pollingChunks");
+            int tickSpeed = this.getGameRules().getInt("randomTickSpeed");
+            boolean raining = this.isRaining();
+            boolean thundering = this.isThundering();
+            this.profiler.startSection("pollingChunks");
 
-        // CubicChunks - iterate over PlayerCubeMap.TickableChunkContainer instead of Chunks, getTickableChunks already includes forced chunks
-        PlayerCubeMap.TickableChunkContainer chunks = ((PlayerCubeMap) this.playerChunkMap).getTickableChunks();
-        for (Chunk chunk : chunks.columns()) {
-            tickColumn(raining, thundering, chunk);
-        }
-        this.profiler.endStartSection("pollingCubes");
-
-        if (tickSpeed > 0) {
-            long worldTime = worldInfo.getWorldTotalTime();
-            // CubicChunks - iterate over cubes instead of storage array from Chunk
-            for (ICube cube : chunks.forcedCubes()) {
-                tickCube(tickSpeed, cube, worldTime);
+            // CubicChunks - iterate over PlayerCubeMap.TickableChunkContainer instead of Chunks, getTickableChunks already includes forced chunks
+            PlayerCubeMap.TickableChunkContainer chunks = ((PlayerCubeMap) this.playerChunkMap).getTickableChunks();
+            for (Chunk chunk : chunks.columns()) {
+                tickColumn(raining, thundering, chunk);
             }
-            for (ICube cube : chunks.playerTickableCubes()) {
-                if (cube == null) { // this is the internal array from the arraylist, anything beyond the size is null
-                    break;
+            this.profiler.endStartSection("pollingCubes");
+
+            if (tickSpeed > 0) {
+                long worldTime = worldInfo.getWorldTotalTime();
+                // CubicChunks - iterate over cubes instead of storage array from Chunk
+                for (ICube cube : chunks.forcedCubes()) {
+                    tickCube(tickSpeed, cube, worldTime);
                 }
-                tickCube(tickSpeed, cube, worldTime);
+                for (ICube cube : chunks.playerTickableCubes()) {
+                    if (cube == null) { // this is the internal array from the arraylist, anything beyond the size is null
+                        break;
+                    }
+                    tickCube(tickSpeed, cube, worldTime);
+                }
             }
-        }
 
-        this.profiler.endSection();
+            this.profiler.endSection();
+        } finally {
+            TickDiagnostics.exit();
+        }
     }
 
     private void tickCube(int tickSpeed, ICube cube, long worldTime) {
