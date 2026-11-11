@@ -24,6 +24,8 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.core.common;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
 import io.github.opencubicchunks.cubicchunks.core.server.CubicAnvilChunkLoader;
 import io.github.opencubicchunks.cubicchunks.core.world.ICubeProviderInternal;
@@ -34,20 +36,19 @@ import net.minecraft.world.chunk.storage.AnvilChunkLoader;
 import net.minecraft.world.chunk.storage.AnvilSaveHandler;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Redirect;
 
 import java.io.File;
 
 @Mixin(AnvilSaveHandler.class)
 public class MixinAnvilSaveHandler {
 
-    @Redirect(method = "getChunkLoader", at = @At(value = "NEW", target = "net/minecraft/world/chunk/storage/AnvilChunkLoader"))
-    private AnvilChunkLoader getChunkLoader(File file, DataFixer dataFixer, WorldProvider provider) {
+    @WrapOperation(method = "getChunkLoader", at = @At(value = "NEW", target = "net/minecraft/world/chunk/storage/AnvilChunkLoader"))
+    private AnvilChunkLoader getChunkLoader(File file, DataFixer dataFixer, Operation<AnvilChunkLoader> original, WorldProvider provider) {
         ICubicWorld world = ((ICubicWorld) ((ICubicWorldProvider) provider).getWorld());
         if (world.isCubicWorld()) {
             return new CubicAnvilChunkLoader(file, dataFixer, () -> ((ICubeProviderInternal.Server) world.getCubeCache()).getCubeIO());
         } else {
-            return new AnvilChunkLoader(file, dataFixer);
+            return original.call(file, dataFixer);
         }
     }
 }

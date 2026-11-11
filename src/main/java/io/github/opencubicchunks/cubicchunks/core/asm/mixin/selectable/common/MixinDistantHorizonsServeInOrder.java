@@ -7,6 +7,8 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.selectable.common;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.seibel.distanthorizons.api.interfaces.override.worldGenerator.IDhApiWorldGenerator;
 import io.github.opencubicchunks.cubicchunks.core.CubicChunksConfig;
 import io.github.opencubicchunks.cubicchunks.core.compat.distanthorizons.ArrivalOrder;
@@ -22,7 +24,6 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
@@ -47,12 +48,11 @@ public abstract class MixinDistantHorizonsServeInOrder {
         if (cubicchunks$inOrder()) cubicchunks$order.arrived(pos);
     }
 
-    @Redirect(method = "tryStartNextWorldGenTask", at = @At(value = "INVOKE",
+    @WrapOperation(method = "tryStartNextWorldGenTask", at = @At(value = "INVOKE",
             target = "Ljava/util/concurrent/ConcurrentHashMap;reduceEntries(JLjava/util/function/Function;Ljava/util/function/BiFunction;)Ljava/lang/Object;"),
             require = 1, allow = 1, remap = false)
-    private Object cubicchunks$firstArrived(ConcurrentHashMap<Long, Object> waiting, long parallelism,
-            Function<Map.Entry<Long, Object>, Object> distance, BiFunction<Object, Object, Object> closest) {
-        if (!cubicchunks$inOrder()) return waiting.reduceEntries(parallelism, distance, closest);
+    private Object cubicchunks$firstArrived(ConcurrentHashMap<Long, Object> waiting, long parallelism, Function<Map.Entry<Long, Object>, Object> distance, BiFunction<Object, Object, Object> closest, Operation<Object> original) {
+        if (!cubicchunks$inOrder()) return original.call(waiting, parallelism, distance, closest);
         Map.Entry<Long, Object> first = cubicchunks$order.first(waiting);
         return first == null ? null : distance.apply(first);
     }

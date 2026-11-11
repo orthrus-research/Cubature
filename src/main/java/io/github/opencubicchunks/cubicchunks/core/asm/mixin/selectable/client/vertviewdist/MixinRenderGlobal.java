@@ -24,6 +24,8 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.selectable.client.vertviewdist;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
 import io.github.opencubicchunks.cubicchunks.core.CubicChunksConfig;
 import net.minecraft.client.Minecraft;
@@ -83,7 +85,7 @@ public abstract class MixinRenderGlobal {
         }
     }
 
-    @Redirect(
+    @WrapOperation(
             method = "setupTerrain",
             at = @At(
                     value = "FIELD",
@@ -93,7 +95,7 @@ public abstract class MixinRenderGlobal {
                     from = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/RenderGlobal;loadRenderers()V")
             )
     )
-    private int onGetRenderDistance(RenderGlobal _this) {
+    private int onGetRenderDistance(RenderGlobal _this, Operation<Integer> original) {
         if (!((ICubicWorld) world).isCubicWorld()) {
             return mc.gameSettings.renderDistanceChunks;
         }

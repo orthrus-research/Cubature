@@ -24,6 +24,8 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.fixes.common;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import mcp.MethodsReturnNonnullByDefault;
 import net.minecraft.block.BlockPortal;
 import net.minecraft.block.state.IBlockState;
@@ -44,7 +46,6 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Constant;
 import org.spongepowered.asm.mixin.injection.ModifyConstant;
-import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.Slice;
 
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
@@ -68,16 +69,16 @@ public class MixinTeleporter {
     
     // placeInExistingPortal fixes
 
-    @Redirect(method = "placeInExistingPortal",
+    @WrapOperation(method = "placeInExistingPortal",
               at = @At(value = "INVOKE", target = "Lnet/minecraft/util/math/BlockPos;add(III)Lnet/minecraft/util/math/BlockPos;"),
               slice = @Slice(
                       from = @At(value = "NEW", target = "(Lnet/minecraft/entity/Entity;)Lnet/minecraft/util/math/BlockPos;"),
                       to = @At(value = "INVOKE", target = "Lnet/minecraft/util/math/BlockPos;down()Lnet/minecraft/util/math/BlockPos;")
               ))
-    private BlockPos makeTopStartPos(BlockPos orig, int dx, int dy, int dz, Entity entity, float rotationYaw) {
+    private BlockPos makeTopStartPos(BlockPos orig, int dx, int dy, int dz, Operation<BlockPos> original, Entity entity, float rotationYaw) {
         if (((ICubicWorld) world).isCubicWorld())
-            return orig.add(dx, 128, dz);
-        return orig.add(dx, dy, dz);
+            return original.call(orig, dx, 128, dz);
+        return original.call(orig, dx, dy, dz);
     }
 
     @ModifyConstant(method = "placeInExistingPortal",

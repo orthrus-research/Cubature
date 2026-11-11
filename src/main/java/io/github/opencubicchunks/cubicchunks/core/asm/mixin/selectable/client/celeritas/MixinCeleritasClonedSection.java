@@ -7,6 +7,8 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.selectable.client.celeritas;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import java.util.Map;
 
 import io.github.opencubicchunks.cubicchunks.core.compat.celeritas.CeleritasCompat;
@@ -19,7 +21,6 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /** Clone a section's blocks and tile entities from its cube rather than from the column. */
@@ -35,9 +36,9 @@ public abstract class MixinCeleritasClonedSection {
     }
 
     // The constructor asks the column for its tile entities twice: an emptiness check, then the section filter.
-    @Redirect(method = "<init>", remap = false, at = @At(value = "INVOKE", remap = true,
+    @WrapOperation(method = "<init>", remap = false, at = @At(value = "INVOKE", remap = true,
             target = "Lnet/minecraft/world/chunk/Chunk;getTileEntityMap()Ljava/util/Map;"), require = 2, allow = 2)
-    private Map<BlockPos, TileEntity> cubicchunks$cubeTileEntities(Chunk column, World world, int x, int y, int z) {
-        return CeleritasCompat.cubic(world) ? CeleritasCompat.tileEntities(world, x, y, z) : column.getTileEntityMap();
+    private Map<BlockPos, TileEntity> cubicchunks$cubeTileEntities(Chunk column, Operation<Map<BlockPos, TileEntity>> original, World world, int x, int y, int z) {
+        return CeleritasCompat.cubic(world) ? CeleritasCompat.tileEntities(world, x, y, z) : original.call(column);
     }
 }

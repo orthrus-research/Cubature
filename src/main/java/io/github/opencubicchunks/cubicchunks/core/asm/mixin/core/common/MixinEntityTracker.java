@@ -24,6 +24,8 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.core.common;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import io.github.opencubicchunks.cubicchunks.api.world.ICube;
 import io.github.opencubicchunks.cubicchunks.core.entity.ICubicEntityTracker;
 import io.github.opencubicchunks.cubicchunks.core.server.ICubicPlayerList;
@@ -40,7 +42,6 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.Set;
@@ -56,10 +57,10 @@ public class MixinEntityTracker implements ICubicEntityTracker {
         setVertViewDistance(((ICubicPlayerList) world.getMinecraftServer().getPlayerList()).getVerticalViewDistance());
     }
 
-    @Redirect(method = "track(Lnet/minecraft/entity/Entity;IIZ)V", at = @At(value = "NEW",
+    @WrapOperation(method = "track(Lnet/minecraft/entity/Entity;IIZ)V", at = @At(value = "NEW",
             target = "net/minecraft/entity/EntityTrackerEntry"))
-    private EntityTrackerEntry onCreateEntry(Entity entityIn, int rangeIn, int maxRangeIn, int updateFrequencyIn, boolean sendVelocityUpdatesIn) {
-        EntityTrackerEntry e = new EntityTrackerEntry(entityIn, rangeIn, maxRangeIn, updateFrequencyIn, sendVelocityUpdatesIn);
+    private EntityTrackerEntry onCreateEntry(Entity entityIn, int rangeIn, int maxRangeIn, int updateFrequencyIn, boolean sendVelocityUpdatesIn, Operation<EntityTrackerEntry> original) {
+        EntityTrackerEntry e = original.call(entityIn, rangeIn, maxRangeIn, updateFrequencyIn, sendVelocityUpdatesIn);
         //noinspection ConstantConditions
         ((ICubicEntityTracker.Entry) e).setMaxVertRange(maxVertTrackingDistanceThreshold);
         return e;

@@ -7,6 +7,8 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.selectable.client;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.seibel.distanthorizons.core.multiplayer.client.AbstractFullDataNetworkRequestQueue;
 import io.github.opencubicchunks.cubicchunks.core.compat.distanthorizons.DistantHorizonsClient;
 import java.util.Comparator;
@@ -18,7 +20,6 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Coerce;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
@@ -33,10 +34,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class MixinDistantHorizonsArrivalRequests {
     @Shadow protected abstract int getRequestRateLimit();
 
-    @Redirect(method = "tick", at = @At(value = "INVOKE", target = "Lcom/seibel/distanthorizons/core/multiplayer/client/AbstractFullDataNetworkRequestQueue;getRequestRateLimit()I"),
+    @WrapOperation(method = "tick", at = @At(value = "INVOKE", target = "Lcom/seibel/distanthorizons/core/multiplayer/client/AbstractFullDataNetworkRequestQueue;getRequestRateLimit()I"),
             require = 1, allow = 1, remap = false)
-    private int cubicchunks$inflight(AbstractFullDataNetworkRequestQueue queue) {
-        int limit = getRequestRateLimit();
+    private int cubicchunks$inflight(AbstractFullDataNetworkRequestQueue queue, Operation<Integer> original) {
+        int limit = original.call(queue);
         return DistantHorizonsClient.generationQueue(this) ? DistantHorizonsClient.inflight(limit) : limit;
     }
 
@@ -45,11 +46,11 @@ public abstract class MixinDistantHorizonsArrivalRequests {
         if (DistantHorizonsClient.generationQueue(this)) DistantHorizonsClient.requestQueued(pos);
     }
 
-    @Redirect(method = "sendNextRequest", at = @At(value = "INVOKE",
+    @WrapOperation(method = "sendNextRequest", at = @At(value = "INVOKE",
             target = "Ljava/util/stream/Stream;min(Ljava/util/Comparator;)Ljava/util/Optional;"), require = 1, allow = 1, remap = false)
-    private Optional<Object> cubicchunks$next(Stream<Object> waiting, Comparator<Object> nearestFirst) {
+    private Optional<Object> cubicchunks$next(Stream<Object> waiting, Comparator<Object> nearestFirst, Operation<Optional<Object>> original) {
         return DistantHorizonsClient.generationQueue(this) ? DistantHorizonsClient.nextRequest(waiting, nearestFirst)
-                : waiting.min(nearestFirst);
+                : original.call(waiting, nearestFirst);
     }
 
     @Inject(method = "handleNetResponse", at = @At("HEAD"), require = 1, remap = false)

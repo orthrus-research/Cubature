@@ -24,6 +24,8 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.selectable.client.vertviewdist;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
 import io.github.opencubicchunks.cubicchunks.core.CubicChunksConfig;
 import net.minecraft.client.Minecraft;
@@ -33,18 +35,17 @@ import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Redirect;
 
 @Mixin(EntityRenderer.class)
 public class MixinEntityRenderer {
     @Shadow @Final private Minecraft mc;
 
-    @Redirect(method = {"updateRenderer", "setupCameraTransform", "renderWorldPass", "updateFogColor"},
+    @WrapOperation(method = {"updateRenderer", "setupCameraTransform", "renderWorldPass", "updateFogColor"},
             at = @At(value = "FIELD", target = "Lnet/minecraft/client/settings/GameSettings;renderDistanceChunks:I"))
-    private int getRenderDistance(GameSettings settings) {
+    private int getRenderDistance(GameSettings settings, Operation<Integer> original) {
         if (!((ICubicWorld) mc.world).isCubicWorld()) {
-            return settings.renderDistanceChunks;
+            return original.call(settings);
         }
-        return Math.max(settings.renderDistanceChunks, CubicChunksConfig.verticalCubeLoadDistance);
+        return Math.max(original.call(settings), CubicChunksConfig.verticalCubeLoadDistance);
     }
 }

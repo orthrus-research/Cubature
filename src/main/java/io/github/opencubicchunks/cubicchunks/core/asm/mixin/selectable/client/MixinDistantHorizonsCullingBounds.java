@@ -7,11 +7,12 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.selectable.client;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Redirect;
 
 /** Give DH's section frustum the level's real vertical span. */
 @Pseudo
@@ -21,10 +22,10 @@ public abstract class MixinDistantHorizonsCullingBounds {
     // while every other DH caller treats getMaxHeight() as the top block Y. Vanilla
     // levels start at 0, so both readings agree; a cubic level at [-512, 384) got a
     // box of [-512, -128) and culled visible sections whenever that box left view.
-    @Redirect(method = "buildRenderList", at = @At(value = "INVOKE",
+    @WrapOperation(method = "buildRenderList", at = @At(value = "INVOKE",
             target = "Lcom/seibel/distanthorizons/core/wrapperInterfaces/world/IClientLevelWrapper;getMaxHeight()I"),
             require = 1, allow = 1, remap = false)
-    private int cubicchunks$frustumHeight(IClientLevelWrapper level) {
-        return level.getMaxHeight() - level.getMinHeight();
+    private int cubicchunks$frustumHeight(IClientLevelWrapper level, Operation<Integer> original) {
+        return original.call(level) - level.getMinHeight();
     }
 }

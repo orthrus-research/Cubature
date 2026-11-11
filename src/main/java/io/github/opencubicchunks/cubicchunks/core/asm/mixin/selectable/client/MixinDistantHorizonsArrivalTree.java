@@ -7,6 +7,8 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.selectable.client;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import io.github.opencubicchunks.cubicchunks.core.compat.distanthorizons.DistantHorizonsClient;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -14,7 +16,6 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Redirect;
 
 /**
  * DH's client quad tree hands its missing sections to the request queue nearest first, until the queue is full. In a
@@ -29,18 +30,18 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 @Pseudo
 @Mixin(targets = "com.seibel.distanthorizons.core.render.QuadTree.LodQuadTree", remap = false)
 public abstract class MixinDistantHorizonsArrivalTree {
-    @Redirect(method = "startQueuedRetrievalTasks", at = @At(value = "INVOKE",
+    @WrapOperation(method = "startQueuedRetrievalTasks", at = @At(value = "INVOKE",
             target = "Ljava/util/ArrayList;sort(Ljava/util/Comparator;)V"), require = 1, allow = 1, remap = false)
-    private void cubicchunks$arrivalOrder(ArrayList<Long> missing, Comparator<? super Long> nearestFirst) {
-        if (!DistantHorizonsClient.orderByArrival(missing)) missing.sort(nearestFirst);
+    private void cubicchunks$arrivalOrder(ArrayList<Long> missing, Comparator<? super Long> nearestFirst, Operation<Void> original) {
+        if (!DistantHorizonsClient.orderByArrival(missing)) original.call(missing, nearestFirst);
     }
 
     @Unique private long cubicchunks$idleSince;
 
     /** DH's queueing thread, idle: its InterruptedException handler ends the thread. */
-    @Redirect(method = "lambda$updateAllRenderSections$6", at = @At(value = "INVOKE", target = "Ljava/lang/Thread;sleep(J)V"),
+    @WrapOperation(method = "lambda$updateAllRenderSections$6", at = @At(value = "INVOKE", target = "Ljava/lang/Thread;sleep(J)V"),
             require = 1, allow = 1, remap = false)
-    private void cubicchunks$endWhenIdle(long millis) throws InterruptedException {
+    private void cubicchunks$endWhenIdle(long millis, Operation<Void> original) throws InterruptedException {
         if (DistantHorizonsClient.refreshesWanted()) {
             long now = System.nanoTime();
             if (cubicchunks$idleSince == 0) cubicchunks$idleSince = now;
@@ -49,6 +50,6 @@ public abstract class MixinDistantHorizonsArrivalTree {
                 throw new InterruptedException("Cubature: find the sections DH wants now");
             }
         }
-        Thread.sleep(millis);
+        original.call(millis);
     }
 }

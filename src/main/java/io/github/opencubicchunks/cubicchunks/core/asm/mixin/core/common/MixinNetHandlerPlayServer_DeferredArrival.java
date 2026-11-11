@@ -4,6 +4,8 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.core.common;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import io.github.opencubicchunks.cubicchunks.core.server.PlayerCubeMap;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.network.NetHandlerPlayServer;
@@ -14,7 +16,6 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.Set;
@@ -42,14 +43,14 @@ public abstract class MixinNetHandlerPlayServer_DeferredArrival {
         }
     }
 
-    @Redirect(method = "processPlayer", require = 4,
+    @WrapOperation(method = "processPlayer", require = 4,
             at = @At(value = "INVOKE", target = "Lnet/minecraft/network/NetHandlerPlayServer;setPlayerLocation(DDDFF)V"))
-    private void cubicchunks$correctMove(NetHandlerPlayServer handler, double x, double y, double z, float yaw, float pitch) {
+    private void cubicchunks$correctMove(NetHandlerPlayServer handler, double x, double y, double z, float yaw, float pitch, Operation<Void> original) {
         PlayerChunkMap map = player.world instanceof WorldServer ? ((WorldServer) player.world).getPlayerChunkMap() : null;
         if (map instanceof PlayerCubeMap) {
-            ((PlayerCubeMap) map).arrivals().correct(() -> handler.setPlayerLocation(x, y, z, yaw, pitch));
+            ((PlayerCubeMap) map).arrivals().correct(() -> original.call(handler, x, y, z, yaw, pitch));
         } else {
-            handler.setPlayerLocation(x, y, z, yaw, pitch);
+            original.call(handler, x, y, z, yaw, pitch);
         }
     }
 }
