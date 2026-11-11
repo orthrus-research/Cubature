@@ -24,6 +24,7 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.core.common;
 
+import com.llamalad7.mixinextras.expression.Definition;
 import com.llamalad7.mixinextras.expression.Expression;
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
@@ -77,7 +78,6 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
-import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.Slice;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
@@ -226,24 +226,20 @@ public abstract class MixinChunk_Cubes {
         Arrays.fill(getBiomeArray(), (byte) -1);
     }
 
-    @Redirect(method = "<init>(Lnet/minecraft/world/World;Lnet/minecraft/world/chunk/ChunkPrimer;II)V",
-            at = @At(
-                    value = "FIELD",
-                    args = "array=get",
-                    target = "Lnet/minecraft/world/chunk/Chunk;storageArrays:[Lnet/minecraft/world/chunk/storage/ExtendedBlockStorage;"
-            ))
-    private ExtendedBlockStorage init_getStorage(ExtendedBlockStorage[] ebs, int y) {
-        return ebs[y - (this.isColumn ? 0 : Coords.blockToCube(((IMinMaxHeight) world).getMinHeight()))];
+    @Definition(id = "storageArrays", field = "Lnet/minecraft/world/chunk/Chunk;storageArrays:[Lnet/minecraft/world/chunk/storage/ExtendedBlockStorage;")
+    @Expression("this.storageArrays[?]")
+    @WrapOperation(method = "<init>(Lnet/minecraft/world/World;Lnet/minecraft/world/chunk/ChunkPrimer;II)V",
+            at = @At("MIXINEXTRAS:EXPRESSION"))
+    private ExtendedBlockStorage init_getStorage(ExtendedBlockStorage[] ebs, int y, Operation<ExtendedBlockStorage> original) {
+        return original.call(ebs, y - (this.isColumn ? 0 : Coords.blockToCube(((IMinMaxHeight) world).getMinHeight())));
     }
 
-    @Redirect(method = "<init>(Lnet/minecraft/world/World;Lnet/minecraft/world/chunk/ChunkPrimer;II)V",
-            at = @At(
-                    value = "FIELD",
-                    args = "array=set",
-                    target = "Lnet/minecraft/world/chunk/Chunk;storageArrays:[Lnet/minecraft/world/chunk/storage/ExtendedBlockStorage;"
-            ))
-    private void getBlockState_getMaxHeight(ExtendedBlockStorage[] ebs, int y, ExtendedBlockStorage val) {
-        ebs[y - (this.isColumn ? 0 : Coords.blockToCube(((IMinMaxHeight) world).getMinHeight()))] = val;
+    @Definition(id = "storageArrays", field = "Lnet/minecraft/world/chunk/Chunk;storageArrays:[Lnet/minecraft/world/chunk/storage/ExtendedBlockStorage;")
+    @Expression("this.storageArrays[?] = ?")
+    @WrapOperation(method = "<init>(Lnet/minecraft/world/World;Lnet/minecraft/world/chunk/ChunkPrimer;II)V",
+            at = @At("MIXINEXTRAS:EXPRESSION"))
+    private void getBlockState_getMaxHeight(ExtendedBlockStorage[] ebs, int y, ExtendedBlockStorage val, Operation<Void> original) {
+        original.call(ebs, y - (this.isColumn ? 0 : Coords.blockToCube(((IMinMaxHeight) world).getMinHeight())), val);
     }
 
     @ModifyExpressionValue(method = "<init>(Lnet/minecraft/world/World;Lnet/minecraft/world/chunk/ChunkPrimer;II)V",
@@ -327,12 +323,10 @@ public abstract class MixinChunk_Cubes {
 
 
     @Nullable
-    @Redirect(method = "generateSkylightMap", at = @At(
-            value = "FIELD",
-            target = "Lnet/minecraft/world/chunk/Chunk;storageArrays:[Lnet/minecraft/world/chunk/storage/ExtendedBlockStorage;",
-            args = "array=get"
-    ))
-    private ExtendedBlockStorage generateSkylightMapRedirectEBSAccess(ExtendedBlockStorage[] array, int index) {
+    @Definition(id = "storageArrays", field = "Lnet/minecraft/world/chunk/Chunk;storageArrays:[Lnet/minecraft/world/chunk/storage/ExtendedBlockStorage;")
+    @Expression("this.storageArrays[?]")
+    @WrapOperation(method = "generateSkylightMap", at = @At("MIXINEXTRAS:EXPRESSION"))
+    private ExtendedBlockStorage generateSkylightMapRedirectEBSAccess(ExtendedBlockStorage[] array, int index, Operation<ExtendedBlockStorage> original) {
         return getEBS_CubicChunks(index);
     }
 
@@ -442,23 +436,19 @@ public abstract class MixinChunk_Cubes {
         return isColumn ? Integer.MIN_VALUE : getWorld().getMinHeight(); // this one is in block coords, max is in cube coords. Mojang logic.
     }
 
-    @Redirect(method = "getBlockState(III)Lnet/minecraft/block/state/IBlockState;",
-            at = @At(
-                    value = "FIELD",
-                    args = "array=length",
-                    target = "Lnet/minecraft/world/chunk/Chunk;storageArrays:[Lnet/minecraft/world/chunk/storage/ExtendedBlockStorage;"
-            ))
-    private int getBlockState_getMaxHeight(ExtendedBlockStorage[] ebs) {
-        return isColumn ? Integer.MAX_VALUE : (ebs.length - Coords.blockToCube(getWorld().getMinHeight()));
+    @Definition(id = "storageArrays", field = "Lnet/minecraft/world/chunk/Chunk;storageArrays:[Lnet/minecraft/world/chunk/storage/ExtendedBlockStorage;")
+    @Expression("this.storageArrays.length")
+    @ModifyExpressionValue(method = "getBlockState(III)Lnet/minecraft/block/state/IBlockState;",
+            at = @At("MIXINEXTRAS:EXPRESSION"))
+    private int getBlockState_getMaxHeight(int length) {
+        return isColumn ? Integer.MAX_VALUE : (length - Coords.blockToCube(getWorld().getMinHeight()));
     }
 
-    @Redirect(method = "getBlockState(III)Lnet/minecraft/block/state/IBlockState;",
-            at = @At(
-                    value = "FIELD",
-                    args = "array=get",
-                    target = "Lnet/minecraft/world/chunk/Chunk;storageArrays:[Lnet/minecraft/world/chunk/storage/ExtendedBlockStorage;"
-            ))
-    private ExtendedBlockStorage getBlockState_getStorage(ExtendedBlockStorage[] ebs, int y) {
+    @Definition(id = "storageArrays", field = "Lnet/minecraft/world/chunk/Chunk;storageArrays:[Lnet/minecraft/world/chunk/storage/ExtendedBlockStorage;")
+    @Expression("this.storageArrays[?]")
+    @WrapOperation(method = "getBlockState(III)Lnet/minecraft/block/state/IBlockState;",
+            at = @At("MIXINEXTRAS:EXPRESSION"))
+    private ExtendedBlockStorage getBlockState_getStorage(ExtendedBlockStorage[] ebs, int y, Operation<ExtendedBlockStorage> original) {
         return getEBS_CubicChunks(y);
     }
 
@@ -488,29 +478,25 @@ public abstract class MixinChunk_Cubes {
         }
     }
 
-    @Redirect(method = "setBlockState", at = @At(
-            value = "FIELD",
-            target = "Lnet/minecraft/world/chunk/Chunk;storageArrays:[Lnet/minecraft/world/chunk/storage/ExtendedBlockStorage;",
-            args = "array=get"
-    ))
-    private ExtendedBlockStorage setBlockState_CubicChunks_EBSGetRedirect(ExtendedBlockStorage[] array, int index) {
+    @Definition(id = "storageArrays", field = "Lnet/minecraft/world/chunk/Chunk;storageArrays:[Lnet/minecraft/world/chunk/storage/ExtendedBlockStorage;")
+    @Expression("this.storageArrays[?]")
+    @WrapOperation(method = "setBlockState", at = @At("MIXINEXTRAS:EXPRESSION"))
+    private ExtendedBlockStorage setBlockState_CubicChunks_EBSGetRedirect(ExtendedBlockStorage[] array, int index, Operation<ExtendedBlockStorage> original) {
         return getEBS_CubicChunks(index);
     }
 
-    @Redirect(method = "setBlockState", at = @At(
-            value = "FIELD",
-            target = "Lnet/minecraft/world/chunk/Chunk;storageArrays:[Lnet/minecraft/world/chunk/storage/ExtendedBlockStorage;",
-            args = "array=set"
-    ))
-    private void setBlockState_CubicChunks_EBSSetRedirect(ExtendedBlockStorage[] array, int index, ExtendedBlockStorage val) {
+    @Definition(id = "storageArrays", field = "Lnet/minecraft/world/chunk/Chunk;storageArrays:[Lnet/minecraft/world/chunk/storage/ExtendedBlockStorage;")
+    @Expression("this.storageArrays[?] = ?")
+    @WrapOperation(method = "setBlockState", at = @At("MIXINEXTRAS:EXPRESSION"))
+    private void setBlockState_CubicChunks_EBSSetRedirect(ExtendedBlockStorage[] array, int index, ExtendedBlockStorage val, Operation<Void> original) {
         setEBS_CubicChunks(index, val);
     }
 
-    @Inject(method = "setBlockState", at = @At(
-        value = "FIELD",
-        target = "Lnet/minecraft/world/chunk/Chunk;storageArrays:[Lnet/minecraft/world/chunk/storage/ExtendedBlockStorage;",
-        args = "array=set"
-    ), cancellable = true)
+    // An Expression, not @At(FIELD, array=set): CleanMix's refmap gives field targets a {,1} quantifier, which
+    // stops at the first access to the field, and the store is the second.
+    @Definition(id = "storageArrays", field = "Lnet/minecraft/world/chunk/Chunk;storageArrays:[Lnet/minecraft/world/chunk/storage/ExtendedBlockStorage;")
+    @Expression("this.storageArrays[?] = ?")
+    @Inject(method = "setBlockState", at = @At("MIXINEXTRAS:EXPRESSION"), cancellable = true)
     private void setBlockState_CubicChunks_EBSSetInject(BlockPos pos, IBlockState state, CallbackInfoReturnable<IBlockState> cir) {
         if (isColumn && getWorld().getCubeCache().getLoadedCube(CubePos.fromBlockCoords(pos)) == null) {
             cir.setReturnValue(null);
@@ -540,12 +526,10 @@ public abstract class MixinChunk_Cubes {
     }
 
     @Nullable
-    @Redirect(method = "getLightFor", at = @At(
-            value = "FIELD",
-            target = "Lnet/minecraft/world/chunk/Chunk;storageArrays:[Lnet/minecraft/world/chunk/storage/ExtendedBlockStorage;",
-            args = "array=get"
-    ))
-    private ExtendedBlockStorage getLightFor_CubicChunks_EBSGetRedirect(ExtendedBlockStorage[] array, int index) {
+    @Definition(id = "storageArrays", field = "Lnet/minecraft/world/chunk/Chunk;storageArrays:[Lnet/minecraft/world/chunk/storage/ExtendedBlockStorage;")
+    @Expression("this.storageArrays[?]")
+    @WrapOperation(method = "getLightFor", at = @At("MIXINEXTRAS:EXPRESSION"))
+    private ExtendedBlockStorage getLightFor_CubicChunks_EBSGetRedirect(ExtendedBlockStorage[] array, int index, Operation<ExtendedBlockStorage> original) {
         return getEBS_CubicChunks(index);
     }
 
@@ -566,22 +550,18 @@ public abstract class MixinChunk_Cubes {
     //                 setLightFor
     // ==============================================
 
-    @Redirect(method = "setLightFor", at = @At(
-            value = "FIELD",
-            target = "Lnet/minecraft/world/chunk/Chunk;storageArrays:[Lnet/minecraft/world/chunk/storage/ExtendedBlockStorage;",
-            args = "array=get"
-    ))
+    @Definition(id = "storageArrays", field = "Lnet/minecraft/world/chunk/Chunk;storageArrays:[Lnet/minecraft/world/chunk/storage/ExtendedBlockStorage;")
+    @Expression("this.storageArrays[?]")
+    @WrapOperation(method = "setLightFor", at = @At("MIXINEXTRAS:EXPRESSION"))
     @Nullable
-    private ExtendedBlockStorage setLightFor_CubicChunks_EBSGetRedirect(ExtendedBlockStorage[] array, int index) {
+    private ExtendedBlockStorage setLightFor_CubicChunks_EBSGetRedirect(ExtendedBlockStorage[] array, int index, Operation<ExtendedBlockStorage> original) {
         return getEBS_CubicChunks(index);
     }
 
-    @Redirect(method = "setLightFor", at = @At(
-            value = "FIELD",
-            target = "Lnet/minecraft/world/chunk/Chunk;storageArrays:[Lnet/minecraft/world/chunk/storage/ExtendedBlockStorage;",
-            args = "array=set"
-    ))
-    private void setLightFor_CubicChunks_EBSSetRedirect(ExtendedBlockStorage[] array, int index, ExtendedBlockStorage ebs) {
+    @Definition(id = "storageArrays", field = "Lnet/minecraft/world/chunk/Chunk;storageArrays:[Lnet/minecraft/world/chunk/storage/ExtendedBlockStorage;")
+    @Expression("this.storageArrays[?] = ?")
+    @WrapOperation(method = "setLightFor", at = @At("MIXINEXTRAS:EXPRESSION"))
+    private void setLightFor_CubicChunks_EBSSetRedirect(ExtendedBlockStorage[] array, int index, ExtendedBlockStorage ebs, Operation<Void> original) {
         setEBS_CubicChunks(index, ebs);
     }
 
@@ -599,12 +579,10 @@ public abstract class MixinChunk_Cubes {
     // ==============================================
 
     @Nullable
-    @Redirect(method = "getLightSubtracted", at = @At(
-            value = "FIELD",
-            target = "Lnet/minecraft/world/chunk/Chunk;storageArrays:[Lnet/minecraft/world/chunk/storage/ExtendedBlockStorage;",
-            args = "array=get"
-    ))
-    private ExtendedBlockStorage getLightSubtracted_CubicChunks_EBSGetRedirect(ExtendedBlockStorage[] array, int index) {
+    @Definition(id = "storageArrays", field = "Lnet/minecraft/world/chunk/Chunk;storageArrays:[Lnet/minecraft/world/chunk/storage/ExtendedBlockStorage;")
+    @Expression("this.storageArrays[?]")
+    @WrapOperation(method = "getLightSubtracted", at = @At("MIXINEXTRAS:EXPRESSION"))
+    private ExtendedBlockStorage getLightSubtracted_CubicChunks_EBSGetRedirect(ExtendedBlockStorage[] array, int index, Operation<ExtendedBlockStorage> original) {
         return getEBS_CubicChunks(index);
     }
 
@@ -629,27 +607,23 @@ public abstract class MixinChunk_Cubes {
         return blockToCube(getWorld().getMinHeight());
     }
 
-    @Redirect(method = "addEntity",
-            at = @At(
-                    value = "FIELD",
-                    args = "array=length",
-                    target = "Lnet/minecraft/world/chunk/Chunk;entityLists:[Lnet/minecraft/util/ClassInheritanceMultiMap;"
-            ),
+    @Definition(id = "entityLists", field = "Lnet/minecraft/world/chunk/Chunk;entityLists:[Lnet/minecraft/util/ClassInheritanceMultiMap;")
+    @Expression("this.entityLists.length")
+    @ModifyExpressionValue(method = "addEntity",
+            at = @At("MIXINEXTRAS:EXPRESSION"),
             require = 2)
-    private int addEntity_getMaxHeight(ClassInheritanceMultiMap<?>[] entityLists) {
-        return isColumn ? blockToCube(getWorld().getMaxHeight()) : (entityLists.length - Coords.blockToCube(getWorld().getMinHeight()));
+    private int addEntity_getMaxHeight(int length) {
+        return isColumn ? blockToCube(getWorld().getMaxHeight()) : (length - Coords.blockToCube(getWorld().getMinHeight()));
     }
 
-    @Redirect(method = "addEntity",
-            at = @At(
-                    value = "FIELD",
-                    args = "array=get",
-                    target = "Lnet/minecraft/world/chunk/Chunk;entityLists:[Lnet/minecraft/util/ClassInheritanceMultiMap;"
-            ),
+    @Definition(id = "entityLists", field = "Lnet/minecraft/world/chunk/Chunk;entityLists:[Lnet/minecraft/util/ClassInheritanceMultiMap;")
+    @Expression("this.entityLists[?]")
+    @WrapOperation(method = "addEntity",
+            at = @At("MIXINEXTRAS:EXPRESSION"),
             require = 1)
-    private ClassInheritanceMultiMap<?> addEntity_getEntityList(ClassInheritanceMultiMap<?>[] entityLists, int idx, Entity entity) {
+    private ClassInheritanceMultiMap<?> addEntity_getEntityList(ClassInheritanceMultiMap<?>[] entityLists, int idx, Operation<ClassInheritanceMultiMap<?>> original, Entity entity) {
         if (!isColumn) {
-            return entityLists[idx - Coords.blockToCube(getWorld().getMinHeight())];
+            return original.call(entityLists, idx - Coords.blockToCube(getWorld().getMinHeight()));
         } else if (cachedCube != null && cachedCube.getY() == idx) {
             cachedCube.getEntityContainer().addEntity(entity);
             return null;
@@ -690,28 +664,23 @@ public abstract class MixinChunk_Cubes {
         return blockToCube(getWorld().getMinHeight());
     }
 
-    @Redirect(method = "removeEntityAtIndex",
-            at = @At(
-                    value = "FIELD",
-                    args = "array=length",
-                    target = "Lnet/minecraft/world/chunk/Chunk;entityLists:[Lnet/minecraft/util/ClassInheritanceMultiMap;"
-            ),
+    @Definition(id = "entityLists", field = "Lnet/minecraft/world/chunk/Chunk;entityLists:[Lnet/minecraft/util/ClassInheritanceMultiMap;")
+    @Expression("this.entityLists.length")
+    @ModifyExpressionValue(method = "removeEntityAtIndex",
+            at = @At("MIXINEXTRAS:EXPRESSION"),
             require = 2)
-    private int removeEntityAtIndex_getMaxHeight(ClassInheritanceMultiMap<?>[] entityLists) {
-        return isColumn ? blockToCube(getWorld().getMaxHeight()) : (entityLists.length - Coords.blockToCube(getWorld().getMinHeight()));
+    private int removeEntityAtIndex_getMaxHeight(int length) {
+        return isColumn ? blockToCube(getWorld().getMaxHeight()) : (length - Coords.blockToCube(getWorld().getMinHeight()));
     }
 
-    @Redirect(method = "removeEntityAtIndex",
-            at = @At(
-                    value = "FIELD",
-                    args = "array=get",
-                    target = "Lnet/minecraft/world/chunk/Chunk;entityLists:[Lnet/minecraft/util/ClassInheritanceMultiMap;"
-            ),
+    @Definition(id = "entityLists", field = "Lnet/minecraft/world/chunk/Chunk;entityLists:[Lnet/minecraft/util/ClassInheritanceMultiMap;")
+    @Expression("this.entityLists[?]")
+    @WrapOperation(method = "removeEntityAtIndex",
+            at = @At("MIXINEXTRAS:EXPRESSION"),
             require = 1)
-    private ClassInheritanceMultiMap<?> removeEntityAtIndex_getEntityList(ClassInheritanceMultiMap<?>[] entityLists, int idx, Entity entity,
-            int index) {
+    private ClassInheritanceMultiMap<?> removeEntityAtIndex_getEntityList(ClassInheritanceMultiMap<?>[] entityLists, int idx, Operation<ClassInheritanceMultiMap<?>> original, Entity entity, int index) {
         if (!isColumn) {
-            return entityLists[idx - Coords.blockToCube(getWorld().getMinHeight())];
+            return original.call(entityLists, idx - Coords.blockToCube(getWorld().getMinHeight()));
         } else if (cachedCube != null && cachedCube.getY() == idx) {
             cachedCube.getEntityContainer().remove(entity);
             return null;
