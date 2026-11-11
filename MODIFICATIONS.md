@@ -41,8 +41,9 @@ update queue and selector, the light block-access interface, a newer server heig
 global generator configuration, the debug tracer, the mapping table, an abstract server message
 handler, a watcher player entry, the generic `WatchersSortingList` with its test, the column's
 tick-storage cache, a BetterPortals accessor on the column watcher, debug dumps, and setters and
-overloads without callers. The structure-start Mixin still writes its unused `ChunkY` tag, so saved
-structure data is unchanged.
+overloads without callers. The structure-start Mixin and `ICubicFeatureStart` are removed as well:
+nothing marked a structure start cubic, so every saved start carried a `ChunkY` of 0 that nothing
+read. New saves omit the tag; vanilla ignores it in existing ones.
 Also on November 10, 2026, upstream's ForgeGradle build was removed: the root and API Gradle
 scripts, properties and wrappers, and the two `buildSrc` submodules pointing at CubicGradle. The
 Unimined project in `cleanroom/` compiles the same sources and is the only build.

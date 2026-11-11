@@ -33,7 +33,6 @@
     "common.MixinNetHandlerPlayServer_DeferredArrival",
         "common.MixinPlayerList",
         "common.MixinPlayerList_LogoutAndRespawn",
-        "common.MixinStructureStart",
         "common.MixinWorld",
         "common.MixinWorld_HeightLimits",
         "common.MixinWorld_SpawnEntity",
