@@ -37,7 +37,6 @@ import io.github.opencubicchunks.cubicchunks.core.client.CubeProviderClient;
 import io.github.opencubicchunks.cubicchunks.core.lighting.ILightingManager;
 import io.github.opencubicchunks.cubicchunks.core.server.CubeProviderServer;
 import io.github.opencubicchunks.cubicchunks.core.server.SpawnCubes;
-import io.github.opencubicchunks.cubicchunks.core.server.VanillaNetworkHandler;
 import io.github.opencubicchunks.cubicchunks.core.util.world.CubeSplitTickList;
 import io.github.opencubicchunks.cubicchunks.core.util.world.CubeSplitTickSet;
 import io.github.opencubicchunks.cubicchunks.core.world.ICubeProviderInternal;
@@ -133,8 +132,6 @@ public interface ICubicWorldInternal extends ICubicWorld {
         CompatGenerationScope doCompatibilityGeneration();
 
         boolean isCompatGenerationScope();
-
-        VanillaNetworkHandler getVanillaNetworkHandler();
     }
 
     interface Client extends ICubicWorldInternal {

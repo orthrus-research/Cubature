@@ -42,7 +42,7 @@ public class TestLayerBoundary {
 
     @Test public void deliveryNamesOnlyItsServerCollaborators() throws IOException {
         Path core = core();
-        List<String> allowed = Arrays.asList("CubeProviderServer", "CubeWatcher", "VanillaNetworkHandler");
+        List<String> allowed = Arrays.asList("CubeProviderServer", "CubeWatcher");
         Pattern server = Pattern.compile("core\\.server\\.(\\w+|\\*)");
         List<Path> sources;
         try (Stream<Path> delivery = Files.walk(core.resolve("server/delivery"))) {

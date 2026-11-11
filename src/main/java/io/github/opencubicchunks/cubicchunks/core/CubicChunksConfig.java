@@ -313,12 +313,6 @@ public class CubicChunksConfig {
             + "The watchdog does not stop or interrupt world generation.")
     public static int worldgenWatchdogTimeLimit = 10000;
 
-    @Config.LangKey("cubicchunks.config.allow_vanilla_clients")
-    @Config.Comment("Allows clients without cubic chunks to join. "
-            + "THIS IS INTENDED FOR VANILLA CLIENTS. "
-            + "This is VERY likely to break when used with other mods")
-    public static boolean allowVanillaClients = false;
-
     @Config.RangeInt(min = 1, max = 1048576)
     @Config.LangKey("cubicchunks.config.cubes_to_send_per_tick")
     @Config.Comment("Max amount of cubes sent to client per tick to players")
@@ -344,10 +338,6 @@ public class CubicChunksConfig {
     @Config.RangeInt(min = 1, max = 1024)
     public static int maxCubePacketCubes = 1024;
 
-    @Config.LangKey("cubicchunks.config.vanilla_clients")
-    @Config.Comment("Options relating to support for vanilla clients.")
-    public static VanillaClients vanillaClients = new VanillaClients();
-
     @Config.LangKey("cubicchunks.config.use_shadow_paging_io")
     @Config.Comment("Whether cubic chunks save format IO should use shadow paging. This may be slightly slower and use "
             + "a bit more storage but should significantly improve reliability in case of improper shutdown.")
@@ -362,18 +352,6 @@ public class CubicChunksConfig {
     @Config.Comment("Disables all light propagation")
     public static boolean disableLighting = false;
 
-    public static final class VanillaClients {
-
-        @Config.LangKey("cubicchunks.config.vanilla_clients.horizontal_slices")
-        @Config.Comment("Enables horizontal slices for vanilla clients. "
-                        + "This will cause coordinates to wrap around on the X and Z axes in the same way as on Y.")
-        public boolean horizontalSlices = false;
-
-        @Config.RangeInt(min = 16, max = 30000000)
-        @Config.LangKey("cubicchunks.config.vanilla_clients.horizontal_slice_size")
-        @Config.Comment("The size (radius) of a horizontal slice.")
-        public int horizontalSliceSize = 65536;
-    }
     @Config.RangeInt(min = 0, max = 1048576)
     public static int defaultMaxCubesPerChunkloadingTicket = 25 * 16;
     public static Map<String, Integer> modMaxCubesPerChunkloadingTicket = new HashMap<>();

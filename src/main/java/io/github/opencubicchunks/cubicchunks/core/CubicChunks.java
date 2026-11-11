@@ -232,7 +232,7 @@ public class CubicChunks {
         String remoteFullVersion = modVersions.get(MODID);
         if (remoteFullVersion == null) {
             if (remoteSide.isClient()) {
-                return CubicChunksConfig.allowVanillaClients; // don't allow client without CC to connect
+                return false; // a client without Cubature cannot join
             }
             return true; // allow connecting to server without CC
         }

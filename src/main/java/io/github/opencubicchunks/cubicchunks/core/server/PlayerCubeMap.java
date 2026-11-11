@@ -209,8 +209,6 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
 
     private final DeferredArrivals arrivals;
 
-    final VanillaNetworkHandler vanillaNetworkHandler;
-
     public PlayerCubeMap(WorldServer worldServer) {
         super(worldServer);
         this.cubeCache = ((ICubicWorldInternal.Server) worldServer).getCubeCache();
@@ -219,7 +217,6 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
                 ((ICubicPlayerList) worldServer.getMinecraftServer().getPlayerList()).getVerticalViewDistance());
         this.chunkGc = new ChunkGc(((ICubicWorldInternal.Server) worldServer).getCubeCache());
         this.arrivals = DeferredArrivals.open(worldServer, cubeCache);
-        this.vanillaNetworkHandler = ((ICubicWorldInternal.Server) worldServer).getVanillaNetworkHandler();
     }
 
     /**
@@ -706,9 +703,6 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
         PlayerWrapper playerWrapper = new PlayerWrapper(player);
         playerWrapper.updateManagedPos();
 
-        if (!vanillaNetworkHandler.hasCubicChunks(player)) {
-            vanillaNetworkHandler.updatePlayerPosition(this, player, playerWrapper.getManagedCubePos());
-        }
 
         CubePos playerCubePos = CubePos.fromEntity(player);
 
@@ -764,7 +758,6 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
                 .forEach(watcher->watcher.removePlayer(player));
         this.players.remove(player.getEntityId());
         sender.removePlayer(player);
-        vanillaNetworkHandler.removePlayer(player);
     }
 
     // CHECKED: 1.10.2-12.18.1.2092
@@ -789,9 +782,6 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
         this.updatePlayer(playerWrapper, playerWrapper.getManagedCubePos(), CubePos.fromEntity(player));
         playerWrapper.updateManagedPos();
 
-        if (!vanillaNetworkHandler.hasCubicChunks(player)) {
-            vanillaNetworkHandler.updatePlayerPosition(this, player, playerWrapper.getManagedCubePos());
-        }
         // With ChunkGc being separate from PlayerCubeMap, there are 2 issues:
         // Problem 0: Sometimes, a chunk can be generated after CubeWatcher's chunk load callback returns with a null
         // but before ChunkGC call. This means that the cube will get unloaded, even when ChunkWatcher is waiting for it.

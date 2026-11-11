@@ -1,7 +1,6 @@
 package io.github.opencubicchunks.cubicchunks.core.server.delivery;
 
 import io.github.opencubicchunks.cubicchunks.core.server.CubeWatcher;
-import io.github.opencubicchunks.cubicchunks.core.server.VanillaNetworkHandler;
 import io.github.opencubicchunks.cubicchunks.api.util.CubePos;
 import io.github.opencubicchunks.cubicchunks.api.world.CubeWatchEvent;
 import io.github.opencubicchunks.cubicchunks.core.CubicChunksConfig;
@@ -37,7 +36,6 @@ public final class CubeSender {
     }
 
     private final WorldServer world;
-    private final VanillaNetworkHandler vanilla;
     private final Watchers watchers;
     private final PendingCubeSends<EntityPlayerMP, Cube> pending = new PendingCubeSends<>();
     private final CubeSendBudget budget = new CubeSendBudget();
@@ -64,7 +62,6 @@ public final class CubeSender {
 
     public CubeSender(WorldServer world, Watchers watchers) {
         this.world = world;
-        this.vanilla = ((ICubicWorldInternal.Server) world).getVanillaNetworkHandler();
         this.watchers = watchers;
     }
 
@@ -126,19 +123,11 @@ public final class CubeSender {
                 ((ICubicWorldInternal) world).getLightingManager().onSendCubes(batch);
                 if (observer != null) lightingNanos += System.nanoTime() - lightStarted;
                 long bodyBytes = 0;
-                PacketCubes packet = null;
-                if (vanilla.hasCubicChunks(player)) {
-                    packet = new PacketCubes(batch, exactBytes);
-                    bodyBytes = Math.max(0, packet.getSerializedSize()); // Unknown (-1) only without exactBytes.
-                }
+                PacketCubes packet = new PacketCubes(batch, exactBytes);
+                bodyBytes = Math.max(0, packet.getSerializedSize()); // Unknown (-1) only without exactBytes.
                 batchWatchers.clear();
                 for (int i = 0; i < batch.size(); i++) batchWatchers.add(watchers.getCubeWatcher(batch.get(i).getCoords()));
-                if (packet != null) {
-                    PacketDispatcher.sendTo(packet, player);
-                } else {
-                    // Vanilla uses a different column protocol; its bytes are not CC message-body bytes.
-                    vanilla.sendCubeLoadPackets(batch, player);
-                }
+                PacketDispatcher.sendTo(packet, player);
                 budget.sent(bodyBytes);
                 sent += batch.size();
                 PlayerCubeDelivery.publishBatch(batch, batchWatchers, player, publication);

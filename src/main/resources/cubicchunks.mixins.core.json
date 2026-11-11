@@ -42,15 +42,7 @@
         "common.MixinWorldProvider",
         "common.MixinWorldServer",
         "common.MixinWorldServer_PeriodicAutosave",
-        "common.MixinWorldSettings",
-        "common.vanillaclient.ICPacketPlayer",
-        "common.vanillaclient.ICPacketPlayerDigging",
-        "common.vanillaclient.ICPacketPlayerTryUseItemOnBlock",
-        "common.vanillaclient.ICPacketTabComplete",
-        "common.vanillaclient.ICPacketUpdateSign",
-        "common.vanillaclient.ICPacketVehicleMove",
-        "common.vanillaclient.ISPacketChunkData",
-        "common.vanillaclient.ISPacketMultiBlockChange"
+        "common.MixinWorldSettings"
     ],
     "client": [
         "client.IChunkProviderClient",

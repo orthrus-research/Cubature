@@ -64,6 +64,11 @@ Geyser (Bedrock) client detection. The vanilla-sided mixins that were the hybrid
 alternative now load with the core configuration under descriptive names. A cubic world reports its
 own height, and the client and server cap view distance at 32 chunks. Unmodded Java clients keep
 their default of no horizontal slices; the slice option now applies to them when enabled.
+On November 11, 2026, support for clients without Cubature was removed: the `allowVanillaClients`
+option and its horizontal-slice settings, `VanillaNetworkHandler`, the vanilla column and block
+packets in delivery, and the 33 packet mixins that shifted positions for such clients. The option
+was off by default and the connection check already refused those clients, so no delivery path
+changes for a client that has Cubature.
 Also on November 10, 2026, initial sky light and surface tracking return early for a cube without
 storage that lies above every staged column top in a sky-lit world: its 4,096 sky checks
 changed nothing, and the column's dirtying, staging removal and surface notifications still run.

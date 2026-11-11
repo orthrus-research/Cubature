@@ -326,14 +326,10 @@ public class CubeWatcher implements ITicket, ICubeWatcher, BucketSorterEntry {
             PacketCubeBlockChange packet = null;
             for (EntityPlayerMP player : this.players) {
                 if (!isSentToPlayer(player)) continue; // A later base snapshot includes these edits and TE state.
-                if (playerCubeMap.vanillaNetworkHandler.hasCubicChunks(player)) {
-                    if (packet == null) { // create packet lazily
-                        packet = new PacketCubeBlockChange(this.cube, this.dirtyBlocks);
-                    }
-                    PacketDispatcher.sendTo(packet, player);
-                } else {
-                    playerCubeMap.vanillaNetworkHandler.sendBlockChanges(dirtyBlocks, cube, player);
+                if (packet == null) { // create packet lazily
+                    packet = new PacketCubeBlockChange(this.cube, this.dirtyBlocks);
                 }
+                PacketDispatcher.sendTo(packet, player);
             }
             // send the block entites on those blocks too
             this.dirtyBlocks.forEach(localAddress -> {
