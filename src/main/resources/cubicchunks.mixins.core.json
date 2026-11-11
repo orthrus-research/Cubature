@@ -2,8 +2,8 @@
     "required": true,
     "package": "io.github.opencubicchunks.cubicchunks.core.asm.mixin.core",
     "refmap": "cubicchunks.mixins.refmap.json",
-    "compatibilityLevel": "JAVA_8",
-    "minVersion": "0.7.10",
+    "compatibilityLevel": "JAVA_25",
+    "minVersion": "0.8",
     "injectors": {
         "defaultRequire": 1
     },
