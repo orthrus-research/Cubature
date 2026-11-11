@@ -24,14 +24,14 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.fixes.common.worldgen.tree;
 
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
 import mcp.MethodsReturnNonnullByDefault;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import net.minecraft.world.gen.feature.WorldGenCanopyTree;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.injection.Constant;
-import org.spongepowered.asm.mixin.injection.ModifyConstant;
+import org.spongepowered.asm.mixin.injection.At;
 
 import java.util.Random;
 
@@ -42,12 +42,12 @@ import javax.annotation.ParametersAreNonnullByDefault;
 @Mixin(WorldGenCanopyTree.class)
 public class MixinWorldGenCanopyTree {
 
-    @ModifyConstant(method = "generate", constant = @Constant(intValue = 1, ordinal = 0))
+    @ModifyExpressionValue(method = "generate", at = @At(value = "CONSTANT", args = "intValue=1", ordinal = 0))
     private int getMinGenHeight(int orig, World worldIn, Random rand, BlockPos position) {
         return ((ICubicWorld) worldIn).getMinHeight() + 1;
     }
 
-    @ModifyConstant(method = "generate", constant = @Constant(intValue = 256, ordinal = 0))
+    @ModifyExpressionValue(method = "generate", at = @At(value = "CONSTANT", args = "intValue=256", ordinal = 0))
     private int getMaxGenHeight(int orig, World worldIn, Random rand, BlockPos position) {
         return ((ICubicWorld) worldIn).getMaxHeight();
     }

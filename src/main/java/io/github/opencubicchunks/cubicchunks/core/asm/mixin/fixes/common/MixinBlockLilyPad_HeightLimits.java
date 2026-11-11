@@ -24,9 +24,11 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.fixes.common;
 
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import javax.annotation.ParametersAreNonnullByDefault;
 
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Constant;
 import org.spongepowered.asm.mixin.injection.ModifyConstant;
 
@@ -53,7 +55,7 @@ public abstract class MixinBlockLilyPad_HeightLimits extends BlockBush {
         return ((ICubicWorld) worldIn).getMinHeight();
     }
     
-    @ModifyConstant(method = "canBlockStay", constant = @Constant(intValue = 256), expect = 1)
+    @ModifyExpressionValue(method = "canBlockStay", at = @At(value = "CONSTANT", args = "intValue=256"), expect = 1)
     private int canBlockStay_getMaxY(int orig, World worldIn, BlockPos pos, IBlockState state) {
         return ((ICubicWorld) worldIn).getMaxHeight();
     }

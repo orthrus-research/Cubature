@@ -7,6 +7,7 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.selectable.client.celeritas;
 
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import io.github.opencubicchunks.cubicchunks.core.compat.celeritas.CeleritasCompat;
 import net.minecraft.client.multiplayer.WorldClient;
 import net.minecraft.world.chunk.storage.ExtendedBlockStorage;
@@ -17,9 +18,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Constant;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.ModifyConstant;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /** Give Celeritas's section manager the cubic world's height and answer section emptiness from cubes. */
@@ -29,13 +28,13 @@ public abstract class MixinCeleritasSectionManager {
     @Shadow(remap = false) @Final private WorldClient world;
 
     // create() passes the vanilla range, sections [0, 16), to the manager and its section graph.
-    @ModifyConstant(method = "create", constant = @Constant(intValue = 0), require = 1, allow = 1, remap = false)
+    @ModifyExpressionValue(method = "create", at = @At(value = "CONSTANT", args = "intValue=0"), require = 1, allow = 1, remap = false)
     private static int cubicchunks$minSection(int vanilla, ChunkVertexType vertexType, WorldClient world,
             int renderDistance, CommandList commandList) {
         return CeleritasCompat.cubic(world) ? CeleritasCompat.minSection(world) : vanilla;
     }
 
-    @ModifyConstant(method = "create", constant = @Constant(intValue = 16), require = 1, allow = 1, remap = false)
+    @ModifyExpressionValue(method = "create", at = @At(value = "CONSTANT", args = "intValue=16"), require = 1, allow = 1, remap = false)
     private static int cubicchunks$maxSection(int vanilla, ChunkVertexType vertexType, WorldClient world,
             int renderDistance, CommandList commandList) {
         return CeleritasCompat.cubic(world) ? CeleritasCompat.maxSection(world) : vanilla;

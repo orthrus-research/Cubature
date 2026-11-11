@@ -24,11 +24,11 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.fixes.common;
 
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import javax.annotation.ParametersAreNonnullByDefault;
 
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.injection.Constant;
-import org.spongepowered.asm.mixin.injection.ModifyConstant;
+import org.spongepowered.asm.mixin.injection.At;
 
 import mcp.MethodsReturnNonnullByDefault;
 import net.minecraft.entity.Entity;
@@ -44,7 +44,7 @@ public abstract class MixinEntityBoat extends Entity {
         super(worldIn);
     }
 
-    @ModifyConstant(method = "checkInWater", constant = @Constant(doubleValue = Double.MIN_VALUE))
+    @ModifyExpressionValue(method = "checkInWater", at = @At(value = "CONSTANT", args = "doubleValue=4.9E-324"))
     private double waterLevelMinValue(double orig) {
         return Double.NEGATIVE_INFINITY;
     }

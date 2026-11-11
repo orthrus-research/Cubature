@@ -24,12 +24,14 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.fixes.common.worldgen;
 
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
 import mcp.MethodsReturnNonnullByDefault;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import net.minecraft.world.gen.feature.WorldGenBigMushroom;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Constant;
 import org.spongepowered.asm.mixin.injection.ModifyConstant;
 
@@ -43,7 +45,7 @@ import javax.annotation.ParametersAreNonnullByDefault;
 public class MixinWorldGenBigMushroom {
 
     // the ordinal=0 is boolean flag = true
-    @ModifyConstant(method = "generate", constant = @Constant(intValue = 1, ordinal = 1))
+    @ModifyExpressionValue(method = "generate", at = @At(value = "CONSTANT", args = "intValue=1", ordinal = 1))
     private int getMinGenHeight(int orig, World worldIn, Random rand, BlockPos position) {
         return ((ICubicWorld) worldIn).getMinHeight() + 1;
     }
@@ -55,7 +57,7 @@ public class MixinWorldGenBigMushroom {
         return ((ICubicWorld) worldIn).getMinHeight();
     }
 
-    @ModifyConstant(method = "generate", constant = @Constant(intValue = 256))
+    @ModifyExpressionValue(method = "generate", at = @At(value = "CONSTANT", args = "intValue=256"))
     private int getMaxGenHeight(int orig, World worldIn, Random rand, BlockPos position) {
         return ((ICubicWorld) worldIn).getMaxHeight();
     }

@@ -24,12 +24,14 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.fixes.common.worldgen.tree;
 
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
 import mcp.MethodsReturnNonnullByDefault;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import net.minecraft.world.gen.feature.WorldGenHugeTrees;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Constant;
 import org.spongepowered.asm.mixin.injection.ModifyConstant;
 
@@ -41,12 +43,12 @@ import javax.annotation.ParametersAreNonnullByDefault;
 public class MixinWorldGenHugeTrees {
 
     // the ordinal=0 is boolean flag = true
-    @ModifyConstant(method = "isSpaceAt", constant = @Constant(intValue = 1, ordinal = 1))
+    @ModifyExpressionValue(method = "isSpaceAt", at = @At(value = "CONSTANT", args = "intValue=1", ordinal = 1))
     private int isSpace_getMinHeight(int val, World worldIn, BlockPos leavesPos, int height) {
         return ((ICubicWorld) worldIn).getMinHeight() + 1;
     }
 
-    @ModifyConstant(method = "isSpaceAt", constant = @Constant(intValue = 256))
+    @ModifyExpressionValue(method = "isSpaceAt", at = @At(value = "CONSTANT", args = "intValue=256"))
     private int isSpace_getMaxHeight(int val, World worldIn, BlockPos leavesPos, int height) {
         return ((ICubicWorld) worldIn).getMaxHeight();
     }

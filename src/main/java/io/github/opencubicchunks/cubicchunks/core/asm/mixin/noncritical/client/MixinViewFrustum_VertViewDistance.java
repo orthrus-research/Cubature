@@ -24,6 +24,7 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.noncritical.client;
 
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import io.github.opencubicchunks.cubicchunks.api.util.Coords;
@@ -39,10 +40,8 @@ import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Constant;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyArg;
-import org.spongepowered.asm.mixin.injection.ModifyConstant;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
@@ -107,7 +106,7 @@ public class MixinViewFrustum_VertViewDistance {
         return original.call(instance) - ((ICubicWorld) world).getMinHeight();
     }
 
-    @ModifyConstant(method = "setCountChunksXYZ", constant = @Constant(intValue = 16))
+    @ModifyExpressionValue(method = "setCountChunksXYZ", at = @At(value = "CONSTANT", args = "intValue=16"))
     private int getYViewDistance(int oldDistance) {
         return renderDistance;
     }

@@ -24,6 +24,7 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.fixes.client;
 
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.mojang.authlib.GameProfile;
@@ -35,8 +36,6 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Constant;
-import org.spongepowered.asm.mixin.injection.ModifyConstant;
 
 import javax.annotation.ParametersAreNonnullByDefault;
 
@@ -49,7 +48,7 @@ public class MixinEntityPlayerSP extends AbstractClientPlayer {
         super(worldIn, playerProfile);
     }
 
-    @ModifyConstant(method = "onUpdate", constant = @Constant(doubleValue = 0.0D))
+    @ModifyExpressionValue(method = "onUpdate", at = @At(value = "CONSTANT", args = "doubleValue=0.0"))
     private double replaceEntityYForBlockPos(double value) {
         return this.posY;
     }

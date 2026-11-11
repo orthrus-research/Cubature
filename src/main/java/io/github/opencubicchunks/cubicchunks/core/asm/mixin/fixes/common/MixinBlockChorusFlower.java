@@ -24,14 +24,14 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.fixes.common;
 
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
 import net.minecraft.block.BlockChorusFlower;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.injection.Constant;
-import org.spongepowered.asm.mixin.injection.ModifyConstant;
+import org.spongepowered.asm.mixin.injection.At;
 
 import java.util.Random;
 
@@ -43,8 +43,8 @@ public class MixinBlockChorusFlower {
      * @author Babbaj
      * @reason Fix hardcoded height check preventing chorus flower from growing above Y=256
      */
-    @ModifyConstant(method = "updateTick",
-            constant = @Constant(intValue = 256))
+    @ModifyExpressionValue(method = "updateTick",
+            at = @At(value = "CONSTANT", args = "intValue=256"))
     private int updateTick(int maxY, World worldIn, BlockPos pos, IBlockState state, Random rand) {
         return ((ICubicWorld) worldIn).getMaxHeight();
     }

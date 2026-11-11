@@ -24,6 +24,7 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.noncritical.common.command;
 
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import static net.minecraft.command.CommandBase.getEntity;
 
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
@@ -34,9 +35,7 @@ import net.minecraft.command.server.CommandTeleport;
 import net.minecraft.server.MinecraftServer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Constant;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.ModifyConstant;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.lang.ref.WeakReference;
@@ -64,7 +63,7 @@ public class MixinCommandTeleport {
         }
     }
 
-    @ModifyConstant(method = "execute", constant = @Constant(intValue = -4096))
+    @ModifyExpressionValue(method = "execute", at = @At(value = "CONSTANT", args = "intValue=-4096"))
     private int getMinY(int original) {
         if (commandWorld == null) {
             return original;
@@ -76,7 +75,7 @@ public class MixinCommandTeleport {
         return world.getMinHeight() + original;
     }
 
-    @ModifyConstant(method = "execute", constant = @Constant(intValue = 4096), expect = 2)
+    @ModifyExpressionValue(method = "execute", at = @At(value = "CONSTANT", args = "intValue=4096"), expect = 2)
     private int getMaxY(int original) {
         if (commandWorld == null) {
             return original;

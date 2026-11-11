@@ -24,6 +24,7 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.fixes.common.worldgen;
 
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import static io.github.opencubicchunks.cubicchunks.api.util.Coords.blockToCube;
 
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
@@ -34,9 +35,7 @@ import net.minecraft.world.World;
 import net.minecraft.world.gen.feature.WorldGenLakes;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Constant;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.ModifyConstant;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.Random;
@@ -55,7 +54,7 @@ public class MixinWorldGenLakes {
         this.minY = Coords.getMinCubePopulationPos(position.getY());
     }
 
-    @ModifyConstant(method = "generate", constant = @Constant(intValue = 5, ordinal = 0))
+    @ModifyExpressionValue(method = "generate", at = @At(value = "CONSTANT", args = "intValue=5", ordinal = 0))
     private int getMinGenHeight(int orig, World worldIn, Random rand, BlockPos position) {
         if (((ICubicWorld) worldIn).isCubicWorld()) {
             return minY;
@@ -63,7 +62,7 @@ public class MixinWorldGenLakes {
         return orig;
     }
 
-    @ModifyConstant(method = "generate", constant = @Constant(intValue = 4, ordinal = 0))
+    @ModifyExpressionValue(method = "generate", at = @At(value = "CONSTANT", args = "intValue=4", ordinal = 0))
     private int getMinWorldHeight(int orig, World worldIn, Random rand, BlockPos position) {
         return ((ICubicWorld) worldIn).getMinHeight() + orig;
     }

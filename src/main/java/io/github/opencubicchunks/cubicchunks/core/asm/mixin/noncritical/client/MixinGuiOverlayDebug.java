@@ -24,6 +24,7 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.noncritical.client;
 
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import io.github.opencubicchunks.cubicchunks.api.util.Coords;
@@ -76,9 +77,9 @@ public class MixinGuiOverlayDebug {
 
     // slice not exactly necessary here, but this is a long method that could change, so keep the slice
     @Group(name = "getMaxWorldHeight", min = 1, max = 1)
-    @ModifyConstant(
+    @ModifyExpressionValue(
             method = "call",
-            constant = @Constant(intValue = 256),
+            at = @At(value = "CONSTANT", args = "intValue=256"),
             slice = @Slice(
                     from = @At(value = "INVOKE",
                             target = "Lnet/minecraft/client/multiplayer/WorldClient;isBlockLoaded(Lnet/minecraft/util/math/BlockPos;)Z"),

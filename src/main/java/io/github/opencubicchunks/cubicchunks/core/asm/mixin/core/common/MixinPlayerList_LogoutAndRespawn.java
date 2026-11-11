@@ -24,6 +24,7 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.core.common;
 
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import io.github.opencubicchunks.cubicchunks.api.util.Coords;
@@ -37,6 +38,7 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.*;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
@@ -72,8 +74,8 @@ public abstract class MixinPlayerList_LogoutAndRespawn {
         }
     }
 
-    @ModifyConstant(method = "recreatePlayerEntity",
-            constant = @Constant(doubleValue = 256))
+    @ModifyExpressionValue(method = "recreatePlayerEntity",
+            at = @At(value = "CONSTANT", args = "doubleValue=256"))
     private double getMaxHeight(double _256, EntityPlayerMP playerIn, int dimension, boolean conqueredEnd) {
         // +/- 8 chunks around the original position are loaded because of an inject above
         if (!playerIn.world.isBlockLoaded(new BlockPos(playerIn))) {

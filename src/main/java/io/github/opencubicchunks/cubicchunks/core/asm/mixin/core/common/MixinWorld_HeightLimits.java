@@ -24,6 +24,7 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.core.common;
 
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import static io.github.opencubicchunks.cubicchunks.api.util.Coords.blockToCube;
@@ -149,8 +150,8 @@ public abstract class MixinWorld_HeightLimits implements ICubicWorld {
      * When max height is exceeded vanilla clamps the value to 255 (maxHeight - 1 = actual max allowed block Y).
      */
     @Group(name = "getLightHeightOverride")
-    @ModifyConstant(method = "getLight(Lnet/minecraft/util/math/BlockPos;Z)I",
-            constant = {@Constant(intValue = 255), @Constant(intValue = 256)}, require = 2)
+    @ModifyExpressionValue(method = "getLight(Lnet/minecraft/util/math/BlockPos;Z)I",
+            at = {@At(value = "CONSTANT", args = "intValue=255"), @At(value = "CONSTANT", args = "intValue=256")}, require = 2)
     private int getLightGetReplacementYTooHigh(int original) {
         return this.getMaxHeight() + original - 256;
     }
@@ -285,7 +286,7 @@ public abstract class MixinWorld_HeightLimits implements ICubicWorld {
         ci.setReturnValue(biome);
     }
 
-    @ModifyConstant(method = {"canSnowAtBody", "canBlockFreezeBody"}, constant = @Constant(intValue = 256), remap = false)
+    @ModifyExpressionValue(method = {"canSnowAtBody", "canBlockFreezeBody"}, at = @At(value = "CONSTANT", args = "intValue=256"), remap = false)
     private int canSnowAt_getMaxHeight(int _256) {
         return getMaxHeight();
     }

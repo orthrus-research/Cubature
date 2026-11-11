@@ -24,21 +24,21 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.fixes.client;
 
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
 import net.minecraft.entity.Entity;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.Shadow;
-import org.spongepowered.asm.mixin.injection.Constant;
-import org.spongepowered.asm.mixin.injection.ModifyConstant;
 
 @Mixin(Entity.class)
 public class MixinEntity_PrepareSpawn {
     @Shadow public World world;
 
-    @ModifyConstant(method = "preparePlayerToSpawn",
-            constant = @Constant(doubleValue = 0))
+    @ModifyExpressionValue(method = "preparePlayerToSpawn",
+            at = @At(value = "CONSTANT", args = "doubleValue=0"))
     private double getMinHeight(double zero) {
         if (!world.isBlockLoaded(new BlockPos((Entity) (Object) this))) {
             // TODO: is this actually correct? Or is this called before the chunks are loaded?
@@ -47,8 +47,8 @@ public class MixinEntity_PrepareSpawn {
         return ((ICubicWorld) world).getMinHeight();
     }
 
-    @ModifyConstant(method = "preparePlayerToSpawn",
-            constant = @Constant(doubleValue = 256))
+    @ModifyExpressionValue(method = "preparePlayerToSpawn",
+            at = @At(value = "CONSTANT", args = "doubleValue=256"))
     private double getMaxHeight(double _256) {
         return ((ICubicWorld) world).getMaxHeight();
     }

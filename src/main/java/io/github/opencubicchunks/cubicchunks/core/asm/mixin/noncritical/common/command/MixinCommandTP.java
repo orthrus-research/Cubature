@@ -24,6 +24,7 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.noncritical.common.command;
 
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import static net.minecraft.command.CommandBase.getCommandSenderAsPlayer;
 import static net.minecraft.command.CommandBase.getEntity;
 
@@ -36,9 +37,7 @@ import net.minecraft.command.PlayerNotFoundException;
 import net.minecraft.server.MinecraftServer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Constant;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.ModifyConstant;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.lang.ref.WeakReference;
@@ -81,7 +80,7 @@ public class MixinCommandTP {
         }
     }
 
-    @ModifyConstant(method = "execute", constant = @Constant(intValue = -4096))
+    @ModifyExpressionValue(method = "execute", at = @At(value = "CONSTANT", args = "intValue=-4096"))
     private int getMinY(int orig) {
         if (commandWorld == null) {
             return orig;
@@ -93,7 +92,7 @@ public class MixinCommandTP {
         return world.getMinHeight() + orig;
     }
 
-    @ModifyConstant(method = "execute", constant = @Constant(intValue = 4096))
+    @ModifyExpressionValue(method = "execute", at = @At(value = "CONSTANT", args = "intValue=4096"))
     private int getMaxY(int orig) {
         if (commandWorld == null) {
             return orig;

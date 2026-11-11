@@ -24,6 +24,7 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.fixes.common;
 
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
@@ -73,11 +74,9 @@ public abstract class MixinWalkNodeProcessor_HeightLimit extends NodeProcessor {
         return ((ICubicWorld) this.entity.world).getMinHeight() + originalY;
     }
 
-    @ModifyConstant(
+    @ModifyExpressionValue(
             method = "getPathNodeType(Lnet/minecraft/world/IBlockAccess;III)Lnet/minecraft/pathfinding/PathNodeType;",
-            constant = @Constant(
-                    intValue = 1, ordinal = 0
-            ))
+            at = @At(value = "CONSTANT", args = "intValue=1", ordinal = 0))
     private int getMinHeight_GetPathNodeType(int originalY, IBlockAccess blockaccessIn, int x, int y, int z) {
         return ((IMinMaxHeight) blockaccessIn).getMinHeight() + originalY;
     }

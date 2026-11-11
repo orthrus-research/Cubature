@@ -24,6 +24,7 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.fixes.common;
 
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
 import mcp.MethodsReturnNonnullByDefault;
 import net.minecraft.entity.Entity;
@@ -31,9 +32,7 @@ import net.minecraft.entity.item.EntityFallingBlock;
 import net.minecraft.world.World;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Constant;
 import org.spongepowered.asm.mixin.injection.Group;
-import org.spongepowered.asm.mixin.injection.ModifyConstant;
 import org.spongepowered.asm.mixin.injection.Slice;
 
 import javax.annotation.ParametersAreNonnullByDefault;
@@ -55,9 +54,9 @@ public abstract class MixinEntityFallingBlock_HeightLimits extends Entity {
      * this.fallTime > 600)
      */
     @Group(name = "onUpdateGetMinHeight", min = 1, max = 1)
-    @ModifyConstant(
+    @ModifyExpressionValue(
             method = "onUpdate",
-            constant = @Constant(intValue = 1),
+            at = @At(value = "CONSTANT", args = "intValue=1"),
             slice = @Slice(
                     from = @At(value = "CONSTANT:ONE", args = "intValue=100"), // between this.fallTime > 100
                     to = @At(value = "CONSTANT:FIRST", args = "stringValue=doEntityDrops") // and this.world.getGameRules().getBoolean
@@ -68,9 +67,9 @@ public abstract class MixinEntityFallingBlock_HeightLimits extends Entity {
     }
 
     @Group(name = "onUpdateGetMaxHeight", min = 1, max = 1)
-    @ModifyConstant(
+    @ModifyExpressionValue(
             method = "onUpdate",
-            constant = @Constant(intValue = 256),
+            at = @At(value = "CONSTANT", args = "intValue=256"),
             slice = @Slice(
                     from = @At(value = "CONSTANT:ONE", args = "intValue=100"), // between this.fallTime > 100
                     to = @At(value = "CONSTANT:LAST", args = "stringValue=doEntityDrops") // and this.world.getGameRules().getBoolean("doEntityDrops")

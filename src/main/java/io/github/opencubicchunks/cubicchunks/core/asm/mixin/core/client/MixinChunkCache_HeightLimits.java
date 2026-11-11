@@ -24,6 +24,7 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.core.client;
 
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
 import mcp.MethodsReturnNonnullByDefault;
 import net.minecraft.world.ChunkCache;
@@ -50,7 +51,7 @@ public abstract class MixinChunkCache_HeightLimits {
         return ((ICubicWorld) world).getMinHeight();
     }
 
-    @ModifyConstant(method = "getLightFor", constant = @Constant(intValue = 256))
+    @ModifyExpressionValue(method = "getLightFor", at = @At(value = "CONSTANT", args = "intValue=256"))
     private int getLightFor_getMaxHeight(int orig) {
         return ((ICubicWorld) world).getMaxHeight();
     }
@@ -67,7 +68,7 @@ public abstract class MixinChunkCache_HeightLimits {
         return ((ICubicWorld) world).getMinHeight();
     }
 
-    @ModifyConstant(method = "getLightForExt", constant = @Constant(intValue = 256))
+    @ModifyExpressionValue(method = "getLightForExt", at = @At(value = "CONSTANT", args = "intValue=256"))
     private int getLightForExt_getMaxHeight(int orig) {
         return ((ICubicWorld) world).getMaxHeight();
     }

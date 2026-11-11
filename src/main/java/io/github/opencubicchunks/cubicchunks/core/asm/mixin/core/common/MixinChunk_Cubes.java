@@ -24,6 +24,7 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.core.common;
 
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import static io.github.opencubicchunks.cubicchunks.api.util.Coords.blockToCube;
@@ -247,8 +248,8 @@ public abstract class MixinChunk_Cubes {
         ebs[y - (this.isColumn ? 0 : Coords.blockToCube(((IMinMaxHeight) world).getMinHeight()))] = val;
     }
 
-    @ModifyConstant(method = "<init>(Lnet/minecraft/world/World;Lnet/minecraft/world/chunk/ChunkPrimer;II)V",
-            constant = @Constant(intValue = 16, ordinal = 0), require = 1)
+    @ModifyExpressionValue(method = "<init>(Lnet/minecraft/world/World;Lnet/minecraft/world/chunk/ChunkPrimer;II)V",
+            at = @At(value = "CONSTANT", args = "intValue=16", ordinal = 0), require = 1)
     private int getInitChunkLoopEnd(int _16, World world, ChunkPrimer primer, int x, int z) {
         if (((ICubicWorldInternal.Server) world).isCompatGenerationScope()) {
             this.compatGenerationPrimer = primer;

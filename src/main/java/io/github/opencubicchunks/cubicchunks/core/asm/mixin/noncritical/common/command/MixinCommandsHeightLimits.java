@@ -24,6 +24,7 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.noncritical.common.command;
 
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
 import mcp.MethodsReturnNonnullByDefault;
 import net.minecraft.command.CommandClone;
@@ -63,18 +64,18 @@ public class MixinCommandsHeightLimits {
     }
 
     @Group(name = "command_getMaxY", min = 2, max = 2)
-    @ModifyConstant(
+    @ModifyExpressionValue(
             method = "execute",
-            constant = @Constant(intValue = 256, ordinal = 0),
+            at = @At(value = "CONSTANT", args = "intValue=256", ordinal = 0),
             slice = @Slice(from = @At(value = "FIELD", target = "Lnet/minecraft/world/gen/structure/StructureBoundingBox;maxY:I")))
     private int command_getMaxY1(int orig, MinecraftServer server, ICommandSender sender, String[] args) {
         return ((ICubicWorld) sender.getEntityWorld()).getMaxHeight();
     }
 
     @Group(name = "command_getMaxY")
-    @ModifyConstant(
+    @ModifyExpressionValue(
             method = "execute",
-            constant = @Constant(intValue = 256, ordinal = 1),
+            at = @At(value = "CONSTANT", args = "intValue=256", ordinal = 1),
             slice = @Slice(from = @At(value = "FIELD", target = "Lnet/minecraft/world/gen/structure/StructureBoundingBox;maxY:I")))
     private int command_getMaxY2(int orig, MinecraftServer server, ICommandSender sender, String[] args) {
         return ((ICubicWorld) sender.getEntityWorld()).getMaxHeight();

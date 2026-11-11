@@ -1,9 +1,9 @@
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.noncritical.client;
 
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import net.minecraft.client.renderer.RegionRenderCacheBuilder;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.injection.Constant;
-import org.spongepowered.asm.mixin.injection.ModifyConstant;
+import org.spongepowered.asm.mixin.injection.At;
 
 /**
  * Starts each chunk-mesh builder's layer buffers small. Vanilla reserves 10 MiB of direct memory
@@ -21,17 +21,17 @@ public class MixinRegionRenderCacheBuilder {
     /** Initial translucent capacity, in ints: 256 KiB instead of 1 MiB. */
     private static final int TRANSLUCENT_INTS = 65536;
 
-    @ModifyConstant(method = "<init>", constant = @Constant(intValue = 2097152))
+    @ModifyExpressionValue(method = "<init>", at = @At(value = "CONSTANT", args = "intValue=2097152"))
     private int cubicchunks$solidCapacity(int vanilla) {
         return SOLID_INTS;
     }
 
-    @ModifyConstant(method = "<init>", constant = @Constant(intValue = 131072))
+    @ModifyExpressionValue(method = "<init>", at = @At(value = "CONSTANT", args = "intValue=131072"))
     private int cubicchunks$cutoutCapacity(int vanilla) {
         return CUTOUT_INTS;
     }
 
-    @ModifyConstant(method = "<init>", constant = @Constant(intValue = 262144))
+    @ModifyExpressionValue(method = "<init>", at = @At(value = "CONSTANT", args = "intValue=262144"))
     private int cubicchunks$translucentCapacity(int vanilla) {
         return TRANSLUCENT_INTS;
     }

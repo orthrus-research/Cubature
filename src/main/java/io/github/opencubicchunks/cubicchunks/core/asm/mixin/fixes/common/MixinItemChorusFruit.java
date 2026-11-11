@@ -24,6 +24,7 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.fixes.common;
 
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
@@ -34,14 +35,12 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.world.World;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Constant;
-import org.spongepowered.asm.mixin.injection.ModifyConstant;
 import java.util.Random;
 
 @Mixin(ItemChorusFruit.class)
 public abstract class MixinItemChorusFruit {
 
-    @ModifyConstant(method = "onItemUseFinish", constant = @Constant(doubleValue = 0.0))
+    @ModifyExpressionValue(method = "onItemUseFinish", at = @At(value = "CONSTANT", args = "doubleValue=0.0"))
     private double getMinHeight(double orig, ItemStack stack, World worldIn, EntityLivingBase entityLiving) {
         return (double)((ICubicWorld) worldIn).getMinHeight();
     }

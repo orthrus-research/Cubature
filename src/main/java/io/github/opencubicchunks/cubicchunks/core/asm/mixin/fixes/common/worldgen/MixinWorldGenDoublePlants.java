@@ -24,14 +24,14 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.fixes.common.worldgen;
 
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
 import mcp.MethodsReturnNonnullByDefault;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import net.minecraft.world.gen.feature.WorldGenDoublePlant;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.injection.Constant;
-import org.spongepowered.asm.mixin.injection.ModifyConstant;
+import org.spongepowered.asm.mixin.injection.At;
 
 import java.util.Random;
 
@@ -42,7 +42,7 @@ import javax.annotation.ParametersAreNonnullByDefault;
 @Mixin(WorldGenDoublePlant.class)
 public class MixinWorldGenDoublePlants {
 
-    @ModifyConstant(method = "generate", constant = @Constant(intValue = 254))
+    @ModifyExpressionValue(method = "generate", at = @At(value = "CONSTANT", args = "intValue=254"))
     private int getMaxGenHeight(int orig, World worldIn, Random rand, BlockPos position) {
         return ((ICubicWorld) worldIn).getMaxHeight() - 2;
     }

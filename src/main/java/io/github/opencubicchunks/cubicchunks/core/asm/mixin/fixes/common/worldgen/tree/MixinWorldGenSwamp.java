@@ -24,6 +24,7 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.asm.mixin.fixes.common.worldgen.tree;
 
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
 import io.github.opencubicchunks.cubicchunks.api.util.Coords;
 import mcp.MethodsReturnNonnullByDefault;
@@ -77,7 +78,7 @@ public class MixinWorldGenSwamp {
     // normal height check replacement:
 
     // the ordinal=0 is boolean flag = true
-    @ModifyConstant(method = "generate", constant = @Constant(intValue = 1, ordinal = 1))
+    @ModifyExpressionValue(method = "generate", at = @At(value = "CONSTANT", args = "intValue=1", ordinal = 1))
     private int getMinGenHeight(int orig, World worldIn, Random rand, BlockPos position) {
         return ((ICubicWorld) worldIn).getMinHeight() + 1;
     }
@@ -89,7 +90,7 @@ public class MixinWorldGenSwamp {
         return ((ICubicWorld) worldIn).getMinHeight();
     }
 
-    @ModifyConstant(method = "generate", constant = @Constant(intValue = 256))
+    @ModifyExpressionValue(method = "generate", at = @At(value = "CONSTANT", args = "intValue=256"))
     private int getMaxGenHeight(int orig, World worldIn, Random rand, BlockPos position) {
         return ((ICubicWorld) worldIn).getMaxHeight();
     }
