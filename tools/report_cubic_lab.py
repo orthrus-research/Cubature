@@ -75,7 +75,7 @@ def main():
             'Lighting-snapshot is a two-operation correctness check; one server tick and a brief client capture are not a latency distribution. Missing optional client-tick observations remain null.',
             'Scheduled-ticks is a correctness fixture; observed state-transition timings include fixture preparation and tick dispatch.',
             'Map-churn includes an explicit flush and loaded-index audit; its timings are correctness work, not isolated map throughput.',
-            'The reduced content profile and lab-specific 0.7 compatibility overlays do not qualify the full Supersymmetry pack.']}
+            'The reduced content profile does not qualify the full Supersymmetry pack.']}
     (output / 'results.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
     import matplotlib
     matplotlib.use('Agg')

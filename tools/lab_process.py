@@ -24,8 +24,6 @@ def argv(manifest, client, recording=None, jfr_settings=None):
               '-Djava.io.tmpdir=' + str(temporary), '-Dfile.encoding=UTF-8']
     result += ['-D' + name + '=' + value for name, value in manifest.get('labProperties', {}).items()]
     if manifest.get('networkReadTimeoutSeconds',30)!=30:result.append('-Dfml.readTimeout='+str(manifest['networkReadTimeoutSeconds']))
-    if tuple(int(x) for x in manifest.get('runtimeVersion', '0.6.13').split('.')[:2]) >= (0, 7):
-        result.append('-Dcubiclab.cleanroom070=true')
     if recording:
         repository = directory / 'jfr-repository'; repository.mkdir(exist_ok=True)
         result += ['-XX:FlightRecorderOptions=repository=' + str(repository),

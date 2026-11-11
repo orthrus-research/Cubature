@@ -19,7 +19,6 @@ if (!inputJar.exists()) { inputJar.parentFile.mkdirs(); java.nio.file.Files.copy
 base { archivesName = 'cubicchunks-lab' }
 layout.buildDirectory = layout.projectDirectory.dir("build/${targetLoader}")
 java { toolchain { languageVersion = JavaLanguageVersion.of(25) }; withSourcesJar() }
-sourceSets.main.java.srcDir('src/cleanroom070/java')
 repositories {
     maven { url = inputRepository; content { includeGroup 'local.cubicchunks' }; metadataSources { artifact() } }
     mavenCentral(); maven { url = 'https://curse.cleanroommc.com' }; maven { url = 'https://maven.cleanroommc.com' }
@@ -27,8 +26,6 @@ repositories {
 configurations { modCompileOnly; compileOnly.extendsFrom(modCompileOnly); modImplementation }
 dependencies {
     modCompileOnly "local.cubicchunks:CubicChunks:${inputVersion}"
-    compileOnly 'zone.rong:imaginebreaker:3.2'
-    testRuntimeOnly 'zone.rong:imaginebreaker:3.2'
     testImplementation 'junit:junit:4.13.2'
 }
 unimined.minecraft {

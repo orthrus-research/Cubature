@@ -60,11 +60,6 @@ def runtime_assets(release, product_version, expected_hashes=None):
     return assets
 
 
-def needs_070_compat(version):
-    return version in ('0.7.0', '0.7.0-alpha', '0.7.1-alpha', '0.7.2-alpha', '0.7.4-alpha', '0.7.5-alpha',
-                       '0.7.6-alpha', '0.7.7-alpha', '0.7.8-alpha', '0.7.9-alpha')
-
-
 def inspect_java26(path):
     path = Path(path).resolve()
     completed = subprocess.run([str(path), '-version'], text=True, capture_output=True, check=True, timeout=15)
@@ -256,8 +251,7 @@ def package_client(target, manifest, base_zip):
             + '\nMaxMemAlloc=' + str(manifest.get('jvmProfile', {}).get('maxHeapMiB', 6144))
             + '\nOverrideJavaArgs=true\nJvmArgs='
             + ' '.join(a for a in manifest.get('jvmProfile', {}).get('arguments', []) if not a.startswith(('-Xms','-Xmx'))) + ' '
-            + ' '.join('-D' + name + '=' + value for name, value in manifest.get('labProperties', {}).items()) + ' '
-            + ('-Dcubiclab.cleanroom070=true' if needs_070_compat(manifest.get('runtimeVersion')) else '')
+            + ' '.join('-D' + name + '=' + value for name, value in manifest.get('labProperties', {}).items())
             + (' -Dfml.readTimeout='+str(manifest['networkReadTimeoutSeconds']) if manifest.get('networkReadTimeoutSeconds',30)!=30 else '') + '\n')
         for folder in ['mods', 'config', 'groovy', 'local', 'resources', 'resourcepacks']:
             for path in sorted((client / folder).rglob('*')):
@@ -311,9 +305,6 @@ def export_client(args):
     manifest['generatedInputHashes'] = record_inputs(manifest)
     manifest['generatedLibraryHashes'] = record_generated_libraries(manifest)
     manifest['generatedInputsRecordedUtc'] = datetime.now(timezone.utc).isoformat()
-    holder_note = 'Lab-only ObjectHolderRef mixin initializes the declaring class before registry field injection, preventing later static initializers from clearing injected values.'
-    if needs_070_compat(manifest.get('runtimeVersion')) and holder_note not in manifest.get('compatibility', []):
-        manifest.setdefault('compatibility', []).append(holder_note)
     package_client(target, manifest, base_zip)
     write_json(target / 'lab.json', manifest)
     print(manifest['prismImport'])

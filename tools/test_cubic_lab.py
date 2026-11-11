@@ -313,20 +313,6 @@ class LabControlTest(unittest.TestCase):
         with self.assertRaises(RuntimeError): lab_instance.runtime_assets(release, '0.7.0-alpha', hashes)
         with self.assertRaises(RuntimeError): lab_instance.runtime_assets(release, '0.7.0', hashes)
 
-    def test_reviewed_07_versions_keep_their_compatibility_bridge(self):
-        self.assertTrue(lab_instance.needs_070_compat('0.7.0'))
-        self.assertTrue(lab_instance.needs_070_compat('0.7.0-alpha'))
-        self.assertTrue(lab_instance.needs_070_compat('0.7.1-alpha'))
-        self.assertTrue(lab_instance.needs_070_compat('0.7.2-alpha'))
-        self.assertTrue(lab_instance.needs_070_compat('0.7.4-alpha'))
-        self.assertTrue(lab_instance.needs_070_compat('0.7.5-alpha'))
-        self.assertTrue(lab_instance.needs_070_compat('0.7.6-alpha'))
-        self.assertTrue(lab_instance.needs_070_compat('0.7.7-alpha'))
-        self.assertTrue(lab_instance.needs_070_compat('0.7.8-alpha'))
-        self.assertTrue(lab_instance.needs_070_compat('0.7.9-alpha'))
-        self.assertFalse(lab_instance.needs_070_compat('0.6.13-alpha'))
-        self.assertFalse(lab_instance.needs_070_compat('0.8.0'))
-
     def test_color_coded_join_is_detected(self):
         messages = queue.Queue(); messages.put('\x1b[0;33;1mCubicLab\x1b[m\x1b[0;33;1m joined the game\x1b[m')
         self.assertIn('CubicLab joined the game', lab_process.await_line(messages, 'CubicLab joined the game', [], 1))
