@@ -131,6 +131,28 @@ public final class LabLodMerge {
         }
     }
 
+    /**
+     * {copied-down columns with data, generated columns with data, columns without data}: what a render build of a
+     * section reads, so a trace shows when a section DH draws holds a coarser level's data copied down to it.
+     */
+    static long[] shown(byte[] steps, boolean[] has) {
+        long copied = 0, generated = 0, empty = 0;
+        for (int i = 0; i < COLUMNS; i++) {
+            if (!has[i]) empty++;
+            else if (steps[i] == DOWN_SAMPLED || steps[i] == EMPTY) copied++;
+            else generated++;
+        }
+        return new long[] {copied, generated, empty};
+    }
+
+    /** A render build reads a section's full data: render-data with {@link #shown}. */
+    public static void rendered(Object source) {
+        byte[] steps = steps(source);
+        if (steps == null) return;
+        long[] r = shown(steps, has(source));
+        LabLodTrace.event("render-data", LabLodTrace.longField(source, "pos"), r[0], r[1], r[2], 0);
+    }
+
     /** The section's column steps (a fastutil ByteArrayList, read through its backing array). */
     private static byte[] steps(Object source) {
         Object list = LabLodTrace.field(source, "columnGenerationSteps");

@@ -1,5 +1,7 @@
 package io.github.opencubicchunks.cubicchunks.lab.mixin;
 
+import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV2;
+import io.github.opencubicchunks.cubicchunks.lab.LabLodMerge;
 import io.github.opencubicchunks.cubicchunks.lab.LabLodTrace;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -11,6 +13,7 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Coerce;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
@@ -48,6 +51,17 @@ public abstract class MixinLodSection {
     private void cubiclab$selected(boolean enabled,CallbackInfo ci){
         int state=(enabled?1:0)|(canRender()?2:0)|(gpuUploadComplete()?4:0);
         if(state!=cubiclab$lodState){cubiclab$lodState=state;LabLodTrace.event("render-state",pos,state);}
+    }
+    /**
+     * The full data a build turns into render data, for this section only (not its neighbours); returned unchanged.
+     * ModifyArg needs the exact argument type, so this one handler names a DH class.
+     */
+    @ModifyArg(method="getRenderSourceForPos",at=@At(value="INVOKE",
+        target="Lcom/seibel/distanthorizons/core/dataObjects/transformers/FullDataToRenderDataTransformer;transformFullDataToRenderSource(Lcom/seibel/distanthorizons/core/dataObjects/fullData/sources/FullDataSourceV2;Lcom/seibel/distanthorizons/core/wrapperInterfaces/world/IClientLevelWrapper;)Lcom/seibel/distanthorizons/core/dataObjects/render/ColumnRenderSource;"),
+        index=0)
+    private FullDataSourceV2 cubiclab$renderData(FullDataSourceV2 fullData){
+        if(LabLodTrace.ENABLED&&fullData!=null&&LabLodTrace.longField(fullData,"pos")==pos)LabLodMerge.rendered(fullData);
+        return fullData;
     }
     @Inject(method="close",at=@At("HEAD"))
     private void cubiclab$closed(CallbackInfo ci){LabLodTrace.event("section-close",pos);}

@@ -95,6 +95,12 @@ public class TestLabLodMerge {
         assertFalse(LabLodMerge.answer(true, null));   // DH propagating down
     }
 
+    @Test public void shownSplitsCopiedGeneratedAndEmptyColumns() {
+        byte[] steps = fill(SURFACE); steps[0] = DOWN; steps[1] = DOWN; steps[2] = EMPTY;
+        boolean[] has = all(true); has[2] = false; has[3] = false;
+        assertArrayEquals(new long[] {2, N - 4, 2}, LabLodMerge.shown(steps, has));
+    }
+
     @Test public void fallbackReportsTransitionsAndHiddenChildren() {
         LabLodFallback f = new LabLodFallback();
         f.begin(); f.fallback(1, 3, 4); f.fallback(2, 0, 1); f.end();
