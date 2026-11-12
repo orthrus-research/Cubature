@@ -126,6 +126,20 @@ where they run and, in a cubic world, in what order they are asked for:
   keeps every other value's `toString`, so strings that were already stable stay
   byte for byte the same. DH deserializes by comparing a stored string with this
   same method's output for each of the block's states, so both sides agree.
+- **Fine columns** (`distantHorizonsKeepFineColumns`). DH merges a section's
+  data into a stored section of the same detail column by column and replaces
+  any column whose generation step is the same or less complete. Preview tiles
+  are SURFACE at every detail, and DH carries the least complete step up when
+  it downsamples children, so a coarse section with any hole, requested again
+  at its own detail, had its answer (one preview sample per cell) replace the
+  columns DH built from 1-block tiles: terrain already shown at full detail
+  showed coarse cells at the coarser levels. A coarse answer's SURFACE column
+  no longer replaces a stored SURFACE column with data
+  (`MixinDistantHorizonsFineColumns`, `FineColumnGuard`); holes and copied-down
+  columns are still filled, more complete data still replaces, and DH's own
+  propagation is untouched. In the lab's 16 blocks/s flight (2026-11-12) it
+  took preview answers over fine-built columns from 36,256 to 0 on the client
+  and 26,496 to 0 on the server.
 
 Pooled sources are retained only until their generation future completes;
 closing cancels work.
