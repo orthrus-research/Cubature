@@ -105,10 +105,13 @@ public class TestLabLodMerge {
         after[0] = new long[] {9};            // fine-built and changed: lost
         after[20] = new long[] {9};           // changed, not fine-built: replaced
         before[30] = null; after[30] = new long[] {3}; // was empty: filled
+        byte[] afterSteps = steps.clone();
+        after[1] = new long[] {9}; afterSteps[1] = LIGHT; // fine-built, replaced by native data: upgraded
         BitSet lost = new BitSet(N);
-        assertArrayEquals(new long[] {1, 1, 1}, LabLodMerge.compare(steps, before, steps.clone(), after, fine, lost));
+        assertArrayEquals(new long[] {1, 1, 1, 1}, LabLodMerge.compare(steps, before, afterSteps, after, fine, lost));
         assertTrue(lost.get(0));
-        assertEquals(9, fine.cardinality());
+        assertFalse(lost.get(1));
+        assertEquals(8, fine.cardinality());
     }
 
     @Test public void answersAreRecognisedByDhPropagationFlags() {

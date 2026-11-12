@@ -161,21 +161,23 @@ public final class LabLodMerge {
     private static final ThreadLocal<Snapshot> PENDING = new ThreadLocal<>();
 
     /**
-     * After a same-detail answer: {lost fine-built columns, other replaced columns, filled columns}, by comparing each
-     * column's step and data with {@code before}. A changed fine-built column is lost and marked in {@code lost}; a
-     * changed column is no longer fine-built.
+     * After a same-detail answer: {lost fine-built columns, other replaced columns, filled columns, upgraded fine-built
+     * columns}, by comparing each column's step and data with {@code before}. A fine-built column replaced at a more
+     * complete step (native data over a preview downsample) is upgraded; one replaced otherwise is lost and marked in
+     * {@code lost}. A changed column is no longer fine-built.
      */
     static long[] compare(byte[] beforeSteps, long[][] before, byte[] afterSteps, long[][] after, BitSet fine, BitSet lost) {
-        long lostCount = 0, replaced = 0, filled = 0;
+        long lostCount = 0, replaced = 0, filled = 0, upgraded = 0;
         for (int i = 0; i < COLUMNS; i++) {
             if (beforeSteps[i] == afterSteps[i] && java.util.Arrays.equals(before[i], after[i])) continue;
             boolean had = before[i] != null && before[i].length > 0;
             if (!had || beforeSteps[i] == EMPTY || beforeSteps[i] == DOWN_SAMPLED) filled++;
+            else if (fine != null && fine.get(i) && afterSteps[i] > beforeSteps[i]) upgraded++;
             else if (fine != null && fine.get(i)) { lostCount++; if (lost != null) lost.set(i); }
             else replaced++;
             if (fine != null) fine.clear(i);
         }
-        return new long[] {lostCount, replaced, filled};
+        return new long[] {lostCount, replaced, filled, upgraded};
     }
 
     /** Called when DH's same-detail merge into {@code target} returns. */
@@ -189,6 +191,7 @@ public final class LabLodMerge {
         long[] r = compare(before.steps, before.data, steps, columns(target), FINE.get(targetPos),
                 LOST.computeIfAbsent(targetPos, k -> new BitSet(COLUMNS)));
         if (r[0] + r[1] + r[2] + before.atRisk > 0) LabLodTrace.event("merge-same", targetPos, r[0], r[1], r[2], before.atRisk);
+        if (r[3] > 0) LabLodTrace.event("merge-upgrade", targetPos, r[3]);
     }
 
     /** Each column's data points (fastutil LongArrayList.toLongArray), or null for a missing column. */
