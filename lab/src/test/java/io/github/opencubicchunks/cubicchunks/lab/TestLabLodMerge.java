@@ -15,6 +15,12 @@ public class TestLabLodMerge {
 
     /** Stand-ins with DH's member names: fastutil lists are read through elements() and size(). */
     static final class Steps { final byte[] a; Steps(byte[] a){this.a=a;} byte[] elements(){return a;} int size(){return a.length;} }
+    /** A fastutil LongArrayList stand-in: the lab reads columns through toLongArray(). */
+    static final class Longs extends ArrayList<Long> {
+        static Longs of(long v) { Longs l = new Longs(); l.add(v); return l; }
+        long[] toLongArray() { long[] a = new long[size()]; for (int i = 0; i < a.length; i++) a[i] = get(i); return a; }
+    }
+
     static final class Source {
         final long pos; final Steps columnGenerationSteps; final Object[] dataPoints;
         Boolean applyToChildren, applyToParent;
@@ -22,7 +28,7 @@ public class TestLabLodMerge {
         Source(long pos, byte step, boolean data) {
             this.pos = pos; byte[] s = new byte[N]; Arrays.fill(s, step); columnGenerationSteps = new Steps(s);
             dataPoints = new Object[N];
-            for (int i = 0; i < N; i++) dataPoints[i] = data ? new ArrayList<>(Collections.singletonList(1L)) : null;
+            for (int i = 0; i < N; i++) dataPoints[i] = data ? Longs.of(1) : null;
         }
     }
 
@@ -81,11 +87,28 @@ public class TestLabLodMerge {
         LabLodMerge.observe(target, parent, new Source(parent, SURFACE, true));
         assertEquals(32 * 32, LabLodMerge.fine(parent).cardinality());
         LabLodMerge.observe(target, parent, new Source(parent, SURFACE, true).answer());
+        // DH merges: every column changes (the stand-in's new data), then the merge returns.
+        for (int i = 0; i < N; i++) target.dataPoints[i] = Longs.of(2);
+        LabLodMerge.afterSame(target, parent);
         assertTrue(LabLodMerge.fine(parent).isEmpty());
         assertEquals(32 * 32, LabLodMerge.lost(parent).cardinality());
         // The child's data comes up again: every lost column is restored.
         LabLodMerge.observe(target, parent, new Source(child, SURFACE, true));
         assertTrue(LabLodMerge.lost(parent).isEmpty());
+    }
+
+    @Test public void compareCountsOnlyColumnsThatChanged() {
+        byte[] steps = fill(SURFACE);
+        long[][] before = new long[N][], after = new long[N][];
+        for (int i = 0; i < N; i++) { before[i] = new long[] {1}; after[i] = new long[] {1}; }
+        BitSet fine = new BitSet(N); fine.set(0, 10);
+        after[0] = new long[] {9};            // fine-built and changed: lost
+        after[20] = new long[] {9};           // changed, not fine-built: replaced
+        before[30] = null; after[30] = new long[] {3}; // was empty: filled
+        BitSet lost = new BitSet(N);
+        assertArrayEquals(new long[] {1, 1, 1}, LabLodMerge.compare(steps, before, steps.clone(), after, fine, lost));
+        assertTrue(lost.get(0));
+        assertEquals(9, fine.cardinality());
     }
 
     @Test public void answersAreRecognisedByDhPropagationFlags() {

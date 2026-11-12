@@ -9,8 +9,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * a section with a same-detail input whose generation step is the same or more complete, so a coarse preview answer
  * (one sample per cell, SURFACE) can replace a column that DH built by downsampling finer data (also SURFACE). This
  * class remembers which columns of each section last came from the level below with generated data ("fine-built"),
- * and reports, before DH merges, how many of those an answer at the same detail is about to replace (lost), and how
- * many lost columns a later merge from below builds again (restored). An answer is a network response or a generated
+ * and reports how many of those an answer at the same detail actually replaced (lost: the column's step or data
+ * differs after the merge), how many DH's own rule would have replaced (at risk; Cubature's FineColumnGuard keeps
+ * them), and how many lost columns a later merge from below builds again (restored). An answer is a network response or a generated
  * tile: DH sets both of its propagation flags (applyToChildren true, applyToParent set); its own propagation leaves
  * applyToChildren null going up and applyToParent null going down, and those merges are not counted. It also reports
  * a downward merge that stamps DOWN_SAMPLED over columns that keep their own data. It reads only, as DH's own rule
@@ -114,10 +115,9 @@ public final class LabLodMerge {
             byte[] in = steps(input);
             if (in == null) return;
             if (!answer(LabLodTrace.field(input, "applyToChildren"), LabLodTrace.field(input, "applyToParent"))) return;
-            if (LOST.size() >= MAX_TRACKED) { LOST.clear(); clears++; }
-            long[] r = sameLevel(steps, has, in, nonNull(input), FINE.get(targetPos),
-                    LOST.computeIfAbsent(targetPos, k -> new BitSet(COLUMNS)));
-            if (r[0] + r[1] + r[2] > 0) LabLodTrace.event("merge-same", targetPos, r[0], r[1], r[2], r[3]);
+            BitSet fine = FINE.get(targetPos);
+            long atRisk = sameLevel(steps, has, in, nonNull(input), fine == null ? null : (BitSet) fine.clone(), null)[0];
+            PENDING.set(new Snapshot(targetPos, steps.clone(), columns(target), atRisk));
         } else if (id + 1 == td) {
             byte[] child = steps(input);
             if (child == null) return;
@@ -151,6 +151,53 @@ public final class LabLodMerge {
         if (steps == null) return;
         long[] r = shown(steps, has(source));
         LabLodTrace.event("render-data", LabLodTrace.longField(source, "pos"), r[0], r[1], r[2], 0);
+    }
+
+    /** A same-detail answer's target before DH's same-detail merge, compared with it after. */
+    static final class Snapshot {
+        final long pos, atRisk; final byte[] steps; final long[][] data;
+        Snapshot(long pos, byte[] steps, long[][] data, long atRisk) { this.pos = pos; this.steps = steps; this.data = data; this.atRisk = atRisk; }
+    }
+    private static final ThreadLocal<Snapshot> PENDING = new ThreadLocal<>();
+
+    /**
+     * After a same-detail answer: {lost fine-built columns, other replaced columns, filled columns}, by comparing each
+     * column's step and data with {@code before}. A changed fine-built column is lost and marked in {@code lost}; a
+     * changed column is no longer fine-built.
+     */
+    static long[] compare(byte[] beforeSteps, long[][] before, byte[] afterSteps, long[][] after, BitSet fine, BitSet lost) {
+        long lostCount = 0, replaced = 0, filled = 0;
+        for (int i = 0; i < COLUMNS; i++) {
+            if (beforeSteps[i] == afterSteps[i] && java.util.Arrays.equals(before[i], after[i])) continue;
+            boolean had = before[i] != null && before[i].length > 0;
+            if (!had || beforeSteps[i] == EMPTY || beforeSteps[i] == DOWN_SAMPLED) filled++;
+            else if (fine != null && fine.get(i)) { lostCount++; if (lost != null) lost.set(i); }
+            else replaced++;
+            if (fine != null) fine.clear(i);
+        }
+        return new long[] {lostCount, replaced, filled};
+    }
+
+    /** Called when DH's same-detail merge into {@code target} returns. */
+    public static void afterSame(Object target, long targetPos) {
+        Snapshot before = PENDING.get();
+        PENDING.remove();
+        if (before == null || before.pos != targetPos) return;
+        byte[] steps = steps(target);
+        if (steps == null) return;
+        if (LOST.size() >= MAX_TRACKED) { LOST.clear(); clears++; }
+        long[] r = compare(before.steps, before.data, steps, columns(target), FINE.get(targetPos),
+                LOST.computeIfAbsent(targetPos, k -> new BitSet(COLUMNS)));
+        if (r[0] + r[1] + r[2] + before.atRisk > 0) LabLodTrace.event("merge-same", targetPos, r[0], r[1], r[2], before.atRisk);
+    }
+
+    /** Each column's data points (fastutil LongArrayList.toLongArray), or null for a missing column. */
+    private static long[][] columns(Object source) {
+        Object[] lists = (Object[]) LabLodTrace.field(source, "dataPoints");
+        long[][] out = new long[COLUMNS][];
+        for (int i = 0; i < COLUMNS && i < lists.length; i++)
+            if (lists[i] != null) out[i] = (long[]) LabLodTrace.call(lists[i], "toLongArray");
+        return out;
     }
 
     /** The section's column steps (a fastutil ByteArrayList, read through its backing array). */

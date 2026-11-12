@@ -125,6 +125,12 @@ public class CubicChunksConfig {
             + "arrive. Server: start preview tiles in the order their requests arrived. Off: DH's nearest-first order.")
     public static boolean distantHorizonsArrivalPlan = true;
 
+    @Config.Comment("A cubic world's Distant Horizons merge keeps LOD columns built from finer data: a coarse preview answer "
+            + "fills a section's empty columns but does not replace columns DH downsampled from finer preview tiles, so "
+            + "terrain already shown at full detail keeps it at coarser levels. Off: DH's rule, where the answer's "
+            + "coarse cells replace them.")
+    public static boolean distantHorizonsKeepFineColumns = true;
+
     @Config.RangeInt(min = 0, max = 65536)
     @Config.Comment("Blocks around each player within which a generator's regional plans (ICubeGenerator.prepareRegion) "
             + "are prepared ahead of demand on the build pool, nearest by time to reach first. Regions within the native "

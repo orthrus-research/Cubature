@@ -21,4 +21,9 @@ public abstract class MixinLodMerge {
     private void cubiclab$merge(@Coerce Object input,CallbackInfoReturnable<Boolean> cir){
         if(LabLodTrace.ENABLED)LabLodMerge.observe(this,pos,input);
     }
+    /** After DH's same-detail merge, before it drops unused ids, so unchanged columns still compare equal. */
+    @Inject(method="updateFromSameDetailLevel",at=@At("RETURN"))
+    private void cubiclab$mergedSame(@Coerce Object input,int[] remappedIds,CallbackInfoReturnable<Boolean> cir){
+        if(LabLodTrace.ENABLED)LabLodMerge.afterSame(this,pos);
+    }
 }
