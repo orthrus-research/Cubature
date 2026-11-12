@@ -202,7 +202,7 @@ public final class LabLodTrace {
         out.put("originMonotonicNanos",origin);out.put("originUtc",originInstant.toString());
         out.put("originEpochMicros",originInstant.getEpochSecond()*1_000_000L+originInstant.getNano()/1000);
         out.put("written",written);out.put("dropped",dropped.get());out.put("capped",capped);out.put("closed",closed);
-        out.put("operations",new TreeMap<>(counts));out.put("threads",new TreeMap<>(threads));
+        out.put("operations",new TreeMap<>(counts));out.put("mergeTrackClears",LabLodMerge.clears());out.put("threads",new TreeMap<>(threads));
         if(failure!=null)out.put("failure",failure);
         out.put("scope","Diagnostic DH LOD stage events. Times are this JVM's monotonic clock from originMonotonicNanos; "
             +"client and server align only through originEpochMicros (wall clock, same machine). "

@@ -4,7 +4,7 @@
   "package": "io.github.opencubicchunks.cubicchunks.lab.mixin",
   "refmap": "cubiclab.mixins.refmap.json",
   "compatibilityLevel": "JAVA_25",
-  "mixins": ["MixinLodRetrieval", "MixinLodGenerationQueue", "MixinLodRequestHandler", "MixinLodPayload", "MixinLodResponse", "MixinLodPreview", "MixinLodThreadPools"],
+  "mixins": ["MixinLodRetrieval", "MixinLodGenerationQueue", "MixinLodRequestHandler", "MixinLodPayload", "MixinLodResponse", "MixinLodPreview", "MixinLodThreadPools", "MixinLodMerge"],
   "client": ["MixinLodSection", "MixinLodQuadTree", "MixinLodNetworkQueue", "MixinLodRequestMessage"],
   "injectors": {"defaultRequire": 1}
 }
