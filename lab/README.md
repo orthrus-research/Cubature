@@ -43,8 +43,11 @@ python -B -m unittest discover -s tools -p "test_*.py"
 start until exit to `lod-client.csv` or `lod-server.csv` there, with a `lod-<side>.json` summary
 rewritten every second (`LabLodTrace`). Its Mixins (`MixinLod*`, `cubiclab.lod.mixins.json`) are
 independently authored read-only observers: they inject at the head or return of DH 3.3.3 methods
-and lambdas by exact name, read fields by reflection and attach completion callbacks, and change no
-result. Every injection is required, so another DH version needs a fresh review. Without a workload
+and lambdas by exact name (one, at the quad tree's fallback call), read fields by reflection and
+attach completion callbacks, and change no result. `merge-same` and `merge-stamp` rows count the
+columns a DH merge replaces that DH last built from finer data, fills or stamps DOWN_SAMPLED
+(`LabLodMerge`); `fallback` rows count parents drawn in place of children that are not all ready,
+and the renderable children they hide (`LabLodFallback`). Every injection is required, so another DH version needs a fresh review. Without a workload
 the rest of the lab stays idle, so a traced instance can be played normally.
 
 `cubiclab preview-survey <id> <minX> <minZ> <size> <footprints> <threads>` samples the overworld
