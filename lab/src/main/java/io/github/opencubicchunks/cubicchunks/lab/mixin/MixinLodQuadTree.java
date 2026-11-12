@@ -25,9 +25,14 @@ public abstract class MixinLodQuadTree {
     @Shadow @Final private Set<Long> missingGenerationPosSet;
     @Shadow @Final private Set<Long> queuedGenerationPosSet;
     @Unique private long cubiclab$lastTree;
-    @Unique private final LabLodFallback cubiclab$fallback=new LabLodFallback();
+    /** Created on first use: a Mixin field initializer did not reach DH's tree in a native run. */
+    @Unique private LabLodFallback cubiclab$fallback;
+    @Unique private LabLodFallback cubiclab$fallback(){
+        if(cubiclab$fallback==null)cubiclab$fallback=new LabLodFallback();
+        return cubiclab$fallback;
+    }
     @Inject(method="updateAllRenderSections",at=@At("HEAD"))
-    private void cubiclab$pass(CallbackInfo ci){cubiclab$fallback.begin();}
+    private void cubiclab$pass(CallbackInfo ci){if(LabLodTrace.ENABLED)cubiclab$fallback().begin();}
     /** DH's fallback branch: the parent renders and its children are disabled. */
     @Inject(method="onDetailLevelTooLow",at=@At(value="INVOKE",
         target="Lcom/seibel/distanthorizons/core/render/QuadTree/LodQuadTree;recursivelyDisableChildNodes(Lcom/seibel/distanthorizons/core/util/objects/quadTree/QuadNode;)V"))
@@ -40,7 +45,7 @@ public abstract class MixinLodQuadTree {
             present++;
             if(Boolean.TRUE.equals(LabLodTrace.call(section,"canRender")))renderable++;
         }
-        cubiclab$fallback.fallback(LabLodTrace.longField(quadNode,"sectionPos"),renderable,present);
+        cubiclab$fallback().fallback(LabLodTrace.longField(quadNode,"sectionPos"),renderable,present);
     }
     @Unique private static final String[] CHILDREN={"nwChild","neChild","swChild","seChild"};
     @Inject(method="tryQueuePosForRetrieval",at=@At("HEAD"))
@@ -54,14 +59,15 @@ public abstract class MixinLodQuadTree {
      */
     @Inject(method="updateAllRenderSections",at=@At("RETURN"))
     private void cubiclab$tree(CallbackInfo ci){
-        cubiclab$fallback.end();
+        if(!LabLodTrace.ENABLED)return;
+        cubiclab$fallback().end();
         long now=System.nanoTime();
         if(now-cubiclab$lastTree<250_000_000L)return;
         cubiclab$lastTree=now;
         Object loads=LabLodTrace.call(LabLodTrace.field(this,"tickNodeHolder"),"getLoadSections");
         LabLodTrace.event("tree",0,enabledSections.size(),missingGenerationPosSet.size(),queuedGenerationPosSet.size(),
             loads instanceof Collection?((Collection<?>)loads).size():-1);
-        long[] fallback=cubiclab$fallback.summary();
+        long[] fallback=cubiclab$fallback().summary();
         LabLodTrace.event("fallback",0,fallback[0],fallback[1],fallback[2],0);
     }
 }
