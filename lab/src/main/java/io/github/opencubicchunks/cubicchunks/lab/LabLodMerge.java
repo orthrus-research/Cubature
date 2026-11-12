@@ -9,8 +9,11 @@ import java.util.concurrent.ConcurrentHashMap;
  * a section with a same-detail input whose generation step is the same or more complete, so a coarse preview answer
  * (one sample per cell, SURFACE) can replace a column that DH built by downsampling finer data (also SURFACE). This
  * class remembers which columns of each section last came from the level below with generated data ("fine-built"),
- * and reports, before DH merges, how many of those a same-detail input is about to replace. It also reports a
- * downward merge that stamps DOWN_SAMPLED over columns that keep their own data. It reads only, as DH's own rule
+ * and reports, before DH merges, how many of those an answer at the same detail is about to replace (lost), and how
+ * many lost columns a later merge from below builds again (restored). An answer is a network response or a generated
+ * tile: DH sets both of its propagation flags (applyToChildren true, applyToParent set); its own propagation leaves
+ * applyToChildren null going up and applyToParent null going down, and those merges are not counted. It also reports
+ * a downward merge that stamps DOWN_SAMPLED over columns that keep their own data. It reads only, as DH's own rule
  * reads, and changes nothing.
  */
 public final class LabLodMerge {
@@ -18,7 +21,7 @@ public final class LabLodMerge {
     static final byte DOWN_SAMPLED = -1, EMPTY = 0;
     /** Sections tracked at most; past it the map is cleared, and the json summary counts the clears. */
     static final int MAX_TRACKED = 200_000;
-    private static final ConcurrentHashMap<Long, BitSet> FINE = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<Long, BitSet> FINE = new ConcurrentHashMap<>(), LOST = new ConcurrentHashMap<>();
 
     private LabLodMerge() {}
 
@@ -31,19 +34,20 @@ public final class LabLodMerge {
     /**
      * A same-detail merge: {a fine-built columns replaced, other generated columns replaced, empty or downsampled
      * columns filled, the most complete input step among replaced columns}. {@code inputHas} is false where the input
-     * column is null, which DH skips. A replaced column is no longer fine-built, so its bit is cleared.
+     * column is null, which DH skips. A replaced column is no longer fine-built, so its bit is cleared; a lost one is
+     * marked in {@code lost} when given.
      */
-    static long[] sameLevel(byte[] target, boolean[] targetHas, byte[] input, boolean[] inputHas, BitSet fine) {
-        long lost = 0, replaced = 0, filled = 0; int top = Byte.MIN_VALUE;
+    static long[] sameLevel(byte[] target, boolean[] targetHas, byte[] input, boolean[] inputHas, BitSet fine, BitSet lost) {
+        long lostCount = 0, replaced = 0, filled = 0; int top = Byte.MIN_VALUE;
         for (int i = 0; i < COLUMNS; i++) {
             if (!inputHas[i] || !replaces(target[i], input[i])) continue;
             if (!targetHas[i] || target[i] == EMPTY || target[i] == DOWN_SAMPLED) filled++;
-            else if (fine != null && fine.get(i)) lost++;
+            else if (fine != null && fine.get(i)) { lostCount++; if (lost != null) lost.set(i); }
             else replaced++;
             if (fine != null) fine.clear(i);
             top = Math.max(top, input[i]);
         }
-        return new long[] {lost, replaced, filled, top == Byte.MIN_VALUE ? 0 : top};
+        return new long[] {lostCount, replaced, filled, top == Byte.MIN_VALUE ? 0 : top};
     }
 
     /** Index of a column, as FullDataSourceV2.relativePosToIndex. */
@@ -78,8 +82,23 @@ public final class LabLodMerge {
         return fills ? real : 0;
     }
 
-    /** For tests: the fine-built columns remembered for a section. */
+    /** For tests: the fine-built and the lost columns remembered for a section. */
     static BitSet fine(long pos) { return FINE.get(pos); }
+    static BitSet lost(long pos) { return LOST.get(pos); }
+
+    /** Lost columns that are fine-built again; they are no longer lost. */
+    static long restored(BitSet fine, BitSet lost) {
+        if (fine == null || lost == null) return 0;
+        BitSet again = (BitSet) lost.clone();
+        again.and(fine);
+        lost.andNot(again);
+        return again.cardinality();
+    }
+
+    /** An answer, by DH's propagation flags (FullDataSourceV2 applyToChildren, applyToParent). */
+    static boolean answer(Object applyToChildren, Object applyToParent) {
+        return Boolean.TRUE.equals(applyToChildren) && applyToParent != null;
+    }
 
     private static long clears;
     public static long clears() { return clears; }
@@ -94,20 +113,21 @@ public final class LabLodMerge {
         if (id == td) {
             byte[] in = steps(input);
             if (in == null) return;
-            long[] r = sameLevel(steps, has, in, nonNull(input), FINE.get(targetPos));
+            if (!answer(LabLodTrace.field(input, "applyToChildren"), LabLodTrace.field(input, "applyToParent"))) return;
+            if (LOST.size() >= MAX_TRACKED) { LOST.clear(); clears++; }
+            long[] r = sameLevel(steps, has, in, nonNull(input), FINE.get(targetPos),
+                    LOST.computeIfAbsent(targetPos, k -> new BitSet(COLUMNS)));
             if (r[0] + r[1] + r[2] > 0) LabLodTrace.event("merge-same", targetPos, r[0], r[1], r[2], r[3]);
         } else if (id + 1 == td) {
             byte[] child = steps(input);
             if (child == null) return;
             if (FINE.size() >= MAX_TRACKED) { FINE.clear(); clears++; }
-            FINE.compute(targetPos, (k, v) -> fromBelow(v, LabLodTrace.x(inputPos), LabLodTrace.z(inputPos), child));
+            BitSet fine = FINE.compute(targetPos, (k, v) -> fromBelow(v, LabLodTrace.x(inputPos), LabLodTrace.z(inputPos), child));
+            long again = restored(fine, LOST.get(targetPos));
+            if (again > 0) LabLodTrace.event("merge-restore", targetPos, again);
         } else if (id - 1 == td) {
             long real = stamped(steps, has);
-            if (real > 0) {
-                LabLodTrace.event("merge-stamp", targetPos, real);
-                BitSet fine = FINE.get(targetPos);
-                if (fine != null) fine.clear();
-            }
+            if (real > 0) LabLodTrace.event("merge-stamp", targetPos, real);
         }
     }
 

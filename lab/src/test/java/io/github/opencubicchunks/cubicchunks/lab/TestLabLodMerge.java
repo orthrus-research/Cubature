@@ -17,6 +17,8 @@ public class TestLabLodMerge {
     static final class Steps { final byte[] a; Steps(byte[] a){this.a=a;} byte[] elements(){return a;} int size(){return a.length;} }
     static final class Source {
         final long pos; final Steps columnGenerationSteps; final Object[] dataPoints;
+        Boolean applyToChildren, applyToParent;
+        Source answer() { applyToChildren = true; applyToParent = true; return this; }
         Source(long pos, byte step, boolean data) {
             this.pos = pos; byte[] s = new byte[N]; Arrays.fill(s, step); columnGenerationSteps = new Steps(s);
             dataPoints = new Object[N];
@@ -38,7 +40,7 @@ public class TestLabLodMerge {
 
     @Test public void coarseAnswerOverFineBuiltColumnsCountsAsLost() {
         BitSet fine = new BitSet(N); fine.set(0, N / 2);
-        long[] r = LabLodMerge.sameLevel(fill(SURFACE), all(true), fill(SURFACE), all(true), fine);
+        long[] r = LabLodMerge.sameLevel(fill(SURFACE), all(true), fill(SURFACE), all(true), fine, null);
         assertArrayEquals(new long[] {N / 2, N / 2, 0, SURFACE}, r);
         assertTrue("replaced columns are no longer fine-built", fine.isEmpty());
     }
@@ -47,7 +49,7 @@ public class TestLabLodMerge {
         boolean[] has = all(true); has[3] = false;
         byte[] target = fill(LIGHT); target[3] = EMPTY; target[4] = DOWN;
         boolean[] in = all(true); in[5] = false;
-        long[] r = LabLodMerge.sameLevel(target, has, fill(SURFACE), in, null);
+        long[] r = LabLodMerge.sameLevel(target, has, fill(SURFACE), in, null, null);
         assertArrayEquals(new long[] {0, 0, 2, SURFACE}, r);
     }
 
@@ -75,8 +77,22 @@ public class TestLabLodMerge {
         Source target = new Source(parent, SURFACE, true);
         LabLodMerge.observe(target, parent, new Source(child, SURFACE, true));
         assertEquals(32 * 32, LabLodMerge.fine(parent).cardinality());
+        // DH's own upward output (applyToChildren null) is not an answer and loses nothing.
         LabLodMerge.observe(target, parent, new Source(parent, SURFACE, true));
+        assertEquals(32 * 32, LabLodMerge.fine(parent).cardinality());
+        LabLodMerge.observe(target, parent, new Source(parent, SURFACE, true).answer());
         assertTrue(LabLodMerge.fine(parent).isEmpty());
+        assertEquals(32 * 32, LabLodMerge.lost(parent).cardinality());
+        // The child's data comes up again: every lost column is restored.
+        LabLodMerge.observe(target, parent, new Source(child, SURFACE, true));
+        assertTrue(LabLodMerge.lost(parent).isEmpty());
+    }
+
+    @Test public void answersAreRecognisedByDhPropagationFlags() {
+        assertTrue(LabLodMerge.answer(true, true));
+        assertTrue(LabLodMerge.answer(true, false));
+        assertFalse(LabLodMerge.answer(null, true));   // DH propagating up
+        assertFalse(LabLodMerge.answer(true, null));   // DH propagating down
     }
 
     @Test public void fallbackReportsTransitionsAndHiddenChildren() {
