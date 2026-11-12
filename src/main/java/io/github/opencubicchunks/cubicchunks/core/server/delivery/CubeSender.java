@@ -21,10 +21,9 @@ import javax.annotation.Nullable;
 
 /**
  * Sends the cubes watchers queue for each player: per player in queue order and round-robin between
- * players, in PacketCubes batches (vanilla column packets for clients without CubicChunks) within the
- * tick's time and byte budget (maxCubeSendTimeMillis, maxCubeSendBytesPerTick, maxCubePacketBytes,
- * maxCubePacketCubes). A batch is published to its watchers before any callback runs; leashed
- * entities and CubeWatchEvent follow.
+ * players, in PacketCubes batches within the tick's time and byte budget (maxCubeSendTimeMillis,
+ * maxCubeSendBytesPerTick, maxCubePacketBytes, maxCubePacketCubes). A batch is published to its
+ * watchers before any callback runs; leashed entities and CubeWatchEvent follow.
  */
 public final class CubeSender {
     /** What the sender asks of the player cube map. */

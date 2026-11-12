@@ -51,7 +51,7 @@ qualified by Riven's generation tests.
 
 The source-built remapped artifact passes the focused async-completion,
 hash-distribution and watchdog tests on Java 25 and 26. Build checks
-also verify Java 25 bytecode, the six mixin configurations and
+also verify Java 25 bytecode, the seven mixin configurations and
 generated refmaps, public API naming, library checksums and packaging.
 The original LaunchWrapper-based upstream test suite is not part of this
 new test task and has not passed here.
