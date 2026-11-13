@@ -4,7 +4,10 @@ plugins {
 }
 
 group = 'cc.orthrus.cubature'
-version = cubic_version
+// -PcubicDevBuild labels a development build: "-DEV" in the version and JAR name, "(DEV build)" in the mod list.
+def devBuild = providers.gradleProperty('cubicDevBuild').isPresent()
+version = devBuild ? "${cubic_version}-DEV" : cubic_version
+def modDisplayName = devBuild ? 'Cubature (DEV build)' : 'Cubature'
 // Cleanroom on Java 25 or 26 is the only target; the Java 8 Forge fallback was retired on 2026-10-30.
 def targetLoader = 'cleanroom'
 def testJavaVersion = providers.gradleProperty('cubicTestJava').map { it.toInteger() }.getOrElse(25)
@@ -96,7 +99,10 @@ tasks.register('verifyEmbeddedLibraries') {
 tasks.named('compileJava') { dependsOn tasks.named('verifyEmbeddedLibraries') }
 processResources {
     inputs.property('version', project.version)
-    filesMatching('mcmod.info') { filter { it.replace('%%VERSION%%', project.version.toString()) } }
+    inputs.property('modDisplayName', modDisplayName)
+    filesMatching('mcmod.info') {
+        filter { it.replace('%%VERSION%%', project.version.toString()).replace('%%NAME%%', modDisplayName) }
+    }
     exclude 'log4j2.xml', 'assets/cubicchunks/logo.png'
 }
 jar {

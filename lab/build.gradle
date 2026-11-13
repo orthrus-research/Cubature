@@ -8,8 +8,10 @@ version = '0.1.0'
 def targetLoader = 'cleanroom'
 def cubicProperties = new Properties()
 file('../cleanroom/gradle.properties').withInputStream { cubicProperties.load(it) }
+// -PcubicDevBuild selects the DEV-labeled Cubature build.
+def cubicVersion = cubicProperties.cubic_version + (providers.gradleProperty('cubicDevBuild').isPresent() ? '-DEV' : '')
 def cubicJar = file(providers.gradleProperty('cubicArtifact').getOrElse(
-        "../cleanroom/build/${targetLoader}/libs/Cubature-${cubicProperties.cubic_version}-${targetLoader}.jar"))
+        "../cleanroom/build/${targetLoader}/libs/Cubature-${cubicVersion}-${targetLoader}.jar"))
 if (!cubicJar.isFile()) throw new GradleException('Build the matching Cubature artifact under cleanroom/ first, or select -PcubicArtifact=<frozen.jar>')
 // A content-addressed module keeps the deobfuscated copy fresh as the local fork changes.
 def inputVersion = targetLoader + '-' + java.security.MessageDigest.getInstance('SHA-256').digest(cubicJar.bytes).encodeHex().toString()

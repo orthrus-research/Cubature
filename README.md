@@ -83,7 +83,9 @@ cd cleanroom
 ```
 
 The build writes `Cubature-*-cleanroom.jar` with a sources JAR and the component license texts. It
-is the only build. `tools/build_cubature.py` runs the tests and builds the optional measurement
+is the only build. `./gradlew build -PcubicDevBuild` labels a development build: the version and
+JAR name gain `-DEV` (`Cubature-1.12.2-0.1.4.0-DEV-cleanroom.jar`) and the mod list shows
+"Cubature (DEV build)". `tools/build_cubature.py` runs the tests and builds the optional measurement
 lab (`lab/`) against the exact artifact; see [docs/cleanroom-port.md](docs/cleanroom-port.md) and
 the [lab guide](lab/README.md). [CONTRIBUTING.md](CONTRIBUTING.md) lists the checks a change must
 pass.

@@ -1,7 +1,7 @@
 [
     {
         "modid": "cubicchunks",
-        "name": "Cubature",
+        "name": "%%NAME%%",
         "description": "Cubic world infrastructure for Minecraft 1.12.2 and Cleanroom, derived from OpenCubicChunks/CubicChunks and maintained by Orthrus Research. Not an official upstream CubicChunks release.",
         "version": "%%VERSION%%",
         "mcversion": "1.12.2",
