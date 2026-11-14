@@ -104,6 +104,11 @@ public class CubeProviderClient extends ChunkProviderClient implements ICubeProv
     //========Cube stuff=========
     //===========================
 
+    /** Every cube the client holds. */
+    public Iterable<Cube> loadedCubes() {
+        return cubeMap;
+    }
+
     /**
      * This is like ChunkProviderClient.loadChunk(), but more useful for our use case
      * It is used when the server sends a new Cube to this client,
@@ -146,6 +151,7 @@ public class CubeProviderClient extends ChunkProviderClient implements ICubeProv
         cubeMap.remove(pos.getX(), pos.getY(), pos.getZ());
         cube.getColumn().removeCube(pos.getY());
         CeleritasCompat.cubeUnloaded(cube);
+        io.github.opencubicchunks.cubicchunks.core.client.source.ClientCubeSource.INSTANCE.cubeUnloaded(cube);
     }
 
     @Override

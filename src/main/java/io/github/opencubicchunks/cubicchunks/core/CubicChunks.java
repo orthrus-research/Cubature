@@ -150,6 +150,18 @@ public class CubicChunks {
         }
         SideUtils.runForClient(() -> () -> MinecraftForge.EVENT_BUS.register(new ClientEventHandler()));
         SideUtils.runForClient(() -> () -> {
+            io.github.opencubicchunks.cubicchunks.core.client.source.ClientCubeSource source =
+                    io.github.opencubicchunks.cubicchunks.core.client.source.ClientCubeSource.INSTANCE;
+            io.github.opencubicchunks.cubicchunks.api.client.CubeSource.install(source);
+            MinecraftForge.EVENT_BUS.register(source);
+            if (io.github.opencubicchunks.cubicchunks.core.client.source.CubeSourceCheck.ENABLED) {
+                io.github.opencubicchunks.cubicchunks.core.client.source.CubeSourceCheck check =
+                        new io.github.opencubicchunks.cubicchunks.core.client.source.CubeSourceCheck();
+                MinecraftForge.EVENT_BUS.register(check);
+                source.setListener(check);
+            }
+        });
+        SideUtils.runForClient(() -> () -> {
             if (Loader.isModLoaded("distanthorizons")) {
                 io.github.opencubicchunks.cubicchunks.core.compat.distanthorizons.DistantHorizonsClient.init();
             }

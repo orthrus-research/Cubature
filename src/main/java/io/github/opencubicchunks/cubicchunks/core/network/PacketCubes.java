@@ -287,6 +287,7 @@ public class PacketCubes implements IMessage {
 
             cubes.stream().filter(Objects::nonNull).forEach(cube -> {
                 io.github.opencubicchunks.cubicchunks.core.compat.celeritas.CeleritasCompat.cubeLoaded(cube);
+                io.github.opencubicchunks.cubicchunks.core.client.source.ClientCubeSource.INSTANCE.cubeLoaded(cube);
                 cube.markForRenderUpdate();
             });
             for (Cube cube:cubes) if(cube!=null)

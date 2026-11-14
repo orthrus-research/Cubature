@@ -97,6 +97,7 @@ pass.
 | [MODIFICATIONS.md](MODIFICATIONS.md) | Fork changes and the source and distribution requirements |
 | [docs/cleanroom-port.md](docs/cleanroom-port.md) | Cleanroom and Java support |
 | [docs/DISTANT-HORIZONS.md](docs/DISTANT-HORIZONS.md) | The optional Distant Horizons adapter |
+| [docs/CUBE-SOURCE.md](docs/CUBE-SOURCE.md) | The cube source for client-side renderers |
 | [lab/README.md](lab/README.md) | The optional in-game measurement lab |
 
 ## Community

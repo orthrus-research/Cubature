@@ -343,6 +343,13 @@ made during a round wait for the next window. Explicit flushes, close and
 tick-driven writes do not wait. A crash or killed process loses up to one
 window of saves plus the round in progress; a clean shutdown writes them.
 
+On November 14, 2026, the public API gained a cube source for client-side
+renderers (`api.client`, described in `docs/CUBE-SOURCE.md`): events for cubes
+arriving, leaving and changing, a version per cube, and immutable snapshots of
+a cube with its 26 neighbors. It is additive; the vanilla, Celeritas, Demonica
+and Distant Horizons paths do not use it. Each client cube carries a version
+number and a reference to its latest snapshot copy.
+
 Both supported builds include `NOTICE.md`, this file, the upstream MIT text,
 the full LGPL-2.1 text and component notices in binary and matching sources
 JARs. The sources JAR includes the mod and API Java sources. It is not by

@@ -1,7 +1,9 @@
-# Cube source (design draft)
+# Cube source
 
-Status: draft, not implemented. When it is implemented, the interfaces live in Cubature's
-public API module and this file describes them as built.
+Status: sections 1 to 4 and 7 are built. The interfaces are in the public API module,
+package `api.client` (`CubeSource`, `ICubeSource`, `ICubeSourceListener`, `ICubeSnapshot`);
+the implementation is `core.client.source`. Sections 5 and 6, the work executor and the
+settled signal, are design and not built. No renderer reads the source yet.
 
 A cube source is what Cubature supplies to a client-side renderer that builds its geometry
 from cubes instead of from the game's 16-section columns. Cubature owns this contract. A
@@ -67,13 +69,17 @@ A snapshot is an immutable copy of a neighborhood, taken on the client thread.
    handlers run against it unchanged.
 5. **Absent neighbors read as empty.** An absent cube reads as air with implicit sky
    light. When it arrives, the cubes around it receive a change event (section 3), so
-   faces drawn against the gap are rebuilt.
+   faces drawn against the gap are rebuilt. The game's own render cache answers full sky
+   light for a cube that is not loaded, so the two differ for a block that takes its
+   brightness from a neighbor in such a cube, until that cube arrives.
 6. **Empty is cheap.** A snapshot whose center cube is storage-less says so without being
    read block by block.
 
-**Cost.** Cubature may share unchanged cube data between snapshots instead of copying it.
-The contract requires only the guarantees above. The Celeritas integration copies blocks
-and block entities per section; that is the cost to beat.
+**Cost.** A cube is copied once per version, and that copy serves every snapshot that
+includes the cube until its version moves. A cube sits in up to 27 neighborhoods, so it is
+copied once where a per-snapshot copy would copy it 27 times. Cube storage is unchanged.
+The copy itself is not measured yet; the Celeritas integration copies blocks and block
+entities per section, and that is the cost to beat.
 
 **Release.** A renderer releases a snapshot when its build finishes or is cancelled.
 Holding one must not keep a cube loaded.
@@ -94,17 +100,23 @@ describe is readable:
 | Cube unloaded | A cube left the client |
 | Cube changed | Blocks, light or biomes in a loaded cube changed; carries the kinds that changed and, where known, the bounds within the cube |
 
+Events are delivered once per client tick, at its end.
+
 **Guarantees:**
 
 1. Events arrive in the order the changes were applied.
 2. A change in a cube's outermost layer of blocks, or its arrival or removal, also raises
-   a change for each loaded neighbor that touches it.
+   a change for each loaded neighbor that touches it. Such a change carries the kind
+   `NEIGHBOR` and does not move the neighbor's version, since nothing in it changed.
 3. Cubature translates every route by which a cube changes into these events: whole-cube
    packets (`PacketCubes`), small block-change packets (`PacketCubeBlockChange`), the
    game's own block and light notifications, and its own lighting. A renderer listens to
    nothing else.
 4. Events may be coalesced within a tick: several changes to one cube may arrive as one
-   event with their kinds and bounds combined.
+   event with their kinds and bounds combined, and a change to a cube whose arrival is
+   queued in the same tick is covered by the arrival.
+5. A cube that arrives and leaves within one tick is reported as both, in order; by the
+   time the arrival is delivered the cube is already gone.
 
 ## 4. Queries
 
@@ -156,14 +168,28 @@ change event is outstanding. Automated frame captures wait on this.
 Adding the source is additive. The vanilla, Celeritas, Demonica and Distant Horizons
 integrations are unaffected by it.
 
+## Verification
+
+`-Dcubicchunks.cubeSourceCheck=true` installs a listener that reads the source as a
+renderer would and checks it against the live world: every cube that loads or changes is
+snapshotted and compared with the game's own render cache, and 40 ticks later, if the
+cube's version has not moved, its copy is compared with the cube again. A difference at
+that point is a change that raised no event.
+
+Measured 2026-11-14 on a forest tour of a Riven world (17 views, about six minutes):
+144,350 arrivals, 128,725 removals and 969,934 change events, 835,689 of them neighbor
+changes; 278,595 snapshots, none differing from the game's render cache where all 27
+cubes were loaded and 15 differing beside a cube that was not (guarantee 5 of section 2);
+133,798 cubes rechecked with their version unmoved, none changed. The tour changes no
+blocks by hand, so the small block-change packet route is exercised only by what the
+server does on its own.
+
 ## Open points
 
 Each has a proposed answer. None is settled until it is implemented and measured.
 
-1. **Sharing against copying.** Whether cube data can be shared between snapshots without
-   changing how cubes are stored, and what a copy costs if not.
-   *Proposed:* copy first, as the Celeritas integration does, and measure. The guarantees
-   in section 2 do not change if sharing is added later.
+1. **What a copy costs.** Copies are shared between snapshots per cube version (section
+   2). The time and memory of one copy are not measured.
 2. **Settled on the client.** The server pushes cubes and the client holds no list of
    what to expect.
    *Proposed:* define settled as quiet: no cube packet applied and no client light work

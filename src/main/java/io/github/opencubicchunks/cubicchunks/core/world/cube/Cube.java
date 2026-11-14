@@ -93,6 +93,10 @@ public class Cube implements ICube {
     @Nullable
     private byte[] blockBiomeArray = null;
 
+    /** Client only, for the cube source: the cube's version, and the copy made of it at that version. */
+    public long sourceVersion;
+    @Nullable public Object sourceCopy;
+
     /**
      * Tickets keep this chunk loaded and ticking. See the docs of {@link TicketList} and {@link ITicket} for additional information.
      */
