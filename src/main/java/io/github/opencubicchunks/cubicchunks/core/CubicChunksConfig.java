@@ -119,6 +119,11 @@ public class CubicChunksConfig {
             + "-1: a quarter of the processors, 1 to 8; 0: DH's own executor, paced by DH's server health check.")
     public static int previewThreads = -1;
 
+    @Config.Comment("Server: send a joining client the world seed with the rest of what it needs to build the "
+            + "generator's terrain preview itself, so the server does no preview work for it. Off: the seed stays on "
+            + "the server, clients are told only that it is withheld, and they build no preview.")
+    public static boolean sendSeedForClientPreview = true;
+
     @Config.Comment("A cubic world's Distant Horizons arrival plan (LOD-DELIVERY step 5). Client: order requests by when "
             + "the player reaches each section, coarse detail first, and hold back sections the native view covers or "
             + "will cover before their data could arrive; the detail that goes first follows how the coarse sections "

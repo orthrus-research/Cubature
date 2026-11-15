@@ -134,6 +134,9 @@ public class PacketCubicWorldData implements IMessage {
                 // Update stale ViewFrustum/RenderChunk-related state, as it was previously set for non-CC world
                 Minecraft.getMinecraft().renderGlobal.setWorldAndLoadRenderers((WorldClient) world);
             }
+            if (message.isCubicWorld()) {
+                io.github.opencubicchunks.cubicchunks.core.client.source.ClientTerrainPreviews.INSTANCE.joined(world);
+            }
 
         }
     }

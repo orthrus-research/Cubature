@@ -350,6 +350,17 @@ a cube with its 26 neighbors. It is additive; the vanilla, Celeritas, Demonica
 and Distant Horizons paths do not use it. Each client cube carries a version
 number and a reference to its latest snapshot copy.
 
+On November 15, 2026, a client gained the generator's terrain preview through
+the cube source (`ICubeSource.terrainPreview`, `docs/CUBE-SOURCE.md` section
+8). A server whose generator offers it sends each joining player one more
+message with the seed, the generator options, the world's recorded definitions
+and an identity hash; the new server option `sendSeedForClientPreview` (default
+on) withholds all of them. The generator's registered factory builds the
+preview on the client; a client of its own integrated server borrows that
+server's generator, which the server takes back before it closes the world. It
+is additive: the vanilla, Celeritas, Demonica and Distant Horizons paths do not
+use it, and a server whose generator offers nothing sends nothing.
+
 Both supported builds include `NOTICE.md`, this file, the upstream MIT text,
 the full LGPL-2.1 text and component notices in binary and matching sources
 JARs. The sources JAR includes the mod and API Java sources. It is not by

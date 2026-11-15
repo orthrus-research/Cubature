@@ -23,6 +23,8 @@
  */
 package io.github.opencubicchunks.cubicchunks.api.client;
 
+import io.github.opencubicchunks.cubicchunks.api.worldgen.ICubicTerrainPreview;
+
 import javax.annotation.Nullable;
 
 /**
@@ -74,6 +76,17 @@ public interface ICubeSource {
      * need not be loaded.
      */
     ICubeSnapshot snapshot(int cubeX, int cubeY, int cubeZ);
+
+    /**
+     * The attached world's terrain preview on this client, or null: no world is attached, the
+     * generator offers none, the server withholds its seed, the generator's factory declined, or
+     * the preview is not built yet. In single player it is the integrated server's own generator.
+     * It belongs to one world identity; once the host withdraws it, it and its samplers throw
+     * {@link io.github.opencubicchunks.cubicchunks.api.worldgen.TerrainPreviewWithdrawnException}.
+     * Samplers may run on any thread.
+     */
+    @Nullable
+    ICubicTerrainPreview terrainPreview();
 
     /** Receives one cube position. */
     @FunctionalInterface

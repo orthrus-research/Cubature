@@ -68,6 +68,8 @@ public class PacketDispatcher {
         registerMessage(PacketCubicWorldData.Handler.class, PacketCubicWorldData.class);
         registerMessage(PacketHeightMapUpdate.Handler.class, PacketHeightMapUpdate.class);
         registerMessage(PacketCubeSkyLightUpdates.Handler.class, PacketCubeSkyLightUpdates.class);
+        // Registered last: earlier messages keep their discriminators.
+        registerMessage(PacketClientPreview.Handler.class, PacketClientPreview.class);
 
     }
 

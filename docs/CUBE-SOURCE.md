@@ -1,9 +1,10 @@
 # Cube source
 
-Status: sections 1 to 4 and 7 are built. The interfaces are in the public API module,
-package `api.client` (`CubeSource`, `ICubeSource`, `ICubeSourceListener`, `ICubeSnapshot`);
-the implementation is `core.client.source`. Sections 5 and 6, the work executor and the
-settled signal, are design and not built. No renderer reads the source yet.
+Status: sections 1 to 4, 7 and 8 are built. The interfaces are in the public API module,
+package `api.client` (`CubeSource`, `ICubeSource`, `ICubeSourceListener`, `ICubeSnapshot`)
+and, for the terrain preview, `api.worldgen`; the implementation is `core.client.source`.
+Sections 5 and 6, the work executor and the settled signal, are design and not built. No
+renderer reads the source yet.
 
 A cube source is what Cubature supplies to a client-side renderer that builds its geometry
 from cubes instead of from the game's 16-section columns. Cubature owns this contract. A
@@ -149,8 +150,116 @@ change event is outstanding. Automated frame captures wait on this.
 | Read a snapshot | Any |
 | Receive an event | Client thread |
 | Run a build task | Cubature's executor |
+| Read `terrainPreview()` | Client thread |
+| Create and run a terrain preview sampler | Any; one sampler per task |
 
-## 8. How the Celeritas integration maps onto this
+## 8. Terrain preview
+
+A generator that implements `ICubicTerrainPreview` describes any column of its world as
+vertical runs of block states, from the seed alone, with no cube generated. A renderer that
+draws terrain beyond the loaded cubes samples it on the client, so the server does no
+preview work for that client. The source gives the attached world's preview, or null:
+
+```java
+// api.client.ICubeSource
+@Nullable ICubicTerrainPreview terrainPreview();
+```
+
+`ICubeSourceListener.terrainPreviewChanged()` is raised when it becomes available or is
+withdrawn. A preview already present when the world attaches raises no event; read it
+then. Samplers are task-confined and may run on any thread.
+
+### What the server sends at join
+
+After `PacketCubicWorldData`, to a player joining a cubic dimension whose generator
+implements `IClientTerrainPreviewOffer`, one message (`PacketClientPreview`). Cubature owns
+the envelope; the generator owns the payload (`ClientPreviewOffer`).
+
+| Field | Owner | Content |
+|---|---|---|
+| Dimension | Cubature | The dimension the preview is for |
+| Factory | Generator | The name its mod registered a factory under |
+| Identity | Generator | A hash that fixes everything the preview depends on |
+| Seed | Generator | 8 bytes |
+| Generator options | Generator | The string the world was created with |
+| Recorded definitions | Generator | Opaque bytes, at most 1 MiB |
+
+A server may keep its seed to itself: with `sendSeedForClientPreview` off (default on) the
+message carries the dimension and the fact that the seed is withheld, and nothing else. The
+identity is left out too, because it is a hash of the seed and would let a guessed seed be
+checked. Such a client builds no preview and `terrainPreview()` stays null.
+
+The capability bit in `PacketCubicWorldData` keeps its meaning: this server answers Distant
+Horizons preview requests.
+
+### Building the preview on a client
+
+A generator mod registers a factory once, at mod construction:
+
+```java
+// api.worldgen
+TerrainPreviewFactories.register("mymod", inputs -> ...);
+
+public interface ICubicTerrainPreviewFactory {
+    @Nullable ICubicTerrainPreview create(ClientPreviewInputs inputs);
+}
+```
+
+`ClientPreviewInputs` carries the dimension, the fields of the offer, a `ForkJoinPool` for
+in-build parallelism and a derived-data directory; both of the last two may be null and
+today always are (see "Not built").
+
+Rules:
+
+1. **Identity first.** The factory computes its own identity from the seed, the options,
+   its packaged definitions and the recorded definitions it was sent, and returns null
+   unless it equals the server's. A client with a different build of the generator, or one
+   that resolves a recorded block differently, draws nothing the server would not generate.
+2. **No world.** The factory receives no `World`. A preview must not read or write a live
+   world, a save directory or the game directory.
+3. **Threads.** The factory runs off the client thread, on a thread Cubature starts for
+   that one build; the generator starts none. Regional builds a sampler triggers run on
+   the sampling thread.
+4. **Lifetime.** The preview belongs to one client world (section 1). When that world is
+   replaced Cubature takes the preview back without waiting: a column being sampled
+   finishes, and every later column, and every later sampler, throws
+   `TerrainPreviewWithdrawnException`. A caller drops the work in hand.
+5. **Memory.** The preview's retained heap is the client's cost. Bounded memos, as on the
+   server.
+
+### Single player
+
+A client of its own integrated server borrows that server's generator: `terrainPreview()`
+returns it (behind the same withdrawal guard) and no factory runs, so the regional data
+native generation already built is shared, not built twice.
+
+- Before the server closes a world (the server-stopping event, and a world's unload ahead
+  of every other unload handler) Cubature takes the loan back and waits for the columns
+  being sampled. No client thread is inside a generator whose stores are closing, and a
+  world that has begun to close lends nothing.
+- A client leaving the world gives the loan back without waiting; the server's own
+  withdrawal still waits.
+- The client's sampling competes with native generation for the same regional builds. A
+  renderer budgets it; the governor that reads the client frame time and the server tick
+  belongs to the work executor.
+- A world opened to LAN leaves the host on the shared generator; guests build their own.
+
+### Not built
+
+- **The client work executor** (section 5). Samplers run on threads the renderer supplies
+  until it exists, and `ClientPreviewInputs.buildPool()` is null.
+- **A client derived-data directory**, with a size cap and eviction, keyed by preview
+  identity: `ClientPreviewInputs.derivedDataDirectory()` is null, so regional data stays in
+  memory and is rebuilt each session.
+- **Sending the generator's regional store.** Measured with Riven on 2026-11-15, a client
+  builds cold in 5 to 7 s to its first tile in an 8 km world and 22 to 35 s in a 32 km one,
+  and receiving the store shortens only that start (to about 5 s), not the total. So a pull
+  transfer (request, bounded chunks under a bandwidth cap, checksum, kept across sessions
+  by identity) is an optimisation for fast links, not a requirement.
+- **Server tiles as the fallback of last resort**, for a withheld seed or a declining
+  factory: the server pool samples and sends tiles, as it does for Distant Horizons today.
+
+## 9. How the Celeritas integration maps onto this
 
 | Today (`CeleritasCompat` and the `selectable.celeritas` Mixins) | In this contract |
 |---|---|
@@ -163,7 +272,7 @@ change event is outstanding. Automated frame captures wait on this.
 | `applyCubeChanges`: deferring changes until the renderer applies its own events | Events arrive on the client thread at a defined point |
 | The entity gatherer | Not in this contract: entities are drawn by the game |
 
-## 9. What changes in Cubature
+## 10. What changes in Cubature
 
 Adding the source is additive. The vanilla, Celeritas, Demonica and Distant Horizons
 integrations are unaffected by it.
@@ -187,6 +296,12 @@ server does on its own.
 ## Open points
 
 Each has a proposed answer. None is settled until it is implemented and measured.
+
+Terrain preview (section 8): whether an identity should refuse or only warn when nothing
+but biome colours differ; the store's granularity, whole world or per continent; whether a
+dedicated server should bake its regional data at world creation; and whether the
+seed-withheld mode, which costs the server what Distant Horizons costs it today, is worth
+keeping.
 
 1. **What a copy costs.** Copies are shared between snapshots per cube version (section
    2). The time and memory of one copy are not measured.

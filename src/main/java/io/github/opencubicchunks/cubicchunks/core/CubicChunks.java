@@ -180,6 +180,7 @@ public class CubicChunks {
     @EventHandler
     public void onServerAboutToStart(FMLServerAboutToStartEvent event) {
         TickDiagnostics.reset();
+        io.github.opencubicchunks.cubicchunks.core.worldgen.SharedTerrainPreviews.serverStarting();
         GeneratorBuildPool.serverStarting(event.getServer());
         // Before any world is built: every dimension of this server shares the mode.
         ServerDeliveryMode.resolve();
@@ -195,6 +196,12 @@ public class CubicChunks {
                     // no-op, done by mixin
                 }
         );
+    }
+
+    /** Before the server saves and closes its worlds: a client sharing a generator stops sampling it. */
+    @EventHandler
+    public void onServerStopping(net.minecraftforge.fml.common.event.FMLServerStoppingEvent event) {
+        io.github.opencubicchunks.cubicchunks.core.worldgen.SharedTerrainPreviews.withdrawAll();
     }
 
     @EventHandler

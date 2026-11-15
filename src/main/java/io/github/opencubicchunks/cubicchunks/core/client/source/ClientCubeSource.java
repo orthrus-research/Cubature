@@ -28,6 +28,7 @@ import io.github.opencubicchunks.cubicchunks.api.client.ICubeSource;
 import io.github.opencubicchunks.cubicchunks.api.client.ICubeSourceListener;
 import io.github.opencubicchunks.cubicchunks.api.util.Coords;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
+import io.github.opencubicchunks.cubicchunks.api.worldgen.ICubicTerrainPreview;
 import io.github.opencubicchunks.cubicchunks.core.client.CubeProviderClient;
 import io.github.opencubicchunks.cubicchunks.core.world.cube.Cube;
 import net.minecraft.block.state.IBlockState;
@@ -181,6 +182,8 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
             return;
         }
         World current = Minecraft.getMinecraft().world;
+        ClientTerrainPreviews previews = ClientTerrainPreviews.INSTANCE;
+        previews.tick(current);
         if (current != world) {
             if (current == null) {
                 detach();
@@ -190,17 +193,23 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
         }
         if (world == null || listener == null) {
             queue.clear();
+            previews.takeChanged();
             return;
         }
         if (!announced) {
-            // What is loaded already is read with forEachLoaded, not replayed as events.
+            // What is loaded already is read with forEachLoaded, not replayed as events; so is a
+            // terrain preview that is already there.
             announced = true;
             queue.clear();
+            previews.takeChanged();
             listener.worldAttached(identity);
             return;
         }
         if (!queue.isEmpty()) {
             queue.drain(listener);
+        }
+        if (previews.takeChanged()) {
+            listener.terrainPreviewChanged();
         }
     }
 
@@ -277,6 +286,12 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
             }
         }
         return new CubeSnapshot(cubeX, cubeY, cubeZ, identity, sky, world.getWorldType(), copies);
+    }
+
+    @Nullable
+    @Override
+    public ICubicTerrainPreview terrainPreview() {
+        return ClientTerrainPreviews.INSTANCE.preview(world);
     }
 
     private CubeCopy copy(int x, int y, int z, boolean sky) {

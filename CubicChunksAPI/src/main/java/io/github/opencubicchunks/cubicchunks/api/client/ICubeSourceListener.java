@@ -44,6 +44,13 @@ public interface ICubeSourceListener {
     /** The client world was replaced or closed. Everything held for that identity is void. */
     void worldDetached(long worldIdentity);
 
+    /**
+     * The attached world's terrain preview became available or was withdrawn; read it with
+     * {@code terrainPreview()}. A preview present when the world attaches raises no event.
+     */
+    default void terrainPreviewChanged() {
+    }
+
     /** A cube's data arrived, including a full resend of a cube already held. */
     void cubeLoaded(int cubeX, int cubeY, int cubeZ);
 

@@ -27,12 +27,17 @@ package io.github.opencubicchunks.cubicchunks.core;
 import com.google.common.collect.ImmutableList;
 import io.github.opencubicchunks.cubicchunks.api.util.IntRange;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
+import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorldServer;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorldType;
+import io.github.opencubicchunks.cubicchunks.api.worldgen.ClientPreviewOffer;
+import io.github.opencubicchunks.cubicchunks.api.worldgen.IClientTerrainPreviewOffer;
+import io.github.opencubicchunks.cubicchunks.api.worldgen.ICubeGenerator;
 import io.github.opencubicchunks.cubicchunks.api.worldgen.WorldBuildPool;
 import io.github.opencubicchunks.cubicchunks.api.worldgen.WorldDerivedDataDirectory;
 import io.github.opencubicchunks.cubicchunks.core.server.delivery.GeneratorBuildPool;
 import io.github.opencubicchunks.cubicchunks.core.asm.mixin.ICubicWorldInternal;
 import io.github.opencubicchunks.cubicchunks.core.asm.mixin.ICubicWorldSettings;
+import io.github.opencubicchunks.cubicchunks.core.network.PacketClientPreview;
 import io.github.opencubicchunks.cubicchunks.core.network.PacketCubicWorldData;
 import io.github.opencubicchunks.cubicchunks.core.network.PacketDispatcher;
 import io.github.opencubicchunks.cubicchunks.core.server.SpawnCubes;
@@ -41,6 +46,7 @@ import io.github.opencubicchunks.cubicchunks.core.server.chunkio.ICubeIO;
 import io.github.opencubicchunks.cubicchunks.core.world.ICubeProviderInternal;
 import io.github.opencubicchunks.cubicchunks.core.world.WorldSavedCubicChunksData;
 import io.github.opencubicchunks.cubicchunks.core.world.provider.ICubicWorldProvider;
+import io.github.opencubicchunks.cubicchunks.core.worldgen.SharedTerrainPreviews;
 import mcp.MethodsReturnNonnullByDefault;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.world.World;
@@ -54,6 +60,7 @@ import net.minecraftforge.common.DimensionManager;
 import net.minecraftforge.event.AttachCapabilitiesEvent;
 import net.minecraftforge.event.entity.EntityJoinWorldEvent;
 import net.minecraftforge.event.world.WorldEvent;
+import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 import net.minecraftforge.fml.relauncher.Side;
@@ -189,6 +196,35 @@ public class CommonEventHandler {
     public void onPlayerJoinWorld(EntityJoinWorldEvent evt) {
         if (evt.getEntity() instanceof EntityPlayerMP && ((ICubicWorld) evt.getWorld()).isCubicWorld()) {
             PacketDispatcher.sendTo(new PacketCubicWorldData((WorldServer) evt.getWorld()), (EntityPlayerMP) evt.getEntity());
+            offerClientPreview((WorldServer) evt.getWorld(), (EntityPlayerMP) evt.getEntity());
+        }
+    }
+
+    /**
+     * Sends what the player's client needs to build the world's terrain preview itself, when the
+     * generator offers it (docs/CUBE-SOURCE.md, section 8). A server that keeps its seed to itself
+     * sends only that fact.
+     */
+    private static void offerClientPreview(WorldServer world, EntityPlayerMP player) {
+        if (!(world instanceof ICubicWorldServer)) {
+            return;
+        }
+        ICubeGenerator generator = ((ICubicWorldServer) world).getCubeGenerator();
+        if (!(generator instanceof IClientTerrainPreviewOffer)) {
+            return;
+        }
+        ClientPreviewOffer offer = ((IClientTerrainPreviewOffer) generator).clientPreviewOffer();
+        if (offer != null) {
+            PacketDispatcher.sendTo(new PacketClientPreview(world.provider.getDimension(),
+                    CubicChunksConfig.sendSeedForClientPreview ? offer : null), player);
+        }
+    }
+
+    /** Before anything else closes: the client stops sampling a generator this world is about to close. */
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public void onWorldUnloadFirst(WorldEvent.Unload event) {
+        if (!event.getWorld().isRemote) {
+            SharedTerrainPreviews.withdraw(event.getWorld());
         }
     }
 
