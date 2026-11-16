@@ -386,6 +386,34 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
     }
 
     @Override
+    public int loadedNeighbors(int cubeX, int cubeY, int cubeZ) {
+        return cubes == null ? 0 : ICubeSource.super.loadedNeighbors(cubeX, cubeY, cubeZ);
+    }
+
+    @Override
+    public int light(int blockX, int blockY, int blockZ) {
+        Cube cube = cubes == null ? null : cubes.getLoadedCube(blockX >> 4, blockY >> 4, blockZ >> 4);
+        if (cube == null) {
+            return -1;
+        }
+        BlockPos pos = new BlockPos(blockX, blockY, blockZ);
+        int sky = world.provider.hasSkyLight() ? cube.getCachedLightFor(net.minecraft.world.EnumSkyBlock.SKY, pos) : 0;
+        return sky << 4 | cube.getCachedLightFor(net.minecraft.world.EnumSkyBlock.BLOCK, pos);
+    }
+
+    @Override
+    public ICubeSnapshot snapshotCenter(int cubeX, int cubeY, int cubeZ) {
+        if (world == null) {
+            throw new IllegalStateException("No cubic client world is attached");
+        }
+        boolean sky = world.provider.hasSkyLight();
+        CubeCopy[] copies = new CubeCopy[27];
+        java.util.Arrays.fill(copies, CubeCopy.NOTHING);
+        copies[13] = copy(cubeX, cubeY, cubeZ, sky);
+        return new CubeSnapshot(cubeX, cubeY, cubeZ, identity, sky, world.getWorldType(), copies);
+    }
+
+    @Override
     public void forEachLoaded(CubeVisitor visitor) {
         if (cubes != null) {
             for (Cube cube : cubes.loadedCubes()) {

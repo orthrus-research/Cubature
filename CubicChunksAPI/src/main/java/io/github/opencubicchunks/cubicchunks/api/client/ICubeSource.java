@@ -37,6 +37,19 @@ public interface ICubeSource {
     /** In {@link #surfaceHeights}: no ground is known, or no liquid stands above the ground. */
     int NO_SURFACE = Integer.MIN_VALUE;
 
+    /** In {@link #loadedNeighbors}: the bit of the cube itself. */
+    int NEIGHBOR_CENTER = 1 << 13;
+    /** In {@link #loadedNeighbors}: the bits of the six cubes that share a face with it. */
+    int NEIGHBOR_FACES = 1 << 4 | 1 << 10 | 1 << 12 | 1 << 14 | 1 << 16 | 1 << 22;
+    /** In {@link #loadedNeighbors}: the bits of all 26 cubes around it. */
+    int NEIGHBOR_ALL = (1 << 27) - 1 & ~NEIGHBOR_CENTER;
+
+    /**
+     * The highest number of block states a cubic world keeps: cube saves store 20 bits of a state's
+     * id, so a state whose id is this or more would lose its high bits when saved.
+     */
+    int MAX_BLOCK_STATES = 1 << 20;
+
     /** {@link #cubeContent}: the cube is not loaded on the client. */
     int NOT_LOADED = 0;
     /** {@link #cubeContent}: the cube is loaded and holds nothing but air. */
@@ -109,6 +122,64 @@ public interface ICubeSource {
      */
     default long lightChecksum(int cubeX, int cubeY, int cubeZ) {
         return -1;
+    }
+
+    /**
+     * The bit for the cube at an offset in {@link #loadedNeighbors}, each offset -1 to 1: bit
+     * {@code (dx + 1) * 9 + (dy + 1) * 3 + (dz + 1)}, the order {@link ICubeSnapshot#present} uses.
+     */
+    static int neighborBit(int dx, int dy, int dz) {
+        return 1 << ((dx + 1) * 9 + (dy + 1) * 3 + dz + 1);
+    }
+
+    /**
+     * Which of a cube and the 26 around it are loaded, without a snapshot: a mask of
+     * {@link #neighborBit} bits, {@link #NEIGHBOR_CENTER} for the cube itself. {@code
+     * Integer.bitCount(mask & NEIGHBOR_ALL)} counts the loaded neighbors, and {@code (mask &
+     * NEIGHBOR_FACES) == NEIGHBOR_FACES} says all six faces have one. Client thread. The default
+     * reads {@link #isLoaded} 27 times.
+     */
+    default int loadedNeighbors(int cubeX, int cubeY, int cubeZ) {
+        int mask = 0;
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dy = -1; dy <= 1; dy++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    if (isLoaded(cubeX + dx, cubeY + dy, cubeZ + dz)) {
+                        mask |= neighborBit(dx, dy, dz);
+                    }
+                }
+            }
+        }
+        return mask;
+    }
+
+    /**
+     * The light at one block, without a snapshot: sky light in bits 4 to 7 and block light in bits 0
+     * to 3 ({@code sky << 4 | block}), as stored, or -1 when the block's cube is not loaded. A cube
+     * without block storage answers its implicit sky light. Client thread. The default answers -1.
+     */
+    default int light(int blockX, int blockY, int blockZ) {
+        return -1;
+    }
+
+    /**
+     * The cube alone, without the 26 around it: an {@link ICubeSnapshot} whose neighbors are all
+     * absent ({@link ICubeSnapshot#present} false), so they read as air with no block light and, in a
+     * dimension with sky light, full sky light, whatever is loaded there. For a reader of the center
+     * only, such as a mesher of interior faces: it copies only the center. The default takes a full
+     * {@link #snapshot}.
+     */
+    default ICubeSnapshot snapshotCenter(int cubeX, int cubeY, int cubeZ) {
+        return snapshot(cubeX, cubeY, cubeZ);
+    }
+
+    /**
+     * The highest number of block states this world keeps, {@link #MAX_BLOCK_STATES}. Snapshots hold
+     * block states themselves, not their ids, so nothing read through the source has a narrower
+     * limit.
+     */
+    default int maxBlockStates() {
+        return MAX_BLOCK_STATES;
     }
 
     /** Visits every loaded cube, in no particular order. */

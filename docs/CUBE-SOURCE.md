@@ -53,7 +53,27 @@ A snapshot is an immutable copy of a neighborhood, taken on the client thread.
 | Block light and sky light | Per block. For a storage-less cube the snapshot answers sky light by the implicit rule, from the column tops it captured |
 | Biomes | As the cube stores them, for tinting |
 | Block entities | The cube's block entity map as it stood. The entities themselves are not copied |
-| Version | See section 3 |
+| Version | The version, block version and light version of each cube (section 3) |
+
+Block states are held as the game's state objects, not as numeric ids, so a snapshot has no
+limit on how many states a game defines. The limit a cubic world has is its save format:
+cube saves keep 20 bits of a state's id, so `ICubeSource.maxBlockStates()` answers
+`MAX_BLOCK_STATES`, 1,048,576. A state whose id is that or more would lose its high bits when
+a cube is saved; Cubature warns in the log at server start when any id reaches it. Cube
+packets carry ids as the game's block state container writes them and, for small changes,
+as variable-length integers of up to 28 bits, so neither narrows the limit.
+
+**Light at a block.** `getCombinedLight` answers as the game's chunk cache does: a block
+that takes its neighbors' brightness (a slab, stairs) is given the brightest of them.
+`getLightFor(type, pos)` answers the light stored at the block itself, 0 to 15. Outside the
+neighborhood and in a cube the snapshot does not hold, both read no block light and the
+sky light of point 5.
+
+**The center alone.** `snapshotCenter(cubeX, cubeY, cubeZ)` copies only the cube itself:
+every neighbor is absent (`present` false) and reads as air with no block light and full
+sky light, whether or not it is loaded. It serves a reader that needs nothing beyond the
+cube, such as a mesher of interior faces; one that draws the cube's outer faces wants the
+full snapshot.
 
 **Guarantees:**
 
@@ -159,7 +179,11 @@ Events are delivered once per client tick, at its end.
    is false and a snapshot reads it as absent. There is no retiring state between the two.
    A column that leaves takes every cube still held in it, each with its own
    `cubeUnloaded`. The game's own renderer clears its mesh of the cube within its usual
-   rebuild latency, at any distance from the player.
+   rebuild latency, at any distance from the player. A renderer of its own needs no
+   retiring state either: it owns its meshes, drops the cube's on `cubeUnloaded`, and no
+   later event or read brings the cube back unless it arrives again (`cubeLoaded`). One
+   that wants to keep drawing a departing cube for a while, to fade it out, keeps that
+   mesh on its own side.
 
 ## 4. Queries
 
@@ -167,6 +191,16 @@ Events are delivered once per client tick, at its end.
   is already loaded.
 - Whether a given cube is loaded, and its current version, block version and light
   version.
+- Which of a cube and its 26 neighbors are loaded, as a mask, without a snapshot:
+  `loadedNeighbors(cubeX, cubeY, cubeZ)`. Bit `(dx + 1) * 9 + (dy + 1) * 3 + (dz + 1)` is
+  the cube at that offset, the order of `ICubeSnapshot.present`; `NEIGHBOR_CENTER` is the
+  cube itself, `NEIGHBOR_FACES` the six that share a face, `NEIGHBOR_ALL` all 26. The
+  count is `Integer.bitCount(mask & NEIGHBOR_ALL)`. It costs 27 cube look-ups. With the
+  `NEIGHBOR` events of section 3 a renderer can tell when a cube's last missing face
+  neighbor arrived.
+- The light at one block, without a snapshot: `light(blockX, blockY, blockZ)`, packed as
+  `sky << 4 | block`, as stored, or -1 when the block's cube is not loaded. A cube without
+  block storage answers its implicit sky light.
 - A diagnostic checksum of a loaded cube's light, `lightChecksum(cubeX, cubeY, cubeZ)`:
   a hash of the block light and sky light of its 4,096 blocks as the cube answers them,
   never negative, -1 for a cube that is not loaded. The server computes the same hash

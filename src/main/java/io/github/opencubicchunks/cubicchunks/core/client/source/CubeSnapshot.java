@@ -96,6 +96,21 @@ final class CubeSnapshot implements ICubeSnapshot {
     }
 
     @Override
+    public long blockVersion(int dx, int dy, int dz) {
+        return at(dx, dy, dz).blockVersion;
+    }
+
+    @Override
+    public long lightVersion(int dx, int dy, int dz) {
+        return at(dx, dy, dz).lightVersion;
+    }
+
+    @Override
+    public int getLightFor(EnumSkyBlock type, BlockPos pos) {
+        return light(type, pos.getX(), pos.getY(), pos.getZ());
+    }
+
+    @Override
     public boolean centerEmpty() {
         return at(0, 0, 0).empty;
     }

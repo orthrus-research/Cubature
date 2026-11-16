@@ -390,6 +390,15 @@ take fewer jobs at once while frames or the integrated server's ticks run long.
 Two client options size and govern it: `clientPreviewThreads` and
 `clientPreviewFrameBudgetMs`.
 
+On November 16, 2026, the cube source gained more reads, all additive defaults
+on the client thread except the snapshot's, which any thread may make:
+`loadedNeighbors` (a mask of which of a cube and its 26 neighbors are loaded),
+`light` (one block's light, packed), `snapshotCenter` (a snapshot of the cube
+alone), `maxBlockStates`, and on snapshots `getLightFor` (light as stored) and
+`blockVersion` and `lightVersion` per offset. Each snapshot copy carries the two
+version halves. At server start Cubature now warns in the log when a block state
+id reaches 1,048,576, the most that cube saves keep.
+
 Both supported builds include `NOTICE.md`, this file, the upstream MIT text,
 the full LGPL-2.1 text and component notices in binary and matching sources
 JARs. The sources JAR includes the mod and API Java sources. It is not by

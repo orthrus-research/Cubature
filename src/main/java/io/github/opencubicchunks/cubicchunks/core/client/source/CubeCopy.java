@@ -53,6 +53,8 @@ final class CubeCopy {
     private static final int BY_TOPS = 2;
 
     final long version;
+    final long blockVersion;
+    final long lightVersion;
     final boolean loaded;
     /** Block states by {@code y << 8 | z << 4 | x}, or null for a cube without block storage. */
     @Nullable final IBlockState[] blocks;
@@ -71,11 +73,14 @@ final class CubeCopy {
     @Nullable private final byte[] columnBiomes;
     final Map<BlockPos, TileEntity> blockEntities;
 
-    private CubeCopy(long version, boolean loaded, @Nullable IBlockState[] blocks, boolean empty,
+    private CubeCopy(long version, long blockVersion, long lightVersion, boolean loaded,
+            @Nullable IBlockState[] blocks, boolean empty,
             @Nullable byte[] blockLight, @Nullable byte[] skyLight, int implicitSky, @Nullable int[] tops,
             int minBlockY, @Nullable byte[] cubeBiomes, @Nullable byte[] columnBiomes,
             Map<BlockPos, TileEntity> blockEntities) {
         this.version = version;
+        this.blockVersion = blockVersion;
+        this.lightVersion = lightVersion;
         this.loaded = loaded;
         this.blocks = blocks;
         this.empty = empty;
@@ -90,7 +95,7 @@ final class CubeCopy {
     }
 
     /** A cube that is not loaded, in no loaded column: air, open to the sky. */
-    static final CubeCopy NOTHING = new CubeCopy(-1, false, null, true, null, null, OPEN, null, 0, null, null,
+    static final CubeCopy NOTHING = new CubeCopy(-1, -1, -1, false, null, true, null, null, OPEN, null, 0, null, null,
             Collections.emptyMap());
 
     /** The copy for a loaded cube, reused while the cube's version stands. */
@@ -115,7 +120,8 @@ final class CubeCopy {
         ExtendedBlockStorage storage = cube.getStorage();
         if (storage == null) {
             int[] tops = hasSkyLight ? tops(column) : null;
-            return new CubeCopy(cube.sourceVersion, true, null, true, null, null, implicit(tops, minBlockY),
+            return new CubeCopy(cube.sourceVersion, cube.sourceBlockVersion, cube.sourceLightVersion, true, null,
+                    true, null, null, implicit(tops, minBlockY),
                     tops, minBlockY, cubeBiomes, columnBiomes, entities);
         }
         IBlockState[] blocks = new IBlockState[4096];
@@ -129,7 +135,8 @@ final class CubeCopy {
             }
         }
         NibbleArray sky = storage.getSkyLight();
-        return new CubeCopy(cube.sourceVersion, true, blocks, storage.isEmpty(),
+        return new CubeCopy(cube.sourceVersion, cube.sourceBlockVersion, cube.sourceLightVersion, true, blocks,
+                storage.isEmpty(),
                 storage.getBlockLight().getData().clone(), sky == null ? null : sky.getData().clone(), OPEN, null,
                 minBlockY, cubeBiomes, columnBiomes, entities);
     }
@@ -138,8 +145,16 @@ final class CubeCopy {
     static CubeCopy absent(Chunk column, int cubeY, boolean hasSkyLight) {
         int minBlockY = Coords.cubeToMinBlock(cubeY);
         int[] tops = hasSkyLight ? tops(column) : null;
-        return new CubeCopy(-1, false, null, true, null, null, implicit(tops, minBlockY), tops, minBlockY, null,
+        return new CubeCopy(-1, -1, -1, false, null, true, null, null, implicit(tops, minBlockY), tops, minBlockY,
+                null,
                 column.getBiomeArray().clone(), Collections.emptyMap());
+    }
+
+    /** For tests: a loaded cube with storage, its biomes and block entities left empty. */
+    static CubeCopy stored(long version, long blockVersion, long lightVersion, IBlockState[] blocks,
+            byte[] blockLight, @Nullable byte[] skyLight) {
+        return new CubeCopy(version, blockVersion, lightVersion, true, blocks, false, blockLight, skyLight, OPEN, null,
+                0, null, null, Collections.emptyMap());
     }
 
     private static int[] tops(Chunk column) {

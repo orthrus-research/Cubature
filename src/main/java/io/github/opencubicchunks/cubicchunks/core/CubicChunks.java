@@ -180,6 +180,7 @@ public class CubicChunks {
     @EventHandler
     public void onServerAboutToStart(FMLServerAboutToStartEvent event) {
         TickDiagnostics.reset();
+        io.github.opencubicchunks.cubicchunks.core.world.BlockStateLimit.check();
         io.github.opencubicchunks.cubicchunks.core.worldgen.SharedTerrainPreviews.serverStarting();
         GeneratorBuildPool.serverStarting(event.getServer());
         // Before any world is built: every dimension of this server shares the mode.
