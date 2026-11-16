@@ -29,7 +29,6 @@ import io.github.opencubicchunks.cubicchunks.core.client.CubeProviderClient;
 import io.netty.buffer.ByteBuf;
 import mcp.MethodsReturnNonnullByDefault;
 import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.network.PacketBuffer;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
@@ -52,9 +51,7 @@ public class PacketColumn implements IMessage {
     public PacketColumn(Chunk column) {
         this.chunkPos = column.getPos();
         this.data = new byte[WorldEncoder.getEncodedSize(column)];
-        PacketBuffer out = new PacketBuffer(WorldEncoder.createByteBufForWrite(this.data));
-
-        WorldEncoder.encodeColumn(out, column);
+        WorldEncoder.writeInto(this.data, out -> WorldEncoder.encodeColumn(out, column));
     }
 
     @Override
@@ -91,10 +88,7 @@ public class PacketColumn implements IMessage {
 
             Chunk column = cubeCache.loadChunk(chunkPos.x, chunkPos.z);
 
-            byte[] data = packet.getData();
-            ByteBuf buf = WorldEncoder.createByteBufForRead(data);
-
-            WorldEncoder.decodeColumn(new PacketBuffer(buf), column);
+            WorldEncoder.readFrom(packet.getData(), in -> WorldEncoder.decodeColumn(in, column));
         }
     }
 }

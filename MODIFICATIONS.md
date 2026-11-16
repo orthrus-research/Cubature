@@ -446,6 +446,10 @@ value: instances are prepared at 12, a run may raise the server's view distances
 or the client's render distance (up to 64) by exception, and the run's distances are recorded
 with a label that marks a raised run. Lower than 12 is still refused.
 
+On November 16, 2026, the column message released the buffers that wrap its
+bytes when it is written on the server and read on the client; before, both were
+left to the garbage collector, and Netty's leak detector could report them.
+
 Both supported builds include `NOTICE.md`, this file, the upstream MIT text,
 the full LGPL-2.1 text and component notices in binary and matching sources
 JARs. The sources JAR includes the mod and API Java sources. It is not by

@@ -238,6 +238,34 @@ class WorldEncoder {
         return size;
     }
 
+    /**
+     * Writes into {@code data} through a buffer that wraps it, and releases that buffer whatever the
+     * writer does. The wrapping buffer is reference counted like any other: one left unreleased is
+     * what Netty's leak detector reports.
+     *
+     * @return the released buffer, for tests
+     */
+    static ByteBuf writeInto(byte[] data, java.util.function.Consumer<PacketBuffer> writer) {
+        ByteBuf buffer = createByteBufForWrite(data);
+        try {
+            writer.accept(new PacketBuffer(buffer));
+        } finally {
+            buffer.release();
+        }
+        return buffer;
+    }
+
+    /** Reads {@code data} through a buffer that wraps it, released afterwards; see {@link #writeInto}. */
+    static ByteBuf readFrom(byte[] data, java.util.function.Consumer<PacketBuffer> reader) {
+        ByteBuf buffer = createByteBufForRead(data);
+        try {
+            reader.accept(new PacketBuffer(buffer));
+        } finally {
+            buffer.release();
+        }
+        return buffer;
+    }
+
     static ByteBuf createByteBufForWrite(byte[] data) {
         ByteBuf bytebuf = Unpooled.wrappedBuffer(data);
         bytebuf.writerIndex(0);
