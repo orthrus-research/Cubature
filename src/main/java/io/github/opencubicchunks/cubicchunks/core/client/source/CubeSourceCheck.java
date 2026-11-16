@@ -104,6 +104,20 @@ public final class CubeSourceCheck implements ICubeSourceListener {
     private long sentTicks;
     private long settledTicks;
     private long maxSettledTicks;
+    /** The build pool, exercised as a background mesher would: one task a cube, nearest first. */
+    private final java.util.Map<Long, io.github.opencubicchunks.cubicchunks.api.client.IClientBuildWork.Task<?>> builds =
+            new java.util.HashMap<>();
+    private final java.util.Map<io.github.opencubicchunks.cubicchunks.api.client.IClientBuildWork.Task<?>, Long> submitted =
+            new java.util.IdentityHashMap<>();
+    private long buildsSubmitted;
+    private long buildsReplaced;
+    private long buildsDone;
+    private long buildsFailed;
+    private long buildsWrongVersion;
+    private long buildLatencyTicks;
+    private long buildMaxLatencyTicks;
+    private int buildMaxQueued;
+    private int buildMaxAdmitted;
 
     @Override
     public void worldAttached(long worldIdentity) {
@@ -244,6 +258,101 @@ public final class CubeSourceCheck implements ICubeSourceListener {
             }
         }
         held.add(new Held(snapshot, tick + DELAY_TICKS));
+        submitBuild(x, y, z);
+    }
+
+    private static long key(int x, int y, int z) {
+        return ((long) x & 0x1FFFFF) << 42 | ((long) y & 0x1FFFFF) << 21 | (long) z & 0x1FFFFF;
+    }
+
+    /** The squared distance in cubes from the player, doubled behind the player's facing. */
+    private static long priority(int x, int y, int z) {
+        net.minecraft.entity.Entity viewer = Minecraft.getMinecraft().getRenderViewEntity();
+        if (viewer == null) {
+            return 0;
+        }
+        double dx = (x << 4) + 8 - viewer.posX;
+        double dy = (y << 4) + 8 - viewer.posY;
+        double dz = (z << 4) + 8 - viewer.posZ;
+        long distance = (long) ((dx * dx + dy * dy + dz * dz) / 256);
+        net.minecraft.util.math.Vec3d look = viewer.getLookVec();
+        return dx * look.x + dy * look.y + dz * look.z < 0 ? distance * 2 : distance;
+    }
+
+    /** Hands in a build of the cube's blocks, replacing one still waiting or running for it. */
+    private void submitBuild(int x, int y, int z) {
+        io.github.opencubicchunks.cubicchunks.api.client.IClientBuildWork work = source.buildWork();
+        if (work == null) {
+            return;
+        }
+        io.github.opencubicchunks.cubicchunks.api.client.IClientBuildWork.Task<?> old = builds.remove(key(x, y, z));
+        if (old != null) {
+            old.cancel();
+            submitted.remove(old);
+            buildsReplaced++;
+        }
+        io.github.opencubicchunks.cubicchunks.api.client.IClientBuildWork.Task<Integer> task = work.submit(
+                priority(x, y, z), x, y, z, false,
+                io.github.opencubicchunks.cubicchunks.api.client.IClientBuildWork.STALE_ON_CENTER, (snapshot, self) -> {
+                    // What a mesher reads: every block of the center, and its light.
+                    int solid = 0;
+                    BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+                    for (int i = 0; i < 4096; i++) {
+                        pos.setPos((x << 4) + (i & 15), (y << 4) + (i >> 8), (z << 4) + (i >> 4 & 15));
+                        if (!snapshot.isAirBlock(pos)) {
+                            solid++;
+                        }
+                        if ((i & 1023) == 1023) {
+                            if (self.cancelled()) {
+                                return -1;
+                            }
+                            self.checkpoint();
+                        }
+                    }
+                    return solid;
+                });
+        builds.put(key(x, y, z), task);
+        submitted.put(task, tick);
+        buildsSubmitted++;
+    }
+
+    /** Takes back finished builds and rescores the waiting ones as the player moves. */
+    private void followBuilds() {
+        io.github.opencubicchunks.cubicchunks.api.client.IClientBuildWork work = source.buildWork();
+        if (work == null) {
+            return;
+        }
+        buildMaxQueued = Math.max(buildMaxQueued, work.queued());
+        buildMaxAdmitted = Math.max(buildMaxAdmitted, work.admitted());
+        for (io.github.opencubicchunks.cubicchunks.api.client.IClientBuildWork.Task<?> task = work.poll(); task != null;
+                task = work.poll()) {
+            Long at = submitted.remove(task);
+            builds.remove(key(task.cubeX(), task.cubeY(), task.cubeZ()), task);
+            if (task.state() == io.github.opencubicchunks.cubicchunks.api.client.IClientBuildWork.FAILED) {
+                if (buildsFailed++ < 5) {
+                    CubicChunks.LOGGER.error("Cube source check: a build failed", task.failure());
+                }
+                continue;
+            }
+            buildsDone++;
+            if (task.snapshotVersion() != source.version(task.cubeX(), task.cubeY(), task.cubeZ())) {
+                // A stale task never comes back: a finished one must match the cube as it stands.
+                buildsWrongVersion++;
+            }
+            if (at != null) {
+                long took = tick - at;
+                buildLatencyTicks += took;
+                buildMaxLatencyTicks = Math.max(buildMaxLatencyTicks, took);
+            }
+        }
+        if (tick % 20 == 0) {
+            work.reprioritizeAll(task -> priority(task.cubeX(), task.cubeY(), task.cubeZ()));
+        }
+        // Tasks the pool made stale or dropped never come back: forget them.
+        if (tick % 200 == 0) {
+            submitted.keySet().removeIf(task -> task.cancelled());
+            builds.values().removeIf(task -> task.cancelled());
+        }
     }
 
     /** The snapshot's block access against the world's, over the center cube's corners and middle. */
@@ -308,6 +417,7 @@ public final class CubeSourceCheck implements ICubeSourceListener {
             checkDeparted(departed.poll());
         }
         followSettled();
+        followBuilds();
         if (tick % REPORT_TICKS == 0 && worlds > 0) {
             orphans = countOrphans();
             report("tick " + tick);
@@ -318,11 +428,15 @@ public final class CubeSourceCheck implements ICubeSourceListener {
         CubicChunks.LOGGER.info("Cube source check, {}: events loaded {} unloaded {} changed {} (neighbor only {}); "
                         + "snapshots {}, differing from the game's render cache {}, differing only beside an absent cube {}, gone before delivery {}; rechecked {} unchanged cubes, {} changed with no "
                         + "event; {} superseded, {} waiting; departed cubes {} back, {} outside the render grid, {} checked, {} still drawn; {} cubes held without their column; "
-                        + "held boxes {}, sent {} (mean {} ticks), settled {} (mean {}, longest {} ticks)",
+                        + "held boxes {}, sent {} (mean {} ticks), settled {} (mean {}, longest {} ticks); "
+                        + "builds submitted {}, replaced {}, done {} (mean {} ticks, longest {}), failed {}, done with a moved "
+                        + "version {}, most queued {}, most admitted {}",
                 when, loaded, unloaded, changed, neighborOnly, snapshots,
                 accessMismatches, absentNeighbor, goneBeforeDelivery, verified, stale, superseded, held.size(),
                 departedReturned, departedOutsideGrid, departedChecked, staleMeshes, orphans, boxes, boxesSent,
                 boxesSent == 0 ? 0 : sentTicks / boxesSent, boxesSettled,
-                boxesSettled == 0 ? 0 : settledTicks / boxesSettled, maxSettledTicks);
+                boxesSettled == 0 ? 0 : settledTicks / boxesSettled, maxSettledTicks, buildsSubmitted, buildsReplaced,
+                buildsDone, buildsDone == 0 ? 0 : buildLatencyTicks / buildsDone, buildMaxLatencyTicks, buildsFailed,
+                buildsWrongVersion, buildMaxQueued, buildMaxAdmitted);
     }
 }

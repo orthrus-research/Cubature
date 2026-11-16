@@ -335,6 +335,17 @@ public interface ICubeSource {
         return null;
     }
 
+    /**
+     * Cubic Chunks' threads for work on cube snapshots, such as building meshes in the background,
+     * so that a renderer starts none of its own; null from a source that has none. The same object for
+     * the life of the client; its tasks belong to the attached world. It shares its budget of running
+     * jobs with {@link #previewWork()}.
+     */
+    @Nullable
+    default IClientBuildWork buildWork() {
+        return null;
+    }
+
     /** Receives one cube position. */
     @FunctionalInterface
     interface CubeVisitor {

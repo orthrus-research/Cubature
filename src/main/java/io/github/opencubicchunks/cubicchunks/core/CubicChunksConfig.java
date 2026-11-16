@@ -131,6 +131,14 @@ public class CubicChunksConfig {
             + "-1: a quarter of the processors, 1 to 4.")
     public static int clientPreviewThreads = -1;
 
+    @Config.RangeInt(min = -1, max = 16)
+    @Config.RequiresMcRestart
+    @Config.Comment("Client: threads of the pool on which renderers build from cube snapshots, such as meshes, in "
+            + "place of threads of their own. They share one budget with the preview pool, set by the same governor, "
+            + "run below normal priority and exist only while a world is attached. -1: a quarter of the processors, "
+            + "1 to 4.")
+    public static int clientBuildThreads = -1;
+
     @Config.RangeInt(min = 5, max = 200)
     @Config.RequiresMcRestart
     @Config.Comment("Client: the frame time, in milliseconds, that the client preview pool keeps to. While its jobs "

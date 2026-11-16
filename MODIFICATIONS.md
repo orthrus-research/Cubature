@@ -415,6 +415,14 @@ per box that every cube of it has been sent (another new client message,
 PacketHeldBoxSent). The client counts the ticks in which nothing arrived, left or
 changed and its light engine had no work queued.
 
+Also on November 16, 2026, the cube source gained `buildWork`, a pool of
+Cubature's threads for work on cube snapshots such as background meshing (a new
+client option, `clientBuildThreads`). Waiting tasks sit in a priority queue on
+the client thread that can be reordered cheaply, take their snapshot only when a
+thread is about to be free, go stale when their cube leaves or changes as their
+mask says, and release their snapshot whatever way they end. The pool shares its
+running jobs with the preview pool under the preview pool's governor.
+
 Both supported builds include `NOTICE.md`, this file, the upstream MIT text,
 the full LGPL-2.1 text and component notices in binary and matching sources
 JARs. The sources JAR includes the mod and API Java sources. It is not by

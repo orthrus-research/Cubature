@@ -218,8 +218,63 @@ A renderer need not start threads. Cubature provides a client-side executor with
 
 Tasks read snapshots and write only memory the renderer owns.
 
-Built for sampling the terrain preview: `ICubeSource.previewWork()` (section 8, Sampling
-threads). An executor for work on cube snapshots is not built.
+Two pools are built on one budget: `previewWork()` for sampling the terrain preview
+(section 8, Sampling threads) and `buildWork()` for work on cube snapshots, such as
+background meshing.
+
+```java
+// api.client.ICubeSource
+IClientBuildWork buildWork();
+// api.client.IClientBuildWork
+<R> Task<R> submit(long priority, int cubeX, int cubeY, int cubeZ, boolean centerOnly, int staleOn,
+        Job<R> job);
+void reprioritize(Task<?> task, long priority);
+void reprioritizeAll(ToLongFunction<Task<?>> priority);
+Task<?> poll();
+int threads(), running(), queued(), admitted();
+// Job<R>: R run(ICubeSnapshot snapshot, Task<R> task)
+```
+
+**How a task moves.** A task names a cube and a priority, lowest first, equal priorities in
+order of arrival. It waits on the client thread in a heap and holds no snapshot while it
+waits. Each client tick and each frame, and on every `submit` and `poll`, the pool admits
+waiting tasks while fewer are admitted than the permits allow plus one a thread: it takes
+each one's snapshot then (`snapshotCenter` when `centerOnly`), on the client thread, and
+hands it to a thread in that order. A cube that is not loaded when its turn comes makes
+its task `STALE` without a snapshot. The job runs with the snapshot and returns a result;
+the snapshot is released when the job ends, whether it returned, threw, was cancelled,
+went stale or its world went. The renderer takes ended tasks back with `poll()`, which
+never waits: `DONE` with `result()`, or `FAILED` with `failure()`. `snapshotVersion()`
+gives the center's version in the snapshot, to keep with the mesh.
+
+**Priority as the camera moves.** `reprioritize` moves one waiting task in O(log n);
+`reprioritizeAll` gives every waiting task a new priority from a function and rebuilds the
+heap in O(n), the call for a camera that turned or moved. Admitted tasks keep their place.
+A renderer might use the squared distance from the camera, doubled for a cube outside the
+view frustum, and call `reprioritizeAll` when the camera has moved a cube or turned
+sharply. Because waiting tasks hold no snapshot, a task that waits a long time builds
+from the cube as it is when it runs, not as it was when it was handed in.
+
+**Stale work.** A task is always stale once its cube leaves. Its `staleOn` mask adds the
+changes that make it stale after its snapshot was taken: `STALE_ON_BLOCKS` (the center's
+blocks or biomes, its block version), `STALE_ON_LIGHT` (the center's light version),
+`STALE_ON_NEIGHBORS` (the version of any of the 26 neighbors, their arrival and departure
+included); `STALE_ON_CENTER` is the first two. Each pump compares the admitted tasks with
+the cubes as they stand: a stale running job sees `cancelled()` and should return, and a
+stale task never comes back from `poll`. The renderer, which hears the change as an event
+(section 3), hands in a new task. A renderer that keeps light apart from geometry hands in
+its geometry task with `STALE_ON_BLOCKS` only. `cancel()` ends a task at any stage; a
+cancelled task never comes back either. When the world changes every task is `DROPPED`,
+its snapshot released, and the threads stop.
+
+**Bounds.** `clientBuildThreads` threads (default a quarter of the processors, 1 to 4),
+daemons just above the lowest priority, started with the first job and stopped when the
+world goes. They share their permits with the preview pool: one governor (section 8,
+Sampling threads) sets how many jobs of the two pools together may run, from the frame
+times and, in single player, the server's ticks, and `running()` reads it. A job that runs
+long calls `checkpoint()` between parts, where it waits if the permits were lowered. At
+most the permits plus one a thread hold snapshots at once, so memory stays bounded however
+many tasks wait.
 
 ## 6. Settled
 
@@ -305,7 +360,8 @@ count is a parameter.
 | Take a snapshot, release a snapshot, queries, attach or detach the listener | Client thread |
 | Read a snapshot | Any |
 | Receive an event | Client thread |
-| Run a build task | Cubature's executor |
+| Run a build task | A thread of `buildWork()` |
+| Submit, reprioritize, cancel or poll a build task | Client thread |
 | Read `terrainPreview()` | Client thread |
 | Create and run a terrain preview sampler | Any; one sampler per task |
 
@@ -464,6 +520,9 @@ interface Task { Job job(); int state(); void cancel(); boolean cancelled();
   40 ms, it adds one. A long job calls `Task.checkpoint()` between rows, where it waits if
   the permits have fallen below the jobs running. A client whose frames are longer than the
   budget whatever the pool does stays at one job.
+- **Shared.** The permits are one budget for this pool and the build pool (section 5): the
+  ceiling is the larger of the two pools' threads, a job of either takes a permit, and the
+  governor reads both pools' waits and runs.
 
 Not run in a game: the tests cover order, cancelling, withdrawal, thread lifetime, permits
 and the governor's arithmetic, with stand-in previews.

@@ -70,8 +70,13 @@ final class ClientPreviewWork implements IClientPreviewWork {
     }
 
     ClientPreviewWork(int size, int permitsAtStart) {
+        this(size, new LivePermits(Math.max(1, Math.min(Math.max(1, size), permitsAtStart))));
+    }
+
+    /** A pool whose jobs share their permits with other pools: the governor sets them for all. */
+    ClientPreviewWork(int size, LivePermits shared) {
         this.size = Math.max(1, size);
-        this.permits = new LivePermits(Math.max(1, Math.min(this.size, permitsAtStart)));
+        this.permits = shared;
     }
 
     /** {@code clientPreviewThreads}: -1 is a quarter of the processors, 1 to 4. */

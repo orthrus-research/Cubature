@@ -93,7 +93,14 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
     @Nullable private World pendingSentWorld;
     /** The preview pool and its governor, made when a renderer first asks for the pool. */
     @Nullable private ClientPreviewWork previewWork;
-    @Nullable private ClientPreviewGovernor previewGovernor;
+    @Nullable private ClientBuildWork buildWork;
+    /** One governor and one set of permits for both pools, made when a renderer first asks for either. */
+    @Nullable private ClientPreviewGovernor workGovernor;
+    @Nullable private io.github.opencubicchunks.cubicchunks.core.server.delivery.LivePermits workBudget;
+    private int previewThreads;
+    private int buildThreads;
+    /** What the build pool reads of the world it follows: made anew for each world, so a change is seen. */
+    @Nullable private ClientBuildWork.Cubes buildCubes;
     private final long[] frameNanos = new long[ClientPreviewGovernor.FRAMES];
     private int frames;
     private long lastFrame;
@@ -244,6 +251,7 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
         world = candidate;
         cubes = (CubeProviderClient) candidate.getChunkProvider();
         settled.clear();
+        buildCubes = new BuildCubes();
         if (heldWorld == candidate && held != null) {
             settled.box(held);
         }
@@ -280,6 +288,7 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
         settled.clear();
         world = null;
         cubes = null;
+        buildCubes = null;
         announced = false;
     }
 
@@ -310,7 +319,14 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
         if (previewWork != null) {
             // The pool's tasks belong to the attached preview: a change withdraws them and stops its threads.
             previewWork.bind(world == null ? null : terrainPreview());
-            governPreviewWork(System.nanoTime());
+        }
+        if (buildWork != null) {
+            // Its tasks belong to the world: a change drops them, releases their snapshots and stops its threads.
+            buildWork.bind(world == null ? null : buildCubes);
+            buildWork.pump();
+        }
+        if (workGovernor != null) {
+            governWork(System.nanoTime());
         }
         if (world == null || listener == null) {
             queue.clear();
@@ -348,7 +364,7 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
     /** The time between frames, for the preview pool's governor. */
     @SubscribeEvent
     public void onRenderTick(TickEvent.RenderTickEvent event) {
-        if (event.phase != TickEvent.Phase.START || previewWork == null) {
+        if (event.phase != TickEvent.Phase.START || workGovernor == null) {
             return;
         }
         long now = System.nanoTime();
@@ -356,10 +372,15 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
             frameNanos[frames++ % frameNanos.length] = now - lastFrame;
         }
         lastFrame = now;
+        if (buildWork != null) {
+            // Once a frame as well as once a tick, so threads that finish between ticks get work.
+            buildWork.bind(world == null ? null : buildCubes);
+            buildWork.pump();
+        }
     }
 
     /** Once a second: the governor reads the latest frames and, in single player, the server's latest ticks. */
-    private void governPreviewWork(long now) {
+    private void governWork(long now) {
         if (now < nextGoverning) {
             return;
         }
@@ -380,8 +401,13 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
                 latestTicks[i] = ring[Math.floorMod(tick - ticks + 1 + i, ring.length)];
             }
         }
-        previewWork.permits(previewGovernor.update(now, latestFrames, latestTicks, previewWork.takeWaited(),
-                previewWork.takeRan()));
+        // Both pools' flags are read every time, so neither carries a stale one into the next second.
+        boolean previewWaited = previewWork != null && previewWork.takeWaited();
+        boolean buildWaited = buildWork != null && buildWork.takeWaited();
+        boolean previewRan = previewWork != null && previewWork.takeRan();
+        boolean buildRan = buildWork != null && buildWork.takeRan();
+        workBudget.set(workGovernor.update(now, latestFrames, latestTicks, previewWaited || buildWaited,
+                previewRan || buildRan));
     }
 
     // ICubeSource.
@@ -638,16 +664,60 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
         }
     }
 
+    /** The governor and permits both pools share. */
+    private void ensureWorkBudget() {
+        if (workGovernor != null) {
+            return;
+        }
+        int processors = Runtime.getRuntime().availableProcessors();
+        previewThreads = ClientPreviewWork.size(CubicChunksConfig.clientPreviewThreads, processors);
+        buildThreads = ClientBuildWork.size(CubicChunksConfig.clientBuildThreads, processors);
+        workGovernor = new ClientPreviewGovernor(Math.max(previewThreads, buildThreads),
+                CubicChunksConfig.clientPreviewFrameBudgetMs);
+        workBudget = new io.github.opencubicchunks.cubicchunks.core.server.delivery.LivePermits(workGovernor.permits());
+    }
+
     @Override
     public IClientPreviewWork previewWork() {
         if (previewWork == null) {
-            int threads = ClientPreviewWork.size(CubicChunksConfig.clientPreviewThreads,
-                    Runtime.getRuntime().availableProcessors());
-            previewGovernor = new ClientPreviewGovernor(threads, CubicChunksConfig.clientPreviewFrameBudgetMs);
-            previewWork = new ClientPreviewWork(threads, previewGovernor.permits());
+            ensureWorkBudget();
+            previewWork = new ClientPreviewWork(previewThreads, workBudget);
             previewWork.bind(world == null ? null : terrainPreview());
         }
         return previewWork;
+    }
+
+    @Override
+    public io.github.opencubicchunks.cubicchunks.api.client.IClientBuildWork buildWork() {
+        if (buildWork == null) {
+            ensureWorkBudget();
+            buildWork = new ClientBuildWork(buildThreads, workBudget);
+            buildWork.bind(world == null ? null : buildCubes);
+        }
+        return buildWork;
+    }
+
+    /** The build pool's reads of one world. */
+    private final class BuildCubes implements ClientBuildWork.Cubes {
+        @Override public boolean isLoaded(int x, int y, int z) {
+            return ClientCubeSource.this.isLoaded(x, y, z);
+        }
+
+        @Override public ICubeSnapshot snapshot(int x, int y, int z, boolean centerOnly) {
+            return centerOnly ? snapshotCenter(x, y, z) : ClientCubeSource.this.snapshot(x, y, z);
+        }
+
+        @Override public long version(int x, int y, int z) {
+            return ClientCubeSource.this.version(x, y, z);
+        }
+
+        @Override public long blockVersion(int x, int y, int z) {
+            return ClientCubeSource.this.blockVersion(x, y, z);
+        }
+
+        @Override public long lightVersion(int x, int y, int z) {
+            return ClientCubeSource.this.lightVersion(x, y, z);
+        }
     }
 
     private CubeCopy copy(int x, int y, int z, boolean sky) {
