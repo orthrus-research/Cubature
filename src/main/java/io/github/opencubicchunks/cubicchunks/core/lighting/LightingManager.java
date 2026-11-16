@@ -60,6 +60,9 @@ public class LightingManager implements ILightingManager {
     private final PhosphorLightEngine lightEngine;
     @Nullable private final FirstLightProcessor firstLightProcessor;
 
+    /** A diagnostic for light determinism: the client skips its relight of a cube's boundaries on arrival. */
+    private static final boolean NO_CLIENT_BOUNDARY_RELIGHT = Boolean.getBoolean("cubicchunks.noClientBoundaryRelight");
+
     public LightingManager(World world) {
         this.world = world;
         this.lightEngine = new PhosphorLightEngine(world);
@@ -85,7 +88,9 @@ public class LightingManager implements ILightingManager {
         if (CubicChunksConfig.disableLighting) {
             return;
         }
-        LightingHooks.scheduleRelightChecksForCubeBoundaries(world, cube);
+        if (!(world.isRemote && NO_CLIENT_BOUNDARY_RELIGHT)) {
+            LightingHooks.scheduleRelightChecksForCubeBoundaries(world, cube);
+        }
         tryScheduleOnLoadHeightChangeRelight(cube);
     }
 

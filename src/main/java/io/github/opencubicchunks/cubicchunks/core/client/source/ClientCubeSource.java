@@ -207,6 +207,8 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
         if (world == null) {
             return;
         }
+        io.github.opencubicchunks.cubicchunks.core.lighting.LightChecksum.dump("client", world.provider.getDimension(),
+                cubes.loadedCubes());
         world.removeEventListener(this);
         queue.clear();
         surfaceVersions.clear();
@@ -235,6 +237,11 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
             } else {
                 follow(current);
             }
+        }
+        if (world != null && io.github.opencubicchunks.cubicchunks.core.lighting.LightChecksum.DUMP != null
+                && world.getTotalWorldTime() % 200 == 0) {
+            io.github.opencubicchunks.cubicchunks.core.lighting.LightChecksum.dump("client",
+                    world.provider.getDimension(), cubes.loadedCubes());
         }
         if (world == null || listener == null) {
             queue.clear();
@@ -316,6 +323,12 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
     public long lightVersion(int cubeX, int cubeY, int cubeZ) {
         Cube cube = cubes == null ? null : cubes.getLoadedCube(cubeX, cubeY, cubeZ);
         return cube == null ? -1 : cube.sourceLightVersion;
+    }
+
+    @Override
+    public long lightChecksum(int cubeX, int cubeY, int cubeZ) {
+        Cube cube = cubes == null ? null : cubes.getLoadedCube(cubeX, cubeY, cubeZ);
+        return cube == null ? -1 : io.github.opencubicchunks.cubicchunks.core.lighting.LightChecksum.of(cube);
     }
 
     @Override

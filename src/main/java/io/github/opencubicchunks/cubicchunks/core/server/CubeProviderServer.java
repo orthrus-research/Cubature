@@ -286,6 +286,11 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
     /** Forgets a cube ChunkGc has just unloaded. */
     void forgetCube(Cube cube) { cubeMap.remove(cube); }
 
+    /** Every cube the server holds, for diagnostics. */
+    public Iterable<Cube> loadedCubes() {
+        return cubeMap;
+    }
+
     @Override
     public boolean tick() {
         // NOTE: the return value is completely ignored

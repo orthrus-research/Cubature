@@ -202,6 +202,16 @@ public class CubicChunks {
     @EventHandler
     public void onServerStopping(net.minecraftforge.fml.common.event.FMLServerStoppingEvent event) {
         io.github.opencubicchunks.cubicchunks.core.worldgen.SharedTerrainPreviews.withdrawAll();
+        if (io.github.opencubicchunks.cubicchunks.core.lighting.LightChecksum.DUMP != null) {
+            for (net.minecraft.world.WorldServer world : net.minecraftforge.common.DimensionManager.getWorlds()) {
+                if (world.getChunkProvider() instanceof io.github.opencubicchunks.cubicchunks.core.server.CubeProviderServer) {
+                    io.github.opencubicchunks.cubicchunks.core.lighting.LightChecksum.dump("server",
+                            world.provider.getDimension(),
+                            ((io.github.opencubicchunks.cubicchunks.core.server.CubeProviderServer) world.getChunkProvider())
+                                    .loadedCubes());
+                }
+            }
+        }
     }
 
     @EventHandler

@@ -167,6 +167,11 @@ Events are delivered once per client tick, at its end.
   is already loaded.
 - Whether a given cube is loaded, and its current version, block version and light
   version.
+- A diagnostic checksum of a loaded cube's light, `lightChecksum(cubeX, cubeY, cubeZ)`:
+  a hash of the block light and sky light of its 4,096 blocks as the cube answers them,
+  never negative, -1 for a cube that is not loaded. The server computes the same hash
+  for its copy of a cube, so the two can be compared (see Verification). It reads every
+  block; it is not for every frame. The default answers -1.
 
 ## 5. Work executor
 
@@ -411,6 +416,33 @@ The same switch also follows each removal: five ticks after a cube leaves, the v
 render chunk at its position, if the render grid still covers it, must hold no mesh, and
 every report counts the cubes the client still holds in a column it no longer has.
 
+**Light checksums.** `-Dcubicchunks.lightChecksumDump=<directory>` has each side write a
+line per cube it holds (position, light checksum, block checksum, whether it has storage
+and whether its first light is done): the server to `server-<dimension>.tsv` as it stops,
+the client to `client-<dimension>.tsv` every 200 ticks and as its world goes.
+`tools/compare_light_checksums.py` compares two dumps over the cubes interior to both.
+`-Dcubicchunks.noClientBoundaryRelight=true` skips the client's relight of a cube's
+boundaries on arrival, for bisecting.
+
+Measured 2026-11-15 on fresh Riven worlds of one seed, the first two views of the forest
+tour, eight runs (25 × 25 × 25 cubes held on each side, 12,167 interior):
+
+| Compared | Cubes whose light differs | Blocks differ |
+|---|---|---|
+| Server, two identical runs (three pairs) | 21, 26, 46 | none |
+| Server, single-threaded generation, two runs | 46 | none |
+| Client against its own server, each of six runs | 408 to 429 | none |
+| The same, client boundary relight off (two runs) | 408, 409 | none |
+
+Every difference lies within five cubes of the edge of what the side holds; none deeper.
+Between servers they lie mostly within four cubes of the top face, under the lowest cubes
+not yet loaded. Between client and server 275 cubes differ in all six runs, so that part
+is systematic, not a matter of order. Single-threaded generation and turning the client's
+boundary relight off change neither. The likely cause of the client's part: the server
+relights a cube it has already sent as cubes beyond it arrive, and a change of light alone
+is not sent (the server's world listener ignores `notifyLightSet`; only changed blocks are
+queued for a player), so the client keeps the light it was sent. That is not yet shown.
+
 ## Open points
 
 Each has a proposed answer. None is settled until it is implemented and measured.
@@ -437,4 +469,10 @@ keeping.
 5. **First-run light.** Frame captures show ground under tree canopy darker on freshly
    generated terrain than on the same terrain after a save and reload. The cause is not
    established. Whatever it is, a light change must raise a change event; one that does
-   not is a defect against guarantee 3 of section 3.
+   not is a defect against guarantee 3 of section 3. Light checksums (Verification) find
+   light identical between runs and between client and server more than five cubes inside
+   what is loaded, and differing nearer the edge: by order between servers, and
+   systematically between a client and its server. *Proposed next:* count on the server
+   the light changes made to cubes already sent to a player; if they match the client's
+   differences, send light-only changes (or resend the cube) when a sent cube's light
+   changes.

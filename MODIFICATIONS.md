@@ -376,6 +376,12 @@ the departed cube drawn. A column unload on the client first unloads every cube
 the client still holds in it, as a cube unload would, instead of leaving those
 cubes in the client's cube map.
 
+Also on November 15, 2026, the cube source gained `lightChecksum`, a diagnostic
+hash of a loaded cube's light (default -1), and Cubature gained two diagnostic
+switches, off by default: `cubicchunks.lightChecksumDump` writes each side's
+checksums to files, and `cubicchunks.noClientBoundaryRelight` skips the client's
+relight of a cube's boundaries on arrival.
+
 Both supported builds include `NOTICE.md`, this file, the upstream MIT text,
 the full LGPL-2.1 text and component notices in binary and matching sources
 JARs. The sources JAR includes the mod and API Java sources. It is not by

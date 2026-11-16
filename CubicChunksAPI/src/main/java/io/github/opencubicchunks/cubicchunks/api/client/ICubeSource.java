@@ -101,6 +101,16 @@ public interface ICubeSource {
         return version(cubeX, cubeY, cubeZ);
     }
 
+    /**
+     * A diagnostic: a hash of the block light and sky light of every block of a loaded cube, as the
+     * cube answers them, so that two runs or the client and the server can be compared. Never
+     * negative for a loaded cube; -1 for a cube that is not loaded, and from a source that does not
+     * compute it. It reads 4,096 blocks; it is not for every frame.
+     */
+    default long lightChecksum(int cubeX, int cubeY, int cubeZ) {
+        return -1;
+    }
+
     /** Visits every loaded cube, in no particular order. */
     void forEachLoaded(CubeVisitor visitor);
 
