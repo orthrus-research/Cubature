@@ -186,7 +186,25 @@ final class ClientBuildWork implements IClientBuildWork {
 
     @Override
     public int admitted() {
-        return admitted.size();
+        int holding = 0;
+        for (BuildTask<?> task : admitted) {
+            if (task.holdsSnapshot()) {
+                holding++;
+            }
+        }
+        return holding;
+    }
+
+    @Override
+    public int finished() {
+        int waiting = 0;
+        for (BuildTask<?> task : admitted) {
+            int state = task.state();
+            if (!task.holdsSnapshot() && (state == DONE || state == FAILED)) {
+                waiting++;
+            }
+        }
+        return waiting;
     }
 
     @Override

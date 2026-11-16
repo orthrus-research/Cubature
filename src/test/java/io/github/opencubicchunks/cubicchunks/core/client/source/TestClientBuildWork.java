@@ -478,6 +478,46 @@ public class TestClientBuildWork {
     }
 
     @Test
+    public void underArrivalsAndDeparturesTheAdmittedStayBounded() throws Exception {
+        World world = new World();
+        int cubes = 3000;
+        for (int x = 0; x < cubes; x++) {
+            world.load(x, 0, 0);
+        }
+        ClientBuildWork pool = pool(4, new LivePermits(4), world);
+        Random random = new Random(42);
+        int maxAdmitted = 0;
+        int back = 0;
+        for (int x = 0; x < cubes; x++) {
+            pool.submit(random.nextInt(1000), x, 0, 0, false, IClientBuildWork.STALE_ON_CENTER, X);
+            if (x % 7 == 0) {
+                world.unload(random.nextInt(cubes), 0, 0);
+            }
+            if (x % 3 == 0 && world.isLoaded(x, 0, 0)) {
+                world.changeLight(x, 0, 0);
+            }
+            for (IClientBuildWork.Task<?> task = pool.poll(); task != null; task = pool.poll()) {
+                back++;
+            }
+            maxAdmitted = Math.max(maxAdmitted, pool.admitted());
+        }
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while ((pool.queued() > 0 || pool.admitted() > 0 || pool.finished() > 0) && System.nanoTime() < deadline) {
+            for (IClientBuildWork.Task<?> task = pool.poll(); task != null; task = pool.poll()) {
+                back++;
+            }
+            maxAdmitted = Math.max(maxAdmitted, pool.admitted());
+            Thread.sleep(1);
+        }
+        assertEquals("queued left", 0, pool.queued());
+        assertEquals("admitted left", 0, pool.admitted());
+        assertEquals("finished left", 0, pool.finished());
+        assertTrue("most admitted " + maxAdmitted, maxAdmitted <= 8);
+        assertTrue(back > 0);
+        waitFor(() -> world.snapshots.get() == world.released.get());
+    }
+
+    @Test
     public void theConfiguredSize() {
         assertEquals(2, ClientBuildWork.size(-1, 8));
         assertEquals(1, ClientBuildWork.size(-1, 2));

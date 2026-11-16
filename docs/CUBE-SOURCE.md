@@ -231,7 +231,7 @@ IClientBuildWork buildWork();
 void reprioritize(Task<?> task, long priority);
 void reprioritizeAll(ToLongFunction<Task<?>> priority);
 Task<?> poll();
-int threads(), running(), queued(), admitted();
+int threads(), running(), queued(), admitted(), finished();
 // Job<R>: R run(ICubeSnapshot snapshot, Task<R> task)
 ```
 
@@ -273,8 +273,9 @@ world goes. They share their permits with the preview pool: one governor (sectio
 Sampling threads) sets how many jobs of the two pools together may run, from the frame
 times and, in single player, the server's ticks, and `running()` reads it. A job that runs
 long calls `checkpoint()` between parts, where it waits if the permits were lowered. At
-most the permits plus one a thread hold snapshots at once, so memory stays bounded however
-many tasks wait.
+most the permits plus one a thread hold snapshots at once (`admitted()`), so memory stays
+bounded however many tasks wait; `finished()` counts results not yet taken back, which hold
+no snapshot.
 
 ## 6. Settled
 

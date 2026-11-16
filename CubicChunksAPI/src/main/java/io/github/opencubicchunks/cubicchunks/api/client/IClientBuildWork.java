@@ -83,8 +83,16 @@ public interface IClientBuildWork {
     /** Tasks waiting without a snapshot. */
     int queued();
 
-    /** Tasks holding a snapshot: admitted, running, or ended and not yet taken back. */
+    /**
+     * Tasks holding a snapshot: admitted and waiting for a thread, or running. Never more than
+     * {@link #running()} plus {@link #threads()}.
+     */
     int admitted();
+
+    /** Tasks whose job ended and that {@link #poll} has not yet handed back; they hold no snapshot. */
+    default int finished() {
+        return 0;
+    }
 
     /**
      * Hands in a job for a loaded cube. A cube that is not loaded when its turn comes makes the task

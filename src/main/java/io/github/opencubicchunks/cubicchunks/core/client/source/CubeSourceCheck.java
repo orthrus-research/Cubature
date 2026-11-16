@@ -118,6 +118,7 @@ public final class CubeSourceCheck implements ICubeSourceListener {
     private long buildMaxLatencyTicks;
     private int buildMaxQueued;
     private int buildMaxAdmitted;
+    private int buildMaxFinished;
 
     @Override
     public void worldAttached(long worldIdentity) {
@@ -324,6 +325,7 @@ public final class CubeSourceCheck implements ICubeSourceListener {
         }
         buildMaxQueued = Math.max(buildMaxQueued, work.queued());
         buildMaxAdmitted = Math.max(buildMaxAdmitted, work.admitted());
+        buildMaxFinished = Math.max(buildMaxFinished, work.finished());
         for (io.github.opencubicchunks.cubicchunks.api.client.IClientBuildWork.Task<?> task = work.poll(); task != null;
                 task = work.poll()) {
             Long at = submitted.remove(task);
@@ -430,13 +432,13 @@ public final class CubeSourceCheck implements ICubeSourceListener {
                         + "event; {} superseded, {} waiting; departed cubes {} back, {} outside the render grid, {} checked, {} still drawn; {} cubes held without their column; "
                         + "held boxes {}, sent {} (mean {} ticks), settled {} (mean {}, longest {} ticks); "
                         + "builds submitted {}, replaced {}, done {} (mean {} ticks, longest {}), failed {}, done with a moved "
-                        + "version {}, most queued {}, most admitted {}",
+                        + "version {}, most queued {}, most holding a snapshot {}, most finished awaiting poll {}",
                 when, loaded, unloaded, changed, neighborOnly, snapshots,
                 accessMismatches, absentNeighbor, goneBeforeDelivery, verified, stale, superseded, held.size(),
                 departedReturned, departedOutsideGrid, departedChecked, staleMeshes, orphans, boxes, boxesSent,
                 boxesSent == 0 ? 0 : sentTicks / boxesSent, boxesSettled,
                 boxesSettled == 0 ? 0 : settledTicks / boxesSettled, maxSettledTicks, buildsSubmitted, buildsReplaced,
                 buildsDone, buildsDone == 0 ? 0 : buildLatencyTicks / buildsDone, buildMaxLatencyTicks, buildsFailed,
-                buildsWrongVersion, buildMaxQueued, buildMaxAdmitted);
+                buildsWrongVersion, buildMaxQueued, buildMaxAdmitted, buildMaxFinished);
     }
 }
