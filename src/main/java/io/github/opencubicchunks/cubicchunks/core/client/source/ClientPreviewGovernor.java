@@ -75,6 +75,15 @@ final class ClientPreviewGovernor {
      * @return the permits now
      */
     int update(long now, long[] frames, long[] ticks, boolean waiting, boolean ran) {
+        return update(now, frames, ticks, waiting, ran, "a job waited");
+    }
+
+    /**
+     * {@link #update(long, long[], long[], boolean, boolean)}, naming the demand for the log.
+     *
+     * @param demand what made {@code waiting} true, as the reason for a raise reads it
+     */
+    int update(long now, long[] frames, long[] ticks, boolean waiting, boolean ran, String demand) {
         double frameTail = p95Ms(frames, FRAMES);
         double tickCut = p95Ms(ticks, CUT_TICKS);
         double tickRaise = p95Ms(ticks, RAISE_TICKS);
@@ -93,7 +102,7 @@ final class ClientPreviewGovernor {
                 && tickRaise < RAISE_TICK_MS) {
             permits++;
             lastChange = now;
-            lastReason = "raised: work waited and frames and ticks are under their raise marks";
+            lastReason = "raised: " + demand + ", and frames and ticks are under their raise marks";
         }
         return permits;
     }

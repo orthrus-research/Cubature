@@ -554,7 +554,7 @@ interface Task { Job job(); int state(); void cancel(); boolean cancelled();
     fallen below the jobs running. A client whose frames are longer than the budget whatever
     the pool does stays at one job.
   - Each change of the permits is logged in one line (`Client work permits 1 -> 2:`) with what
-    decided it, the frame p95, the server tick p95 or `remote server`, and whether a job
+    decided it (for a raise, the demand: work queued, a pool that ran full, a job that waited), the frame p95, the server tick p95 or `remote server`, and whether a job
     waited, ran, was queued and whether the pool ran full.
 - **Shared.** The permits are one budget for this pool and the build pool (section 5): the
   ceiling is the larger of the two pools' threads, a job of either takes a permit, and the

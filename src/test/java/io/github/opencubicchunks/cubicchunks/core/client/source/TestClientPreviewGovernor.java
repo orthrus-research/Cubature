@@ -62,7 +62,10 @@ public class TestClientPreviewGovernor {
         assertEquals("held at the floor", governor.lastReason());
         assertEquals(50.0, governor.lastTickMs(), 0.01);
         governor.update(4 * SECOND, all(120, 2), new long[0], true, false);
-        assertEquals("raised: work waited and frames and ticks are under their raise marks", governor.lastReason());
+        assertEquals("raised: a job waited, and frames and ticks are under their raise marks", governor.lastReason());
+        governor.update(7 * SECOND, all(120, 2), new long[0], true, false, "4 queued, a pool ran full");
+        assertEquals("raised: 4 queued, a pool ran full, and frames and ticks are under their raise marks",
+                governor.lastReason());
         governor.update(5 * SECOND, all(120, 2), new long[0], false, false);
         assertEquals("unchanged", governor.lastReason());
     }

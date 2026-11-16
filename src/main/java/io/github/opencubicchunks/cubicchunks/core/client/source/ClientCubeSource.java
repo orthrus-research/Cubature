@@ -449,7 +449,17 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
         // The preview's own build pool counts as work that ran: it shares the machine, not the permits.
         boolean ran = previewRan || buildRan || ClientTerrainPreviews.INSTANCE.buildActive() > 0;
         int before = workBudget.permits();
-        int after = workGovernor.update(now, latestFrames, latestTicks, demand, ran);
+        java.util.List<String> wanted = new java.util.ArrayList<>(3);
+        if (queued > 0) {
+            wanted.add(queued + " queued");
+        }
+        if (previewFull || buildFull) {
+            wanted.add("a pool ran full");
+        }
+        if (waited) {
+            wanted.add("a job waited");
+        }
+        int after = workGovernor.update(now, latestFrames, latestTicks, demand, ran, String.join(", ", wanted));
         workBudget.set(after);
         if (after != before) {
             CubicChunks.LOGGER.info("Client work permits {} -> {}: {} (frame p95 {} ms, server tick p95 {}, waited {}, "
