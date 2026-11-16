@@ -68,12 +68,19 @@ public final class CubeSourceCheck implements ICubeSourceListener {
         final int y;
         final int z;
         final long dueTick;
+        /** Seen before with its render chunk still waiting on a rebuild. */
+        final boolean awaiting;
 
         Departed(int x, int y, int z, long dueTick) {
+            this(x, y, z, dueTick, false);
+        }
+
+        Departed(int x, int y, int z, long dueTick, boolean awaiting) {
             this.x = x;
             this.y = y;
             this.z = z;
             this.dueTick = dueTick;
+            this.awaiting = awaiting;
         }
     }
 
@@ -97,6 +104,10 @@ public final class CubeSourceCheck implements ICubeSourceListener {
     private long departedReturned;
     private long departedOutsideGrid;
     private long staleMeshes;
+    /** Departed cubes whose render chunk was still marked for a rebuild when checked, and checked again later. */
+    private long departedAwaitingRebuild;
+    /** Of those, checked again now: still in the queue. */
+    private long departedAwaitingNow;
     private long orphans;
     /** The tick the current held box was stated, and whether it has settled since. */
     private long boxTick = -1;
@@ -128,6 +139,7 @@ public final class CubeSourceCheck implements ICubeSourceListener {
         worlds++;
         held.clear();
         departed.clear();
+        departedAwaitingNow = 0;
         source.forEachLoaded(this::take);
         CubicChunks.LOGGER.info("Cube source check: world {} attached, {} cubes already loaded, heights {} to {}",
                 worldIdentity, held.size(), source.minCubeY(), source.maxCubeY());
@@ -137,6 +149,7 @@ public final class CubeSourceCheck implements ICubeSourceListener {
     public void worldDetached(long worldIdentity) {
         held.clear();
         departed.clear();
+        departedAwaitingNow = 0;
         report("world " + worldIdentity + " detached");
     }
 
@@ -191,6 +204,9 @@ public final class CubeSourceCheck implements ICubeSourceListener {
      * grid still covers the cube, compiled something. Only the vanilla terrain path is read.
      */
     private void checkDeparted(Departed cube) {
+        if (cube.awaiting) {
+            departedAwaitingNow--;
+        }
         if (source.isLoaded(cube.x, cube.y, cube.z)) {
             departedReturned++;
             return;
@@ -208,6 +224,16 @@ public final class CubeSourceCheck implements ICubeSourceListener {
                         .getRenderChunkAt(origin);
         if (chunk == null || !chunk.getPosition().equals(origin)) {
             departedOutsideGrid++;
+            return;
+        }
+        if (chunk.needsUpdate()) {
+            // The game has not yet tried to rebuild it: it does so once the chunk is in view. Only a
+            // mesh the game had its chance to clear and did not is counted, so this one waits.
+            if (!cube.awaiting) {
+                departedAwaitingRebuild++;
+            }
+            departedAwaitingNow++;
+            departed.add(new Departed(cube.x, cube.y, cube.z, tick + MESH_DELAY_TICKS, true));
             return;
         }
         departedChecked++;
@@ -432,13 +458,13 @@ public final class CubeSourceCheck implements ICubeSourceListener {
     private void report(String when) {
         CubicChunks.LOGGER.info("Cube source check, {}: events loaded {} unloaded {} changed {} (neighbor only {}); "
                         + "snapshots {}, differing from the game's render cache {}, differing only beside an absent cube {}, gone before delivery {}; rechecked {} unchanged cubes, {} changed with no "
-                        + "event; {} superseded, {} waiting; departed cubes {} back, {} outside the render grid, {} checked, {} still drawn; {} cubes held without their column; "
+                        + "event; {} superseded, {} waiting; departed cubes {} back, {} outside the render grid, {} waited on a rebuild ({} still waiting), {} checked, {} still drawn; {} cubes held without their column; "
                         + "held boxes {}, sent {} (mean {} ticks), settled {} (mean {}, longest {} ticks); "
                         + "builds submitted {}, replaced {}, done {} (mean {} ticks, longest {}), failed {}, done with a moved "
                         + "version {}, most queued {}, most holding a snapshot {}, most finished awaiting poll {}",
                 when, loaded, unloaded, changed, neighborOnly, snapshots,
                 accessMismatches, absentNeighbor, goneBeforeDelivery, verified, stale, superseded, held.size(),
-                departedReturned, departedOutsideGrid, departedChecked, staleMeshes, orphans, boxes, boxesSent,
+                departedReturned, departedOutsideGrid, departedAwaitingRebuild, departedAwaitingNow, departedChecked, staleMeshes, orphans, boxes, boxesSent,
                 boxesSent == 0 ? 0 : sentTicks / boxesSent, boxesSettled,
                 boxesSettled == 0 ? 0 : settledTicks / boxesSettled, maxSettledTicks, buildsSubmitted, buildsReplaced,
                 buildsDone, buildsDone == 0 ? 0 : buildLatencyTicks / buildsDone, buildMaxLatencyTicks, buildsFailed,

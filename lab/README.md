@@ -110,14 +110,18 @@ the observer does no file work inside a measured tick.
 question each and not part of any suite.
 
 `tours/stale-mesh-walk-2485331.json` walks the player 540 blocks east in steps of 9 blocks, 5
-seconds at each (the tour client captures a view only after the player has moved more than 8
+seconds at each, then steps back west twice, facing west over the edge the cubes left from (the tour client captures a view only after the player has moved more than 8
 blocks and held still 100 ticks), so cubes leave at the trailing edge one column at a time
 instead of all at once as a long teleport makes them. It looks for the case in which the
 game's renderer kept drawing a cube that had left: a render chunk still in the client's grid
 whose cube the server unloaded, its outer neighbor already gone. Prepare the instance with
 `--seed 2485331 --no-distant-horizons --capture-ticks 100` and play the tour with
 `-Dcubicchunks.cubeSourceCheck=true`; 40 ticks after each removal the check looks at the cube's
-render chunk and counts the departed cubes still drawn. `-Dcubicchunks.noUnloadedMeshFix=true`
+render chunk and counts the departed cubes still drawn. The game rebuilds a render chunk marked
+for an update only once it is in view, so a chunk still marked when checked has not had its
+chance yet: it is checked again every 40 ticks, counted as having waited on a rebuild, and
+counted as still drawn only once it is no longer marked and its mesh is not empty. The look
+back brings the departed edge into view, so its chunks are rebuilt or found stale. `-Dcubicchunks.noUnloadedMeshFix=true`
 puts back the game's wait, to compare.
 
 A tour file is a list of views, or an object with `views` and the view distances the tour
@@ -130,5 +134,9 @@ arrivals and 21,250 departures, every departed cube already outside the render g
 neither run reached the case. At equal view distances it cannot arise: the grid spans the
 client's render distance around the player's chunk and the server's box its view distance
 around the player's cube. The tour therefore asks for a client render distance of 20 against
-the server's 12, so the cubes 13 to 20 cubes away leave the server while still in the grid. It
-has not been run that way yet.
+the server's 12, so the cubes 13 to 20 cubes away leave the server while still in the grid.
+
+Measured 2026-11-16 at client render 20 against server 12, before the look back and before
+the check waited on rebuilds: 61 views each, 21,250 departures, all inside the grid, and 3,840
+still drawn with the fix and without, the same cubes. The walk faced east, away from the
+departed edge, so none of those chunks had been in view to be rebuilt.

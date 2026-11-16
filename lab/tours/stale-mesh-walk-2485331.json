@@ -556,6 +556,24 @@
    "yaw": -90.0,
    "pitch": 10,
    "commands": []
+  },
+  {
+   "label": "look-back-01",
+   "x": -8174.5,
+   "y": 120,
+   "z": 11732.5,
+   "yaw": 90.0,
+   "pitch": 10,
+   "commands": []
+  },
+  {
+   "label": "look-back-02",
+   "x": -8183.5,
+   "y": 120,
+   "z": 11732.5,
+   "yaw": 90.0,
+   "pitch": 10,
+   "commands": []
   }
  ]
 }
