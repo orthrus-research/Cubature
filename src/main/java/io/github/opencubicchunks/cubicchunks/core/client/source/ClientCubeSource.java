@@ -83,6 +83,10 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
     /** The version at which every column last changed at once. */
     private long surfaceFloor;
     private final SurfaceHeights surfaces = new SurfaceHeights();
+    /** The box the server last stated, the world it was stated for, and whether the listener has heard. */
+    @Nullable private int[] held;
+    @Nullable private World heldWorld;
+    private boolean heldChanged;
     /** The preview pool and its governor, made when a renderer first asks for the pool. */
     @Nullable private ClientPreviewWork previewWork;
     @Nullable private ClientPreviewGovernor previewGovernor;
@@ -115,6 +119,17 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
         cube.sourceCopy = null;
         surfaceVersions.put(ChunkPos.asLong(cube.getX(), cube.getZ()), ++versions);
         queue.unloaded(cube.getX(), cube.getY(), cube.getZ(), isLoaded);
+    }
+
+    /** The server stated the box of cubes it keeps sent to this client (PacketHeldBox). */
+    public void heldBox(World stated, int centerX, int centerY, int centerZ, int horizontal, int vertical) {
+        int[] box = {centerX, centerY, centerZ, horizontal, vertical};
+        if (stated == heldWorld && java.util.Arrays.equals(box, held)) {
+            return;
+        }
+        held = box;
+        heldWorld = stated;
+        heldChanged = true;
     }
 
     /** The server corrected a column's height index, which the surface search starts from. */
@@ -228,6 +243,10 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
         if (announced && listener != null) {
             listener.worldDetached(identity);
         }
+        if (heldWorld == world) {
+            held = null;
+            heldWorld = null;
+        }
         world = null;
         cubes = null;
         announced = false;
@@ -269,11 +288,18 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
             announced = true;
             queue.clear();
             previews.takeChanged();
+            heldChanged = false;
             listener.worldAttached(identity);
             return;
         }
         if (!queue.isEmpty()) {
             queue.drain(listener);
+        }
+        if (heldChanged) {
+            heldChanged = false;
+            if (heldWorld == world) {
+                listener.heldBoxChanged();
+            }
         }
         if (previews.takeChanged()) {
             listener.terrainPreviewChanged();
@@ -383,6 +409,12 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
     public long lightChecksum(int cubeX, int cubeY, int cubeZ) {
         Cube cube = cubes == null ? null : cubes.getLoadedCube(cubeX, cubeY, cubeZ);
         return cube == null ? -1 : io.github.opencubicchunks.cubicchunks.core.lighting.LightChecksum.of(cube);
+    }
+
+    @Nullable
+    @Override
+    public int[] heldBox() {
+        return world != null && heldWorld == world && held != null ? held.clone() : null;
     }
 
     @Override

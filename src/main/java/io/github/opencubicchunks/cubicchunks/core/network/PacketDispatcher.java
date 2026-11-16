@@ -70,6 +70,7 @@ public class PacketDispatcher {
         registerMessage(PacketCubeSkyLightUpdates.Handler.class, PacketCubeSkyLightUpdates.class);
         // Registered last: earlier messages keep their discriminators.
         registerMessage(PacketClientPreview.Handler.class, PacketClientPreview.class);
+        registerMessage(PacketHeldBox.Handler.class, PacketHeldBox.class);
 
     }
 

@@ -399,6 +399,14 @@ alone), `maxBlockStates`, and on snapshots `getLightFor` (light as stored) and
 version halves. At server start Cubature now warns in the log when a block state
 id reaches 1,048,576, the most that cube saves keep.
 
+Also on November 16, 2026, the server states to each player the box of cubes it
+keeps sent (a new client message, PacketHeldBox: the player's cube and the
+horizontal and vertical view distances it applies), when the player joins, when
+the player moves to another cube and when the distances change. The cube source
+answers it with `heldBox` and `inHeldBox`, and its listener hears
+`heldBoxChanged`. A client built before this message is disconnected when it
+receives it; both sides need this build or later.
+
 Both supported builds include `NOTICE.md`, this file, the upstream MIT text,
 the full LGPL-2.1 text and component notices in binary and matching sources
 JARs. The sources JAR includes the mod and API Java sources. It is not by

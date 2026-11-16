@@ -223,6 +223,37 @@ threads). An executor for work on cube snapshots is not built.
 
 ## 6. Settled
 
+### The held box
+
+```java
+// api.client.ICubeSource
+int[] heldBox();                 // {centerX, centerY, centerZ, horizontal, vertical}, or null
+boolean inHeldBox(int cubeX, int cubeY, int cubeZ);
+// api.client.ICubeSourceListener
+void heldBoxChanged();
+```
+
+The server keeps a box of cubes sent to each player: every cube within its horizontal view
+distance of the player's cube along X and Z and within its vertical view distance along Y,
+each inclusive. It states that box to the client (`PacketHeldBox`, 14 bytes) when the player
+joins a cubic world, when the center moves to another cube and when either view distance
+changes, and the source answers it with `heldBox()`, a new array each call. The distances
+are the ones the server applies, which cap what the client's options ask for. The center
+is the player's cube as the server last moved it, and can trail the player by a tick.
+
+Every cube in the box is one the server will send; the client may also hold cubes outside
+it, sent ahead of the player or not yet unloaded. `heldBoxChanged` arrives at the end of
+the tick, after that tick's cube events; a box already stated when the world attaches
+raises no event. With no world attached, or from a server that does not state the box,
+`heldBox()` is null and `inHeldBox` false.
+
+The message is new in this build. A client and server of the same Cubature version but
+built before it cannot tell they differ (the version check compares mod versions), and a
+client without it is disconnected when the server sends it, as with the terrain preview's
+message (section 8): run both sides from this build or later.
+
+### The settled signal
+
 The source reports whether cube arrival for the current view is settled: every cube the
 client expects within its view distance has arrived, and no light work that would raise a
 change event is outstanding. Automated frame captures wait on this.

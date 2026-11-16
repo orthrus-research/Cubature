@@ -51,6 +51,15 @@ public interface ICubeSourceListener {
     default void terrainPreviewChanged() {
     }
 
+    /**
+     * The box of cubes the server keeps sent to this client changed: its center moved to another
+     * cube, or its view distances changed. Read it with {@code heldBox()}. Delivered at the end of
+     * the tick, after the cube events of that tick. A box already stated when the world attaches
+     * raises no event.
+     */
+    default void heldBoxChanged() {
+    }
+
     /** A cube's data arrived, including a full resend of a cube already held. */
     void cubeLoaded(int cubeX, int cubeY, int cubeZ);
 

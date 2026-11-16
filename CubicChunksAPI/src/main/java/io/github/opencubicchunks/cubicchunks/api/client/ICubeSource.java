@@ -182,6 +182,31 @@ public interface ICubeSource {
         return MAX_BLOCK_STATES;
     }
 
+    /**
+     * The box of cubes the server keeps sent to this client, as the server last stated it: {@code
+     * {centerX, centerY, centerZ, horizontal, vertical}}, a new array each call, or null when the
+     * server has not stated one (no world attached, or a server without this message). The box is
+     * every cube within {@code horizontal} of the center along X and Z and within {@code vertical}
+     * along Y, each inclusive. The center is the player's cube as the server last moved it, which
+     * can trail the player by a tick or two. The client may also hold cubes outside the box (sent
+     * ahead of the player, or not yet unloaded); every cube inside it is one the server will send.
+     * Client thread. The default answers null.
+     */
+    @Nullable
+    default int[] heldBox() {
+        return null;
+    }
+
+    /**
+     * Whether a cube lies in the {@linkplain #heldBox held box}; false when there is none. Client
+     * thread.
+     */
+    default boolean inHeldBox(int cubeX, int cubeY, int cubeZ) {
+        int[] box = heldBox();
+        return box != null && Math.abs((long) cubeX - box[0]) <= box[3] && Math.abs((long) cubeY - box[1]) <= box[4]
+                && Math.abs((long) cubeZ - box[2]) <= box[3];
+    }
+
     /** Visits every loaded cube, in no particular order. */
     void forEachLoaded(CubeVisitor visitor);
 

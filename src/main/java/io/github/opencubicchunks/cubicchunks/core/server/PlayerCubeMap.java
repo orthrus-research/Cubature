@@ -719,6 +719,15 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
             scheduleAddPlayerToWatcher(cubeWatcher, player);
         });
         this.players.put(player.getEntityId(), playerWrapper);
+        sendHeldBox(playerWrapper);
+    }
+
+    /** Tells the player's client which box of cubes the server keeps sent to it (PacketHeldBox). */
+    private void sendHeldBox(PlayerWrapper player) {
+        io.github.opencubicchunks.cubicchunks.core.network.PacketDispatcher.sendTo(
+                new io.github.opencubicchunks.cubicchunks.core.network.PacketHeldBox(
+                player.getManagedCubePosX(), player.getManagedCubePosY(), player.getManagedCubePosZ(),
+                horizontalViewDistance, verticalViewDistance), player.playerEntity);
     }
 
     // CHECKED: 1.10.2-12.18.1.2092
@@ -781,6 +790,7 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
 
         this.updatePlayer(playerWrapper, playerWrapper.getManagedCubePos(), CubePos.fromEntity(player));
         playerWrapper.updateManagedPos();
+        sendHeldBox(playerWrapper);
 
         // With ChunkGc being separate from PlayerCubeMap, there are 2 issues:
         // Problem 0: Sometimes, a chunk can be generated after CubeWatcher's chunk load callback returns with a null
@@ -965,6 +975,9 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
 
         this.horizontalViewDistance = newHorizontalViewDistance;
         this.verticalViewDistance = newVerticalViewDistance;
+        for (PlayerWrapper playerWrapper : this.players.valueCollection()) {
+            sendHeldBox(playerWrapper);
+        }
     }
 
     @Override
