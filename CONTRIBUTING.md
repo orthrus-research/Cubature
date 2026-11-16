@@ -27,7 +27,9 @@ Build with the tests from `cleanroom/` (JDK 25; Cleanroom is the only target):
 ```
 
 `tools/build_cubature.py` runs the same tests and also builds the measurement lab against the
-exact artifact. The Python tools have their own tests
+exact artifact. It records the build in the workspace's `.local/builds/cubature-latest.json` and
+`cubature-<branch>.json`, and publishes each artifact to `.local/builds/cubature/` under the commit
+it was built from, so builds from several worktrees do not replace one another. The Python tools have their own tests
 (`python -m pip install -r tools/requirements.txt`, then
 `python -B -m unittest discover -s tools -p "test_*.py"`). Changes that affect scheduling, storage, lighting or delivery also need a native
 check in the lab ([lab/README.md](lab/README.md)) or, within Riven's workspace, `riven.ps1 full`.

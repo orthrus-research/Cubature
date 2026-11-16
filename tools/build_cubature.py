@@ -3,8 +3,17 @@
 Default: the Cleanroom main artifact with its Java 26 regression tests, then the lab observer
 built against that exact artifact. Cleanroom is the only target (Java 25 bytecode, Java 26 tests).
 `--skip-tests` assembles only. Writes `.local/builds/cubature-latest.json` in the Riven
-workspace with artifact hashes, the git state and per-module test counts. `--freeze <label>`
-copies the artifacts to the workspace's `.local/frozen/<label>/` beside Riven's.
+workspace with artifact hashes, the git state and per-module test counts, and the same manifest
+as `.local/builds/cubature-<branch>.json` for the branch built. `--freeze <label>` copies the
+artifacts to the workspace's `.local/frozen/<label>/` beside Riven's.
+
+Every worktree builds into its own checkout but records into the one workspace, so the latest
+manifest names whichever worktree built last. Each artifact is therefore also published under a
+name that says what it was built from, in `.local/builds/cubature/`:
+`Cubature-<version>-<commit>[-dirty-<hash>]-cleanroom.jar`, with a `.sha256` file beside it. A
+clean build's name is its commit; a build with uncommitted changes adds `-dirty` and the start of
+its own hash, since the same commit can then give different artifacts. A published file is never
+replaced by a different one. `--no-publish` leaves the folder alone.
 
 Examples (from the Cubature checkout or anywhere):
   python tools/build_cubature.py
@@ -70,6 +79,40 @@ def test_summary(results: Path, since: float) -> dict | None:
         for key in ("tests", "failures", "errors", "skipped"):
             totals[key] += int(suite.get(key, 0))
     return totals if found else None
+
+
+def published_name(artifact: Path, commit: str, dirty: bool, digest: str) -> str:
+    """The artifact's name with what it was built from before the loader: `-<commit>[-dirty-<hash>]`."""
+    stem, loader = artifact.stem.rsplit("-", 1)
+    built_from = commit[:8] + (f"-dirty-{digest[:8]}" if dirty else "")
+    return f"{stem}-{built_from}-{loader}{artifact.suffix}"
+
+
+def publish(artifact: Path, digest: str, folder: Path, commit: str, dirty: bool) -> Path:
+    """Copies an artifact to the published folder under its built-from name, with a .sha256 beside it.
+
+    Refuses to replace a published file whose hash differs: the same name must always mean the
+    same bytes. Copies to a temporary name first, so a reader never finds a half-written file.
+    """
+    folder.mkdir(parents=True, exist_ok=True)
+    destination = folder / published_name(artifact, commit, dirty, digest)
+    checksum = destination.with_name(destination.name + ".sha256")
+    if destination.exists():
+        if sha(destination) != digest:
+            sys.exit(f"Refusing to overwrite a different published artifact: {destination}")
+    else:
+        temporary = destination.with_name(destination.name + ".tmp")
+        shutil.copy2(artifact, temporary)
+        os.replace(temporary, destination)
+    checksum.write_text(f"{digest}  {destination.name}\n", encoding="utf-8")
+    return destination
+
+
+def branch_manifest_name(branch: str | None) -> str | None:
+    """`cubature-<branch>.json`, with the branch's slashes as dashes; None for a detached HEAD."""
+    if not branch or branch == "HEAD":
+        return None
+    return "cubature-" + branch.replace("/", "-").replace("\\", "-") + ".json"
 
 
 def gradle(directory: Path, arguments: list, environment: dict, label: str):
@@ -142,6 +185,9 @@ def main():
     parser.add_argument("--no-lab", action="store_true", help="skip the lab observer")
     parser.add_argument("--freeze", metavar="LABEL", help="copy artifacts to .local/frozen/LABEL")
     parser.add_argument(
+        "--no-publish", action="store_true", help="skip publishing to .local/builds/cubature"
+    )
+    parser.add_argument(
         "--no-daemon", action="store_true", help="leave no Gradle daemon (for native captures)"
     )
     args = parser.parse_args()
@@ -189,6 +235,18 @@ def main():
         },
         "tests": tests,
     }
+    builds = workspace / ".local/builds"
+    if not args.no_publish and manifest["git"]["commit"]:
+        for entry in manifest["artifacts"].values():
+            entry["published"] = str(
+                publish(
+                    Path(entry["path"]),
+                    entry["sha256"],
+                    builds / "cubature",
+                    manifest["git"]["commit"],
+                    manifest["git"]["dirty"],
+                )
+            )
     if args.freeze:
         target = workspace / ".local/frozen" / args.freeze
         target.mkdir(parents=True, exist_ok=True)
@@ -200,9 +258,12 @@ def main():
             entry["frozen"] = str(destination)
         merge_frozen_manifest(target, "cubature", manifest)
         manifest["frozenTo"] = str(target)
-    out = workspace / ".local/builds/cubature-latest.json"
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    builds.mkdir(parents=True, exist_ok=True)
+    text = json.dumps(manifest, indent=2)
+    (builds / "cubature-latest.json").write_text(text, encoding="utf-8")
+    pointer = branch_manifest_name(manifest["git"]["branch"])
+    if pointer:
+        (builds / pointer).write_text(text, encoding="utf-8")
     for name, entry in manifest["artifacts"].items():
         counts = tests.get(name)
         summary = (
@@ -212,6 +273,8 @@ def main():
             else "no tests run"
         )
         print(f"{name}: {Path(entry['path']).name}  sha256 {entry['sha256'][:16]}  ({summary})")
+        if "published" in entry:
+            print(f"  published: {entry['published']}")
     if args.freeze:
         print(f"frozen: {manifest['frozenTo']}")
     state = "dirty" if manifest["git"]["dirty"] else "clean"
