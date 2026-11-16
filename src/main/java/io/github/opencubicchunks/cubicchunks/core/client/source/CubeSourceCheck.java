@@ -46,8 +46,11 @@ public final class CubeSourceCheck implements ICubeSourceListener {
 
     private static final int DELAY_TICKS = 40;
     private static final int PER_TICK = 64;
-    /** Ticks after an unload by which its render chunk has been rebuilt: several frames of build latency. */
-    private static final int MESH_DELAY_TICKS = 5;
+    /**
+     * Ticks after an unload by which its render chunk has been rebuilt: two seconds, well past the
+     * game's rebuild latency, so a mesh still drawn then is one that was never going to go.
+     */
+    private static final int MESH_DELAY_TICKS = 40;
     private static final int REPORT_TICKS = 200;
 
     private static final class Held {

@@ -432,6 +432,15 @@ near the edge of what was loaded differed from the server's, against 19 with the
 change. The new server option `deliverLightChanges` (default on) turns it off.
 Every cube records whether its light was written since the server's last tick.
 
+Also on November 16, 2026, the server records block by block which blocks' light
+it wrote in a cube already sent, and sends nothing when none was. The new server
+option `deliverOnlyChangedLight` (default off) sends only those blocks' light (a
+new client message, PacketCubeLightChanges, 3 bytes a block). The diagnostic
+light dumps gained periodic server dumps (`cubicchunks.lightChecksumEvery`),
+per-block light for listed cubes (`cubicchunks.lightDetail`) and each cube's
+pending boundary checks. A lab switch, `cubicchunks.noUnloadedMeshFix`, puts back
+the game's wait in the render worker, and `lab/tours` holds a one-off walking tour.
+
 Both supported builds include `NOTICE.md`, this file, the upstream MIT text,
 the full LGPL-2.1 text and component notices in binary and matching sources
 JARs. The sources JAR includes the mod and API Java sources. It is not by

@@ -80,3 +80,26 @@ inside that minute count; a tick crossing its end keeps its entire duration. Cle
 report is valid only when exactly one ready message was observed synchronously on the server
 thread, the minute completed, and no samples were dropped. Shutdown exports the retained data;
 the observer does no file work inside a measured tick.
+
+## One-off tours
+
+`tours/` holds tour definitions for Riven's `tools/runtime.py play --tour`, kept for a single
+question each and not part of any suite.
+
+`tours/stale-mesh-walk-2485331.json` walks the player 540 blocks east in steps of 9 blocks, 5
+seconds at each (the tour client captures a view only after the player has moved more than 8
+blocks and held still 100 ticks), so cubes leave at the trailing edge one column at a time
+instead of all at once as a long teleport makes them. It looks for the case in which the
+game's renderer kept drawing a cube that had left: a render chunk still in the client's grid
+whose cube the server unloaded, its outer neighbor already gone. Prepare the instance with
+`--seed 2485331 --no-distant-horizons --capture-ticks 100` and play the tour with
+`-Dcubicchunks.cubeSourceCheck=true`; 40 ticks after each removal the check looks at the cube's
+render chunk and counts the departed cubes still drawn. `-Dcubicchunks.noUnloadedMeshFix=true`
+puts back the game's wait, to compare.
+
+Measured 2026-11-16, with the fix and without: 61 views, 36,875 arrivals and 21,250
+departures, every departed cube already outside the render grid, so neither run reached the
+case. At equal view distances it cannot arise: the grid spans the client's render distance
+around the player's chunk and the server's box its view distance around the player's cube,
+and the lab keeps both at 12. It needs a client whose render distance is above the server's
+view distance, which the lab's view-distance check refuses.

@@ -73,12 +73,15 @@ public abstract class MixinRenderWorker {
      * neighbors usually gone too nothing would ever replace it. Such a chunk is built as though it
      * were near: its cube reads as air, so it compiles to nothing.
      */
+    /** A lab switch: leaves the game's wait in place, to show what it does without this fix. */
+    private static final boolean WAIT_LIKE_VANILLA = Boolean.getBoolean("cubicchunks.noUnloadedMeshFix");
+
     @WrapOperation(method = "processTask", at = @At(value = "INVOKE",
             target = "Lnet/minecraft/util/math/BlockPos;distanceSq(Lnet/minecraft/util/math/Vec3i;)D"))
     private double buildWhenOwnCubeGone(BlockPos center, Vec3i player, Operation<Double> original,
             @Local(argsOnly = true) ChunkCompileTaskGenerator task) {
         World world = task.getRenderChunk().getWorld();
-        if (world != null && ((ICubicWorld) world).isCubicWorld() && ((ICubicWorld) world).getCubeCache()
+        if (!WAIT_LIKE_VANILLA && world != null && ((ICubicWorld) world).isCubicWorld() && ((ICubicWorld) world).getCubeCache()
                 .getLoadedCube(center.getX() >> 4, center.getY() >> 4, center.getZ() >> 4) == null) {
             return 0.0;
         }
