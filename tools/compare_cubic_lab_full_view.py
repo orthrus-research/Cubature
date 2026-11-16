@@ -84,7 +84,8 @@ def geometry(manifest):
     except (ValueError, TypeError, KeyError) as error: raise ValueError('Manifest must record explicit full-view camera coordinates') from error
     if not all(math.isfinite(value) for value in position) or abs(position[0]) > 29999000 or abs(position[2]) > 29999000 or not -128 <= position[1] < 384:
         raise ValueError('Invalid full-view camera')
-    if manifest.get('schema') != 1 or manifest.get('viewDistance') != {'horizontal': 12, 'vertical': 12, 'clientRender': 12}:
+    if manifest.get('schema') != 1 or manifest.get('viewProfile', 'baseline') != 'baseline' \
+            or manifest.get('viewDistance') != {'horizontal': 12, 'vertical': 12, 'clientRender': 12}:
         raise ValueError('Full-view manifest requires all recorded view distances 12')
     center = tuple(math.floor(value / 16) for value in position)
     return {'camera': list(position), 'centerCube': list(center), 'distance': 12, 'expectedCubes': 15625, 'expectedColumns': 625,

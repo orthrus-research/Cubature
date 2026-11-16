@@ -82,6 +82,8 @@ def prepare(args):
         serverRuntimeHashes=server_files, cubicJar={'source': str(args.cubic_jar.resolve()), 'sha256': lab_files.sha(args.cubic_jar)},
         purpose='Interactive CC-only: vanilla compatibility terrain, creative/peaceful, no instrumentation mod',
         height={'minY': -128, 'maxYExclusive': 384}, modFiles=['cubicchunks.jar'])
+    # A named reduced view profile is chosen here, once, for the instance's whole life.
+    lab_profiles.choose_view_profile(manifest, getattr(args, 'view_profile', None))
     lab_files.write_json(target / 'standalone.json', manifest)
     print(target, flush=True)
 
@@ -150,6 +152,8 @@ def main():
     parser.add_argument('--port', type=int, default=25591)
     parser.add_argument('--seed', type=int, default=8675309)
     parser.add_argument('--text')
+    parser.add_argument('--view-profile', choices=sorted(lab_profiles.REDUCED_VIEW_PROFILES),
+                        help='prepare: a named view profile below the baseline of 12, fixed for the instance')
     args = parser.parse_args()
     if not args.name or any(c not in 'abcdefghijklmnopqrstuvwxyz0123456789-_' for c in args.name):
         parser.error('Use a lowercase alphanumeric instance name with optional hyphens/underscores')

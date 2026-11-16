@@ -464,6 +464,10 @@ a preview is shared across threads, a sampler is confined to one thread at a tim
 and may serve many tasks there, and what either keeps between calls is a pure
 function of the preview's inputs and the coordinates. The interface is unchanged.
 
+Also on November 16, 2026, the lab gained named reduced view profiles below the
+baseline (`near-8`), chosen when an instance is prepared and fixed for its life;
+such an instance is never raised, and its runs are not compared with others.
+
 Both supported builds include `NOTICE.md`, this file, the upstream MIT text,
 the full LGPL-2.1 text and component notices in binary and matching sources
 JARs. The sources JAR includes the mod and API Java sources. It is not by

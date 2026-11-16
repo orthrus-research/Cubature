@@ -46,6 +46,15 @@ before launch and in each capture compare the files and the measured distances w
 record. The game clamps the server's distances above 32 and Cubature's render distance above 64,
 so those are the highest a run may ask for.
 
+Below the baseline only a named reduced profile is allowed, chosen when the instance is
+prepared (`--view-profile near-8`: all three distances 8) and fixed for its life. The manifest
+records it as `viewProfile`, with a label such as `reduced near-8: horizontal 8, vertical 8,
+clientRender 8 (baseline 12)`; its values are enforced exactly, a run may not raise or change
+them, and a play asked to is refused. An instance that names no profile is a baseline one.
+Runs of different profiles, or of a baseline and a raised run, are not compared:
+`lab_profiles.require_same_view_profile` refuses them, and the full-view comparison accepts
+only baseline runs.
+
 | Path | Contents |
 | --- | --- |
 | `src/` | The lab mod: scenarios, probes and their Mixins |

@@ -331,6 +331,63 @@ class LabControlTest(unittest.TestCase):
         client['renderDistance'] = 12
         with self.assertRaises(RuntimeError): profiles.validate_view_distance_capture(manifest, server, client)
 
+    def test_a_reduced_profile_is_chosen_at_preparation_and_held_exactly(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            manifest = self._prepared(Path(temporary))
+            profiles.choose_view_profile(manifest, 'near-8')
+            self.assertEqual(manifest['viewProfile'], 'near-8')
+            self.assertEqual(manifest['viewDistance'], {'horizontal': 8, 'vertical': 8, 'clientRender': 8})
+            self.assertTrue(manifest['viewDistanceLabel'].startswith('reduced near-8: '))
+            profiles.validate_view_distance_inputs(manifest)
+            self.assertIn('view-distance=8', (Path(manifest['server']) / 'server.properties').read_text())
+            self.assertIn('renderDistance:8\n', (Path(manifest['client']) / 'options.txt').read_text())
+            # Its own values set again change nothing; anything else is refused, the baseline included.
+            self.assertFalse(profiles.apply_view_distance(manifest, profiles.reduced_view_profile('near-8')))
+            for asked in [profiles.view_distance_profile(), profiles.view_distance_profile(client_render=20)]:
+                with self.assertRaisesRegex(RuntimeError, 'reduced view profile near-8'):
+                    profiles.apply_view_distance(manifest, asked)
+            self.assertEqual(manifest['viewDistance'], {'horizontal': 8, 'vertical': 8, 'clientRender': 8})
+
+    def test_a_reduced_instance_refuses_drift_and_other_values(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            manifest = self._prepared(Path(temporary))
+            profiles.choose_view_profile(manifest, 'near-8')
+            (Path(manifest['client']) / 'options.txt').write_text('renderDistance:12\n', encoding='utf-8')
+            with self.assertRaisesRegex(RuntimeError, 'changed or is ambiguous'):
+                profiles.validate_view_distance_inputs(manifest)
+            manifest['viewDistance'] = {'horizontal': 8, 'vertical': 8, 'clientRender': 9}
+            with self.assertRaisesRegex(RuntimeError, 'exactly'):
+                profiles.validate_view_distance_inputs(manifest)
+        with self.assertRaisesRegex(RuntimeError, 'No reduced view profile'):
+            profiles.reduced_view_profile('near-3')
+
+    def test_an_instance_without_a_profile_reads_as_baseline(self):
+        self.assertEqual(profiles.view_profile_name({}), 'baseline')
+        with tempfile.TemporaryDirectory() as temporary:
+            manifest = self._prepared(Path(temporary))
+            self.assertNotIn('viewProfile', manifest)
+            profiles.validate_view_distance_inputs(manifest)
+            profiles.choose_view_profile(manifest, 'baseline')
+            self.assertNotIn('viewProfile', manifest)
+
+    def test_runs_of_different_profiles_are_not_compared(self):
+        baseline = {'viewDistance': profiles.view_distance_profile()}
+        raised = {'viewDistance': profiles.view_distance_profile(client_render=20)}
+        reduced = {'viewProfile': 'near-8', 'viewDistance': profiles.reduced_view_profile('near-8')}
+        profiles.require_same_view_profile(baseline, dict(baseline))
+        profiles.require_same_view_profile(reduced, dict(reduced))
+        for pair in [(baseline, reduced), (baseline, raised), (raised, reduced)]:
+            with self.assertRaisesRegex(RuntimeError, 'not compared'):
+                profiles.require_same_view_profile(*pair)
+
+    def test_a_reduced_capture_is_checked_against_its_profile(self):
+        manifest = {'viewProfile': 'near-8', 'viewDistance': profiles.reduced_view_profile('near-8')}
+        server = {'horizontalViewDistance': 8, 'verticalViewDistance': 8}
+        client = {'renderDistance': 8, 'verticalViewDistance': 8}
+        profiles.validate_view_distance_capture(manifest, server, client)
+        server['horizontalViewDistance'] = 12
+        with self.assertRaises(RuntimeError): profiles.validate_view_distance_capture(manifest, server, client)
+
     def test_duplicate_view_settings_are_rejected(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary); (root / 'server.properties').write_text('view-distance=12\nview-distance=3\n', encoding='utf-8')

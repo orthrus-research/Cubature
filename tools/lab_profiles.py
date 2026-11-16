@@ -9,6 +9,10 @@ VIEW_DISTANCE = 12
 VIEW_DISTANCE_KEYS = ('horizontal', 'vertical', 'clientRender')
 # Above these the game clamps the value: the server's view distances to 32, Cubature's render distance to 64.
 VIEW_DISTANCE_LIMITS = {'horizontal': 32, 'vertical': 32, 'clientRender': 64}
+# Named profiles below the baseline, chosen only when an instance is prepared. Their values are exact:
+# an instance prepared with one is never raised, and its runs are never compared with baseline runs.
+BASELINE_VIEW_PROFILE = 'baseline'
+REDUCED_VIEW_PROFILES = {'near-8': {'horizontal': 8, 'vertical': 8, 'clientRender': 8}}
 # Cubature's CubicChunksConfig.DeliveryMode, in stage order.
 DELIVERY_MODES = ('BASELINE', 'MAINTENANCE', 'SAVE', 'PREFETCH')
 JVM_ARGUMENTS = ['-Xms1G', '-Xmx8G', '-XX:+UseZGC']
@@ -123,9 +127,27 @@ def view_distance_profile(horizontal=None, vertical=None, client_render=None):
     return profile
 
 
-def check_view_distance_profile(profile):
+def view_profile_name(manifest):
+    """The instance's named view profile: 'baseline', the default for every instance that names none."""
+    return manifest.get('viewProfile', BASELINE_VIEW_PROFILE)
+
+
+def reduced_view_profile(name):
+    if name not in REDUCED_VIEW_PROFILES:
+        raise RuntimeError('No reduced view profile named ' + repr(name) + '; known: '
+                           + ', '.join(sorted(REDUCED_VIEW_PROFILES)))
+    return dict(REDUCED_VIEW_PROFILES[name])
+
+
+def check_view_distance_profile(profile, view_profile=BASELINE_VIEW_PROFILE):
     """Refuses a profile that is not one: a missing or extra key, a value that is not a whole number,
-    one below the baseline, or one above what the game would clamp it to."""
+    one below the baseline, or one above what the game would clamp it to. A named reduced profile
+    instead allows exactly its own values."""
+    if view_profile != BASELINE_VIEW_PROFILE:
+        if profile != reduced_view_profile(view_profile):
+            raise RuntimeError(f'The reduced view profile {view_profile} is exactly '
+                               f'{reduced_view_profile(view_profile)}; this instance records {profile!r}')
+        return
     if not isinstance(profile, dict) or set(profile) != set(VIEW_DISTANCE_KEYS):
         raise RuntimeError('This lab has no view-distance profile; preserve this older lab and prepare a new instance')
     for key in VIEW_DISTANCE_KEYS:
@@ -144,8 +166,11 @@ def is_baseline_view_distance(profile):
     return profile == view_distance_profile()
 
 
-def view_distance_label(profile):
-    """How a run's view distances read in its records: 'baseline', or what was raised."""
+def view_distance_label(profile, view_profile=BASELINE_VIEW_PROFILE):
+    """How a run's view distances read in its records: 'baseline', what was raised, or the reduced profile."""
+    if view_profile != BASELINE_VIEW_PROFILE:
+        return (f'reduced {view_profile}: ' + ', '.join(f'{key} {profile[key]}' for key in VIEW_DISTANCE_KEYS)
+                + f' (baseline {VIEW_DISTANCE})')
     if is_baseline_view_distance(profile):
         return 'baseline'
     raised = [f'{key} {profile[key]}' for key in VIEW_DISTANCE_KEYS if profile[key] != VIEW_DISTANCE]
@@ -163,10 +188,10 @@ def _set_vertical(config, vertical):
     config.write_text(text, encoding='utf-8')
 
 
-def configure_view_distance(server, profile=None):
+def configure_view_distance(server, profile=None, view_profile=BASELINE_VIEW_PROFILE):
     """Applies a run's server distances (the baseline unless given) to a preparation directory."""
     profile = view_distance_profile() if profile is None else profile
-    check_view_distance_profile(profile)
+    check_view_distance_profile(profile, view_profile)
     properties = server / 'server.properties'
     text = re.sub(r'^view-distance=.*\n?', '', properties.read_text(), flags=re.M)
     properties.write_text(text + f'view-distance={profile["horizontal"]}\n', encoding='utf-8')
@@ -183,12 +208,45 @@ def client_options(profile=None):
 def apply_view_distance(manifest, profile):
     """Sets a prepared instance's view distances for the next run, and records them in its manifest:
     the server's view-distance and vertical distance, the client's render distance, and the client's
-    vertical distance, which follows the server's. Returns whether anything changed."""
-    check_view_distance_profile(profile)
+    vertical distance, which follows the server's. Returns whether anything changed. An instance
+    prepared with a reduced profile keeps it: asking it for anything else is refused."""
+    name = view_profile_name(manifest)
+    if name != BASELINE_VIEW_PROFILE and profile != reduced_view_profile(name):
+        raise RuntimeError(f'This instance was prepared with the reduced view profile {name}; its distances '
+                           'are fixed, so a run may not set them')
+    check_view_distance_profile(profile, name)
     if manifest.get('viewDistance') == profile:
         return False
+    _write_view_distance(manifest, profile, name)
+    manifest['viewDistance'] = dict(profile)
+    manifest['viewDistanceLabel'] = view_distance_label(profile, name)
+    return True
+
+
+def choose_view_profile(manifest, name):
+    """At preparation: gives a fresh instance a named view profile, writing its distances and
+    recording it as viewProfile. The baseline is every instance's already, so naming it changes
+    nothing."""
+    if name in (None, BASELINE_VIEW_PROFILE):
+        return
+    profile = reduced_view_profile(name)
+    _write_view_distance(manifest, profile, name)
+    manifest['viewProfile'] = name
+    manifest['viewDistance'] = profile
+    manifest['viewDistanceLabel'] = view_distance_label(profile, name)
+
+
+def require_same_view_profile(*manifests):
+    """Refuses to compare runs whose view profiles or distances differ."""
+    seen = {(view_profile_name(m), repr(m.get('viewDistance'))) for m in manifests}
+    if len(seen) > 1:
+        raise RuntimeError('Runs of different view profiles are not compared: '
+                           + '; '.join(f'{name} {distances}' for name, distances in sorted(seen)))
+
+
+def _write_view_distance(manifest, profile, view_profile):
     server, client = Path(manifest['server']), Path(manifest['client'])
-    configure_view_distance(server, profile)
+    configure_view_distance(server, profile, view_profile)
     _set_vertical(client / 'config/cubicchunks.cfg', profile['vertical'])
     options = client / 'options.txt'
     text = options.read_text()
@@ -196,14 +254,11 @@ def apply_view_distance(manifest, profile):
     if count != 1:
         raise RuntimeError('Client options have no single renderDistance in ' + str(options))
     options.write_text(text, encoding='utf-8')
-    manifest['viewDistance'] = dict(profile)
-    manifest['viewDistanceLabel'] = view_distance_label(profile)
-    return True
 
 
 def validate_view_distance_inputs(manifest):
     profile = manifest.get('viewDistance')
-    check_view_distance_profile(profile)
+    check_view_distance_profile(profile, view_profile_name(manifest))
     server, client = Path(manifest['server']), Path(manifest['client'])
     checks = [(server / 'server.properties', r'^view-distance=(\d+)\s*$', profile['horizontal']),
               (client / 'options.txt', r'^renderDistance:(\d+)\s*$', profile['clientRender'])]
@@ -217,7 +272,7 @@ def validate_view_distance_inputs(manifest):
 
 def validate_view_distance_capture(manifest, server, client):
     expected = manifest.get('viewDistance')
-    check_view_distance_profile(expected)
+    check_view_distance_profile(expected, view_profile_name(manifest))
     observed = {'horizontal': server.get('horizontalViewDistance'), 'vertical': server.get('verticalViewDistance'),
                 'clientRender': client.get('renderDistance')}
     if observed != expected or client.get('verticalViewDistance') != expected['vertical']:
