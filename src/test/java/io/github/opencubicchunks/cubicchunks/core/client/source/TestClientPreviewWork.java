@@ -159,6 +159,8 @@ public class TestClientPreviewWork {
         IClientPreviewWork.Task queued = work.submit(5, (sampler, task) -> ranAfter.incrementAndGet());
         IClientPreviewWork.Task done = work.submit(-1, (sampler, task) -> { });
         work.bind(null);
+        // The stop is counted as it is logged: two threads, two waiting tasks withdrawn, two running interrupted.
+        org.junit.Assert.assertArrayEquals(new int[] {2, 2, 2}, work.lastStop);
         assertEquals("A waiting task is withdrawn where it stands", IClientPreviewWork.WITHDRAWN, queued.state());
         assertEquals(IClientPreviewWork.WITHDRAWN, done.state());
         awaitNoThreads(work);

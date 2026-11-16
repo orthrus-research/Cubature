@@ -96,19 +96,28 @@ final class ClientBuildWork implements IClientBuildWork {
         if (now == cubes) {
             return;
         }
+        int queuedDropped = heap.size();
         while (heap.size() > 0) {
             heap.poll().end(DROPPED);
         }
+        int admittedDropped = admitted.size();
         for (BuildTask<?> task : admitted) {
             task.drop();
         }
         admitted.clear();
         if (threads != null) {
+            int count = threads.getPoolSize();
+            int running = threads.getActiveCount();
             // Waiting runs never start: their snapshots are released here. Running jobs see the interrupt.
             for (Runnable waiting : threads.shutdownNow()) {
                 ((Run) waiting).task.releaseSnapshot();
             }
             threads = null;
+            lastStop = new int[] {count, queuedDropped + admittedDropped, running};
+            io.github.opencubicchunks.cubicchunks.core.CubicChunks.LOGGER.info(
+                    "Client build pool stopped: {} threads told to stop, {} tasks dropped ({} waiting, {} admitted), "
+                            + "{} running interrupted ({})", count, queuedDropped + admittedDropped, queuedDropped,
+                    admittedDropped, running, now == null ? "world gone" : "world replaced");
         }
         ended.clear();
         cubes = now;
@@ -282,8 +291,11 @@ final class ClientBuildWork implements IClientBuildWork {
         return was;
     }
 
-    /** For tests: the threads this pool has started that are still alive. */
-    int liveThreads() {
+    /** The last stop's threads told to stop, tasks dropped and running jobs interrupted; for tests. */
+    @Nullable int[] lastStop;
+
+    @Override
+    public int liveThreads() {
         synchronized (started) {
             started.removeIf(thread -> !thread.isAlive());
             return started.size();

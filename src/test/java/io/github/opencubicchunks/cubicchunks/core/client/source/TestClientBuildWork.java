@@ -372,7 +372,10 @@ public class TestClientBuildWork {
         }
         started.await();
         assertEquals(12, pool.queued());
+        assertEquals(2, pool.liveThreads());
         pool.bind(null);
+        // Counted as logged: two threads told to stop, all sixteen tasks dropped, two running interrupted.
+        org.junit.Assert.assertArrayEquals(new int[] {2, 16, 2}, pool.lastStop);
         for (IClientBuildWork.Task<?> task : tasks) {
             assertEquals(IClientBuildWork.DROPPED, task.state());
         }

@@ -77,6 +77,14 @@ public interface IClientBuildWork {
     /** How many threads this pool has. */
     int threads();
 
+    /**
+     * How many of the pool's threads are alive now: 0 before the first job and after the world goes,
+     * when the pool stops them and logs it. -1 from a pool that does not track them.
+     */
+    default int liveThreads() {
+        return -1;
+    }
+
     /** How many jobs of this pool and the preview pool together may run at once now. */
     int running();
 

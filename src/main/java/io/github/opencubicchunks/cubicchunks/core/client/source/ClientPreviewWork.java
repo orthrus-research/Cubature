@@ -96,10 +96,19 @@ final class ClientPreviewWork implements IClientPreviewWork {
         if (old != null) {
             old.withdrawn = true;
             if (old.threads != null) {
+                int threads = old.threads.getPoolSize();
+                int running = old.threads.getActiveCount();
+                int withdrawn = 0;
                 // Waiting tasks are withdrawn where they stand; running ones see the interrupt.
                 for (Runnable waiting : old.threads.shutdownNow()) {
                     ((Running) waiting).task.end(WITHDRAWN, null);
+                    withdrawn++;
                 }
+                lastStop = new int[] {threads, withdrawn, running};
+                io.github.opencubicchunks.cubicchunks.core.CubicChunks.LOGGER.info(
+                        "Client preview pool stopped: {} threads told to stop, {} waiting tasks withdrawn, {} running "
+                                + "interrupted ({})", threads, withdrawn, running,
+                        preview == null ? "preview withdrawn" : "preview replaced");
             }
         }
         // What the old preview's jobs finished is not handed back.
@@ -176,8 +185,11 @@ final class ClientPreviewWork implements IClientPreviewWork {
         return was;
     }
 
-    /** For tests: the threads this pool has started that are still alive. */
-    int liveThreads() {
+    /** The last stop's threads told to stop, waiting tasks withdrawn and running ones interrupted; for tests. */
+    @Nullable int[] lastStop;
+
+    @Override
+    public int liveThreads() {
         int live = 0;
         synchronized (started) {
             started.removeIf(thread -> !thread.isAlive());

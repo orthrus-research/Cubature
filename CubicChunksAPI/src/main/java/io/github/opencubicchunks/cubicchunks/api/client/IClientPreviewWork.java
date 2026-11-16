@@ -60,6 +60,14 @@ public interface IClientPreviewWork {
     /** How many threads the pool has. Fewer may run at once: see {@link #running()}. */
     int threads();
 
+    /**
+     * How many of the pool's threads are alive now: 0 before the first job and after the preview is
+     * withdrawn, when the pool stops them and logs it. -1 from a pool that does not track them.
+     */
+    default int liveThreads() {
+        return -1;
+    }
+
     /** How many jobs may run at once now, as the pool's governor has set it: 1 to {@link #threads()}. */
     int running();
 

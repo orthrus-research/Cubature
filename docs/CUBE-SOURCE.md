@@ -242,7 +242,7 @@ IClientBuildWork buildWork();
 void reprioritize(Task<?> task, long priority);
 void reprioritizeAll(ToLongFunction<Task<?>> priority);
 Task<?> poll();
-int threads(), running(), queued(), admitted(), finished();
+int threads(), running(), queued(), admitted(), finished(), liveThreads();
 // Job<R>: R run(ICubeSnapshot snapshot, Task<R> task)
 ```
 
@@ -276,7 +276,9 @@ stale task never comes back from `poll`. The renderer, which hears the change as
 (section 3), hands in a new task. A renderer that keeps light apart from geometry hands in
 its geometry task with `STALE_ON_BLOCKS` only. `cancel()` ends a task at any stage; a
 cancelled task never comes back either. When the world changes every task is `DROPPED`,
-its snapshot released, and the threads stop.
+its snapshot released, and the threads stop; the client log says so in one line (`Client build
+pool stopped:` with the threads told to stop, the tasks dropped, waiting and admitted, and the
+jobs interrupted), and `liveThreads()` falls to 0.
 
 **Bounds.** `clientBuildThreads` threads (default a quarter of the processors, 1 to 4),
 daemons just above the lowest priority, started with the first job and stopped when the
@@ -536,6 +538,11 @@ interface Task { Job job(); int state(); void cancel(); boolean cancelled();
 - **Shared.** The permits are one budget for this pool and the build pool (section 5): the
   ceiling is the larger of the two pools' threads, a job of either takes a permit, and the
   governor reads both pools' waits and runs.
+- **Stopping.** When the preview is withdrawn or replaced the pool stops its threads and the
+  client log says so in one line (`Client preview pool stopped:` with the threads told to stop,
+  the waiting tasks withdrawn and the running ones interrupted). `liveThreads()` counts the
+  pool's threads still alive, 0 once they have stopped; -1 from a pool that does not track
+  them.
 
 Not run in a game: the tests cover order, cancelling, withdrawal, thread lifetime, permits
 and the governor's arithmetic, with stand-in previews.

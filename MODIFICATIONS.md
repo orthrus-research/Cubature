@@ -450,6 +450,10 @@ On November 16, 2026, the column message released the buffers that wrap its
 bytes when it is written on the server and read on the client; before, both were
 left to the garbage collector, and Netty's leak detector could report them.
 
+Also on November 16, 2026, the client preview pool and the client build pool log
+one line when they stop their threads, and both report their live threads
+through a new default, `liveThreads()`.
+
 Both supported builds include `NOTICE.md`, this file, the upstream MIT text,
 the full LGPL-2.1 text and component notices in binary and matching sources
 JARs. The sources JAR includes the mod and API Java sources. It is not by
