@@ -254,9 +254,49 @@ message (section 8): run both sides from this build or later.
 
 ### The settled signal
 
-The source reports whether cube arrival for the current view is settled: every cube the
-client expects within its view distance has arrived, and no light work that would raise a
-change event is outstanding. Automated frame captures wait on this.
+```java
+// api.client.ICubeSource
+int quietTicks();
+boolean heldBoxSent();
+boolean settled(int quietTicks);
+// api.client.ICubeSourceListener
+void heldBoxSent();
+```
+
+The signal has two parts, and `settled(n)` is both.
+
+**Every cube of the box has arrived.** The server walks each player's held box after it
+sends cubes each tick, from a cursor that only moves past cubes already sent to that
+player, at most 4,096 a tick. When the whole box is sent it says so once
+(`PacketHeldBoxSent`, naming the box). That message follows the cubes' own on the same
+channel, so the client has applied every cube of the box when it reads it. The source
+answers `heldBoxSent()` true only while the box the message names is the box the client
+holds; a new box (the player moves to another cube, a view distance changes) makes it false
+until the server reports the new one, and the listener hears `heldBoxSent()` each time it
+turns true. A box of 25 cubes a side is 15,625 cubes, walked in four ticks once its cubes
+are sent; while one waits, the walk costs one look-up a tick.
+
+**Nothing has moved since.** `quietTicks()` counts the client ticks in a row, ending with the
+last, in which no cube arrived, left or changed (blocks, light or biomes, a neighbor's
+included), the held box did not change, and the client's light engine had no work left
+queued at the tick's end. Client relighting raises change events (section 3), so a tick in
+which the client relit anything is not quiet either.
+
+`settled(n)` is `heldBoxSent() && quietTicks() >= n`; from a server that states no box it is
+the quiet ticks alone. For a frame capture, `settled(20)`, one second, is the intended use:
+wait for it, then capture. A player that moves keeps it false; so does any world in which
+something changes every tick (flowing water, a working machine), which is why the quiet
+count is a parameter.
+
+**What settled does not say:**
+
+- that the client's light equals the server's. Until light-only changes are delivered
+  (open point 5), cubes within a few cubes of the box's edge can hold light the server has
+  since changed; the interior has measured the same (Verification);
+- anything of cubes outside the box, which the client may hold too;
+- that a renderer has built what arrived: that is the renderer's own queue;
+- anything of entities, block entities' contents, or Distant Horizons' level of detail;
+- that it will stay settled: the next change ends it.
 
 ## 7. Threads
 
@@ -576,11 +616,9 @@ keeping.
 
 1. **What a copy costs.** Copies are shared between snapshots per cube version (section
    2). The time and memory of one copy are not measured.
-2. **Settled on the client.** The server pushes cubes and the client holds no list of
-   what to expect.
-   *Proposed:* define settled as quiet: no cube packet applied and no client light work
-   outstanding for a stated number of consecutive ticks. A signal from the server that a
-   player's view is fully sent would be exact and can replace it later.
+2. **Settled on the client.** Answered by section 6: the server states the held box and
+   says when every cube of it is sent, and the client counts quiet ticks. Left open: light
+   the server changes after it sent a cube (point 5).
 3. **Biome data.** Whether the stored biomes are enough for the game's color blending at
    neighborhood edges.
    *Proposed:* the neighborhood is enough for the game's default blend radius; confirm

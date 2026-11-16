@@ -87,6 +87,10 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
     @Nullable private int[] held;
     @Nullable private World heldWorld;
     private boolean heldChanged;
+    private final SettledState settled = new SettledState();
+    /** A box the server said was sent before the source followed its world. */
+    @Nullable private int[] pendingSent;
+    @Nullable private World pendingSentWorld;
     /** The preview pool and its governor, made when a renderer first asks for the pool. */
     @Nullable private ClientPreviewWork previewWork;
     @Nullable private ClientPreviewGovernor previewGovernor;
@@ -106,6 +110,7 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
         if (!follow(cube.getWorld())) {
             return;
         }
+        settled.busy();
         stamp(cube, ARRIVED, ++versions);
         surfaceVersions.put(ChunkPos.asLong(cube.getX(), cube.getZ()), versions);
         queue.loaded(cube.getX(), cube.getY(), cube.getZ(), isLoaded);
@@ -117,6 +122,7 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
             return;
         }
         cube.sourceCopy = null;
+        settled.busy();
         surfaceVersions.put(ChunkPos.asLong(cube.getX(), cube.getZ()), ++versions);
         queue.unloaded(cube.getX(), cube.getY(), cube.getZ(), isLoaded);
     }
@@ -130,6 +136,20 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
         held = box;
         heldWorld = stated;
         heldChanged = true;
+        if (stated == world) {
+            settled.box(box);
+        }
+    }
+
+    /** The server said it has sent every cube of a box (PacketHeldBoxSent). */
+    public void heldBoxSent(World stated, int centerX, int centerY, int centerZ, int horizontal, int vertical) {
+        int[] box = {centerX, centerY, centerZ, horizontal, vertical};
+        if (stated == world) {
+            settled.boxSent(box);
+        } else {
+            pendingSent = box;
+            pendingSentWorld = stated;
+        }
     }
 
     /** The server corrected a column's height index, which the surface search starts from. */
@@ -187,6 +207,7 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
     }
 
     private void changed(Cube cube, int kinds, int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {
+        settled.busy();
         stamp(cube, kinds, ++versions);
         if ((kinds & ICubeSourceListener.BLOCKS) != 0) {
             surfaceVersions.put(ChunkPos.asLong(cube.getX(), cube.getZ()), versions);
@@ -222,6 +243,15 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
         }
         world = candidate;
         cubes = (CubeProviderClient) candidate.getChunkProvider();
+        settled.clear();
+        if (heldWorld == candidate && held != null) {
+            settled.box(held);
+        }
+        if (pendingSentWorld == candidate) {
+            settled.boxSent(pendingSent);
+        }
+        pendingSent = null;
+        pendingSentWorld = null;
         identity++;
         announced = false;
         candidate.addEventListener(this);
@@ -247,6 +277,7 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
             held = null;
             heldWorld = null;
         }
+        settled.clear();
         world = null;
         cubes = null;
         announced = false;
@@ -272,6 +303,10 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
             io.github.opencubicchunks.cubicchunks.core.lighting.LightChecksum.dump("client",
                     world.provider.getDimension(), cubes.loadedCubes());
         }
+        if (world != null) {
+            settled.tick(((io.github.opencubicchunks.cubicchunks.core.asm.mixin.ICubicWorldInternal) world)
+                    .getLightingManager().hasQueuedLightWork());
+        }
         if (previewWork != null) {
             // The pool's tasks belong to the attached preview: a change withdraws them and stops its threads.
             previewWork.bind(world == null ? null : terrainPreview());
@@ -289,6 +324,7 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
             queue.clear();
             previews.takeChanged();
             heldChanged = false;
+            settled.takeSentChanged();
             listener.worldAttached(identity);
             return;
         }
@@ -300,6 +336,9 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
             if (heldWorld == world) {
                 listener.heldBoxChanged();
             }
+        }
+        if (settled.takeSentChanged() && settled.boxSent()) {
+            listener.heldBoxSent();
         }
         if (previews.takeChanged()) {
             listener.terrainPreviewChanged();
@@ -409,6 +448,16 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
     public long lightChecksum(int cubeX, int cubeY, int cubeZ) {
         Cube cube = cubes == null ? null : cubes.getLoadedCube(cubeX, cubeY, cubeZ);
         return cube == null ? -1 : io.github.opencubicchunks.cubicchunks.core.lighting.LightChecksum.of(cube);
+    }
+
+    @Override
+    public int quietTicks() {
+        return world == null ? 0 : settled.quietTicks();
+    }
+
+    @Override
+    public boolean heldBoxSent() {
+        return world != null && settled.boxSent();
     }
 
     @Nullable

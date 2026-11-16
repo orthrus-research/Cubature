@@ -351,6 +351,7 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
             TickDiagnostics.enter(TickDiagnostics.Phase.SEND);
             try {
                 sender.send();
+                reportHeldBoxesSent();
             } finally {
                 TickDiagnostics.exit();
             }
@@ -722,8 +723,27 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
         sendHeldBox(playerWrapper);
     }
 
+    /** Cubes of a held box looked at per player per tick while it is not yet all sent. */
+    private static final int HELD_BOX_LOOKS_PER_TICK = 4096;
+
+    /** Tells each player's client once every cube of its held box has been sent (PacketHeldBoxSent). */
+    private void reportHeldBoxesSent() {
+        for (PlayerWrapper playerWrapper : this.players.valueCollection()) {
+            EntityPlayerMP player = playerWrapper.playerEntity;
+            if (playerWrapper.heldBox.advance((x, y, z) -> isPlayerWatchingCube(player, x, y, z),
+                    HELD_BOX_LOOKS_PER_TICK)) {
+                int[] box = playerWrapper.heldBox.box();
+                io.github.opencubicchunks.cubicchunks.core.network.PacketDispatcher.sendTo(
+                        new io.github.opencubicchunks.cubicchunks.core.network.PacketHeldBoxSent(
+                                box[0], box[1], box[2], box[3], box[4]), player);
+            }
+        }
+    }
+
     /** Tells the player's client which box of cubes the server keeps sent to it (PacketHeldBox). */
     private void sendHeldBox(PlayerWrapper player) {
+        player.heldBox.reset(player.getManagedCubePosX(), player.getManagedCubePosY(), player.getManagedCubePosZ(),
+                horizontalViewDistance, verticalViewDistance);
         io.github.opencubicchunks.cubicchunks.core.network.PacketDispatcher.sendTo(
                 new io.github.opencubicchunks.cubicchunks.core.network.PacketHeldBox(
                 player.getManagedCubePosX(), player.getManagedCubePosY(), player.getManagedCubePosZ(),
@@ -1056,6 +1076,7 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
 
         final EntityPlayerMP playerEntity;
         final AheadCubePreparation ahead;
+        final HeldBoxProgress heldBox = new HeldBoxProgress();
         private double managedPosY;
 
         PlayerWrapper(EntityPlayerMP player) {

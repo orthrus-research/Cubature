@@ -171,6 +171,10 @@ public class LightingManager implements ILightingManager {
         return lightEngine.hasLightUpdates();
     }
 
+    @Override public boolean hasQueuedLightWork() {
+        return !CubicChunksConfig.disableLighting && lightEngine.hasLightUpdates();
+    }
+
     @Override public void onHeightUpdate(BlockPos pos) {
         if (!world.isRemote) {
             heightListener().heightUpdated(pos.getX(), pos.getZ());

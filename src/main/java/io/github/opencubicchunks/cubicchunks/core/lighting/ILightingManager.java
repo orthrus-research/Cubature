@@ -86,6 +86,11 @@ public interface ILightingManager {
 
     boolean hasPendingLightUpdates(ICube cube);
 
+    /** Whether light work is queued in this world and not yet done; the client's settled signal reads it. */
+    default boolean hasQueuedLightWork() {
+        return false;
+    }
+
     void onHeightUpdate(BlockPos pos);
 
     void onTrackCubeSurface(ICube cube);

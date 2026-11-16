@@ -71,6 +71,7 @@ public class PacketDispatcher {
         // Registered last: earlier messages keep their discriminators.
         registerMessage(PacketClientPreview.Handler.class, PacketClientPreview.class);
         registerMessage(PacketHeldBox.Handler.class, PacketHeldBox.class);
+        registerMessage(PacketHeldBoxSent.Handler.class, PacketHeldBoxSent.class);
 
     }
 

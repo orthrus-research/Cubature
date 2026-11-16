@@ -60,6 +60,13 @@ public interface ICubeSourceListener {
     default void heldBoxChanged() {
     }
 
+    /**
+     * The server said it sent every cube of the current held box: {@code heldBoxSent()} is now true.
+     * Delivered at the end of the tick, after the cube events of that tick.
+     */
+    default void heldBoxSent() {
+    }
+
     /** A cube's data arrived, including a full resend of a cube already held. */
     void cubeLoaded(int cubeX, int cubeY, int cubeZ);
 

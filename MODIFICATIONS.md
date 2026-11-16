@@ -407,6 +407,14 @@ answers it with `heldBox` and `inHeldBox`, and its listener hears
 `heldBoxChanged`. A client built before this message is disconnected when it
 receives it; both sides need this build or later.
 
+Also on November 16, 2026, the cube source gained a settled signal for frame
+captures (`quietTicks`, `heldBoxSent`, `settled`, and the listener's
+`heldBoxSent`). The server walks each player's held box after sending cubes, at
+most 4,096 look-ups a player a tick while the box is not all sent, and says once
+per box that every cube of it has been sent (another new client message,
+PacketHeldBoxSent). The client counts the ticks in which nothing arrived, left or
+changed and its light engine had no work queued.
+
 Both supported builds include `NOTICE.md`, this file, the upstream MIT text,
 the full LGPL-2.1 text and component notices in binary and matching sources
 JARs. The sources JAR includes the mod and API Java sources. It is not by

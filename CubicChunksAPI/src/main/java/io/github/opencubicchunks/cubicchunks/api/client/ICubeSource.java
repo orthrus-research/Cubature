@@ -207,6 +207,40 @@ public interface ICubeSource {
                 && Math.abs((long) cubeZ - box[2]) <= box[3];
     }
 
+    /**
+     * How many client ticks in a row, ending with the last one, nothing in the view moved: no cube
+     * arrived, left or changed (blocks, light or biomes, a neighbor's included), the held box did not
+     * change, and no client light work was left queued at the tick's end. 0 in a tick with any of
+     * those, and with no world attached. Client thread. The default answers 0.
+     */
+    default int quietTicks() {
+        return 0;
+    }
+
+    /**
+     * Whether the server has said it sent every cube of the current {@linkplain #heldBox held box}.
+     * The server says so once per box, after the cubes' own messages, so when this turns true every
+     * cube of the box has arrived. It turns false again when the box changes (the player moves to
+     * another cube, or a view distance changes), until the server says so of the new box. False with
+     * no box. Client thread. The default answers false.
+     */
+    default boolean heldBoxSent() {
+        return false;
+    }
+
+    /**
+     * Whether the view is settled (docs/CUBE-SOURCE.md, section 6): every cube of the held box has
+     * arrived ({@link #heldBoxSent}) and the view has been quiet for at least {@code quietTicks}
+     * ticks. From a server that states no held box, the quiet ticks alone. It says nothing of light
+     * the server computes after it sent a cube, of what a renderer has built, or of entities. Client
+     * thread.
+     *
+     * @param quietTicks how many quiet ticks to require; 20 (one second) suits frame captures
+     */
+    default boolean settled(int quietTicks) {
+        return quietTicks() >= quietTicks && (heldBox() == null || heldBoxSent());
+    }
+
     /** Visits every loaded cube, in no particular order. */
     void forEachLoaded(CubeVisitor visitor);
 

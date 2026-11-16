@@ -95,6 +95,15 @@ public final class CubeSourceCheck implements ICubeSourceListener {
     private long departedOutsideGrid;
     private long staleMeshes;
     private long orphans;
+    /** The tick the current held box was stated, and whether it has settled since. */
+    private long boxTick = -1;
+    private boolean boxSettled;
+    private long boxes;
+    private long boxesSent;
+    private long boxesSettled;
+    private long sentTicks;
+    private long settledTicks;
+    private long maxSettledTicks;
 
     @Override
     public void worldAttached(long worldIdentity) {
@@ -111,6 +120,35 @@ public final class CubeSourceCheck implements ICubeSourceListener {
         held.clear();
         departed.clear();
         report("world " + worldIdentity + " detached");
+    }
+
+    @Override
+    public void heldBoxChanged() {
+        boxes++;
+        boxTick = tick;
+        boxSettled = false;
+    }
+
+    @Override
+    public void heldBoxSent() {
+        if (boxTick >= 0) {
+            boxesSent++;
+            sentTicks += tick - boxTick;
+        }
+    }
+
+    /** Ticks from a box being stated to the view settling (20 quiet ticks with the box sent). */
+    private void followSettled() {
+        if (boxTick < 0 || boxSettled || !source.settled(20)) {
+            return;
+        }
+        boxSettled = true;
+        boxesSettled++;
+        long took = tick - boxTick;
+        settledTicks += took;
+        maxSettledTicks = Math.max(maxSettledTicks, took);
+        CubicChunks.LOGGER.info("Cube source check: settled {} ticks after the held box {} was stated",
+                took, java.util.Arrays.toString(source.heldBox()));
     }
 
     @Override
@@ -269,6 +307,7 @@ public final class CubeSourceCheck implements ICubeSourceListener {
         for (int i = 0; i < PER_TICK && !departed.isEmpty() && departed.peek().dueTick <= tick; i++) {
             checkDeparted(departed.poll());
         }
+        followSettled();
         if (tick % REPORT_TICKS == 0 && worlds > 0) {
             orphans = countOrphans();
             report("tick " + tick);
@@ -278,9 +317,12 @@ public final class CubeSourceCheck implements ICubeSourceListener {
     private void report(String when) {
         CubicChunks.LOGGER.info("Cube source check, {}: events loaded {} unloaded {} changed {} (neighbor only {}); "
                         + "snapshots {}, differing from the game's render cache {}, differing only beside an absent cube {}, gone before delivery {}; rechecked {} unchanged cubes, {} changed with no "
-                        + "event; {} superseded, {} waiting; departed cubes {} back, {} outside the render grid, {} checked, {} still drawn; {} cubes held without their column",
+                        + "event; {} superseded, {} waiting; departed cubes {} back, {} outside the render grid, {} checked, {} still drawn; {} cubes held without their column; "
+                        + "held boxes {}, sent {} (mean {} ticks), settled {} (mean {}, longest {} ticks)",
                 when, loaded, unloaded, changed, neighborOnly, snapshots,
                 accessMismatches, absentNeighbor, goneBeforeDelivery, verified, stale, superseded, held.size(),
-                departedReturned, departedOutsideGrid, departedChecked, staleMeshes, orphans);
+                departedReturned, departedOutsideGrid, departedChecked, staleMeshes, orphans, boxes, boxesSent,
+                boxesSent == 0 ? 0 : sentTicks / boxesSent, boxesSettled,
+                boxesSettled == 0 ? 0 : settledTicks / boxesSettled, maxSettledTicks);
     }
 }
