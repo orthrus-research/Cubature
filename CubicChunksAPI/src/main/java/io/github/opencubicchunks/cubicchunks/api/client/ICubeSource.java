@@ -34,6 +34,9 @@ import javax.annotation.Nullable;
  */
 public interface ICubeSource {
 
+    /** In {@link #surfaceHeights}: no ground is known, or no liquid stands above the ground. */
+    int NO_SURFACE = Integer.MIN_VALUE;
+
     /**
      * Sets the one listener that receives world and cube events, or removes it with null. A listener
      * set while a world is attached receives no events for what is already loaded; it reads that
@@ -87,6 +90,45 @@ public interface ICubeSource {
      */
     @Nullable
     ICubicTerrainPreview terrainPreview();
+
+    /**
+     * The ground and the liquid surface of the 256 block columns of a chunk column, at index
+     * {@code localZ << 4 | localX}. Ground is the highest block that blocks movement and is not
+     * liquid, a log or plant matter (leaves, plants, vines, cactus, gourds): under a tree it is the
+     * soil, and at an overhang it is the overhang's top. The liquid surface is the highest liquid
+     * block above that ground. A height is the Y of the block's top face, the block's Y plus one.
+     *
+     * <p>A block column whose surface the loaded cubes hold is answered from them, so edits are
+     * followed, and {@code fromLoaded} is true for it. Any other is answered from the
+     * {@linkplain #terrainPreview terrain preview}, as the generator would make it, with
+     * {@code fromLoaded} false; with no preview its ground is {@link #NO_SURFACE}. A liquid height
+     * of {@link #NO_SURFACE} also means that no liquid stands above the ground.
+     *
+     * <p>Client thread only. A source that does not track surfaces fills in {@link #NO_SURFACE}
+     * and returns 0.
+     *
+     * @param ground     receives 256 ground heights
+     * @param liquid     receives 256 liquid surface heights
+     * @param fromLoaded receives, for each block column, whether its heights are the loaded cubes'
+     * @return how many of the 256 block columns were answered from loaded cubes
+     */
+    default int surfaceHeights(int columnX, int columnZ, int[] ground, int[] liquid, boolean[] fromLoaded) {
+        java.util.Arrays.fill(ground, 0, 256, NO_SURFACE);
+        java.util.Arrays.fill(liquid, 0, 256, NO_SURFACE);
+        java.util.Arrays.fill(fromLoaded, 0, 256, false);
+        return 0;
+    }
+
+    /**
+     * A number for a chunk column that changes whenever what its loaded cubes say of
+     * {@link #surfaceHeights} could have changed: a cube of the column loaded or unloaded, a block
+     * in one changed, or the column's height index was corrected by the server. While it stands,
+     * the heights answered from loaded cubes stand. It says nothing of the preview's answers, which
+     * change only when the preview does. -1 when no world is attached or surfaces are not tracked.
+     */
+    default long surfaceVersion(int columnX, int columnZ) {
+        return -1;
+    }
 
     /** Receives one cube position. */
     @FunctionalInterface

@@ -27,10 +27,13 @@ import io.github.opencubicchunks.cubicchunks.api.client.ICubeSnapshot;
 import io.github.opencubicchunks.cubicchunks.api.client.ICubeSource;
 import io.github.opencubicchunks.cubicchunks.api.client.ICubeSourceListener;
 import io.github.opencubicchunks.cubicchunks.api.util.Coords;
+import io.github.opencubicchunks.cubicchunks.api.world.IColumn;
+import io.github.opencubicchunks.cubicchunks.api.world.IHeightMap;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
 import io.github.opencubicchunks.cubicchunks.api.worldgen.ICubicTerrainPreview;
 import io.github.opencubicchunks.cubicchunks.core.client.CubeProviderClient;
 import io.github.opencubicchunks.cubicchunks.core.world.cube.Cube;
+import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.entity.Entity;
@@ -38,6 +41,7 @@ import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.util.SoundCategory;
 import net.minecraft.util.SoundEvent;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.IWorldEventListener;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
@@ -68,6 +72,12 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
     private long identity;
     private long versions;
     private boolean announced;
+    /** For each chunk column touched, the version at which its loaded cubes last changed. */
+    private final Long2LongOpenHashMap surfaceVersions = new Long2LongOpenHashMap();
+    /** The version at which every column last changed at once. */
+    private long surfaceFloor;
+    private final SurfaceHeights surfaces = new SurfaceHeights();
+    private final LoadedSurface loadedSurface = new LoadedSurface();
 
     private ClientCubeSource() {
     }
@@ -80,6 +90,7 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
             return;
         }
         cube.sourceVersion = ++versions;
+        surfaceVersions.put(ChunkPos.asLong(cube.getX(), cube.getZ()), versions);
         queue.loaded(cube.getX(), cube.getY(), cube.getZ(), isLoaded);
     }
 
@@ -89,7 +100,15 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
             return;
         }
         cube.sourceCopy = null;
+        surfaceVersions.put(ChunkPos.asLong(cube.getX(), cube.getZ()), ++versions);
         queue.unloaded(cube.getX(), cube.getY(), cube.getZ(), isLoaded);
+    }
+
+    /** The server corrected a column's height index, which the surface search starts from. */
+    public void heightsChanged(World changed, int columnX, int columnZ) {
+        if (changed == world) {
+            surfaceVersions.put(ChunkPos.asLong(columnX, columnZ), ++versions);
+        }
     }
 
     @Override
@@ -121,6 +140,8 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
             for (Cube cube : cubes.loadedCubes()) {
                 changed(cube, ALL, 0, 0, 0, 15, 15, 15);
             }
+            surfaceVersions.clear();
+            surfaceFloor = versions;
             return;
         }
         for (int cx = minX; cx <= maxX; cx++) {
@@ -139,6 +160,9 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
 
     private void changed(Cube cube, int kinds, int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {
         cube.sourceVersion = ++versions;
+        if ((kinds & ICubeSourceListener.BLOCKS) != 0) {
+            surfaceVersions.put(ChunkPos.asLong(cube.getX(), cube.getZ()), versions);
+        }
         queue.changed(cube.getX(), cube.getY(), cube.getZ(), kinds, minX, minY, minZ, maxX, maxY, maxZ, isLoaded);
     }
 
@@ -168,6 +192,10 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
         }
         world.removeEventListener(this);
         queue.clear();
+        surfaceVersions.clear();
+        surfaceFloor = versions;
+        surfaces.clear();
+        loadedSurface.forget();
         if (announced && listener != null) {
             listener.worldDetached(identity);
         }
@@ -292,6 +320,87 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
     @Override
     public ICubicTerrainPreview terrainPreview() {
         return ClientTerrainPreviews.INSTANCE.preview(world);
+    }
+
+    @Override
+    public int surfaceHeights(int columnX, int columnZ, int[] ground, int[] liquid, boolean[] fromLoaded) {
+        if (world == null) {
+            return ICubeSource.super.surfaceHeights(columnX, columnZ, ground, liquid, fromLoaded);
+        }
+        Chunk column = cubes.getLoadedColumn(columnX, columnZ);
+        try {
+            return surfaces.fill(column == null ? null : loadedSurface.of(column, columnX, columnZ),
+                    terrainPreview(), columnX, columnZ, ground, liquid, fromLoaded);
+        } finally {
+            loadedSurface.forget();
+        }
+    }
+
+    @Override
+    public long surfaceVersion(int columnX, int columnZ) {
+        if (world == null) {
+            return -1;
+        }
+        return Math.max(surfaceFloor, surfaceVersions.get(ChunkPos.asLong(columnX, columnZ)));
+    }
+
+    /** A chunk column's loaded cubes for the surface search, keeping the cubes it has looked up. */
+    private final class LoadedSurface implements SurfaceHeights.LoadedColumn {
+        private static final int WINDOW = 64;
+        private final Cube[] held = new Cube[WINDOW];
+        private final boolean[] asked = new boolean[WINDOW];
+        private IHeightMap tops;
+        private int columnX;
+        private int columnZ;
+        private int baseCubeY;
+        private boolean based;
+
+        LoadedSurface of(Chunk column, int x, int z) {
+            forget();
+            tops = ((IColumn) column).getOpacityIndex();
+            columnX = x;
+            columnZ = z;
+            return this;
+        }
+
+        void forget() {
+            java.util.Arrays.fill(held, null);
+            java.util.Arrays.fill(asked, false);
+            tops = null;
+            based = false;
+        }
+
+        @Override
+        public int top(int localX, int localZ) {
+            return tops.getTopBlockY(localX, localZ);
+        }
+
+        @Nullable
+        @Override
+        public IBlockState state(int localX, int blockY, int localZ) {
+            int cubeY = blockY >> 4;
+            if (!based) {
+                // The first block asked for is a column's top; the search only goes down from tops.
+                based = true;
+                baseCubeY = cubeY + 8;
+            }
+            int slot = baseCubeY - cubeY;
+            Cube cube;
+            if (slot < 0 || slot >= WINDOW) {
+                cube = cubes.getLoadedCube(columnX, cubeY, columnZ);
+            } else if (asked[slot]) {
+                cube = held[slot];
+            } else {
+                asked[slot] = true;
+                cube = held[slot] = cubes.getLoadedCube(columnX, cubeY, columnZ);
+            }
+            return cube == null ? null : cube.getBlockState(localX, blockY, localZ);
+        }
+
+        @Override
+        public int floor() {
+            return ((ICubicWorld) world).getMinHeight();
+        }
     }
 
     private CubeCopy copy(int x, int y, int z, boolean sky) {

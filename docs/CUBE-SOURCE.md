@@ -259,6 +259,54 @@ native generation already built is shared, not built twice.
 - **Server tiles as the fallback of last resort**, for a withheld seed or a declining
   factory: the server pool samples and sends tiles, as it does for Distant Horizons today.
 
+### Surface heights
+
+A renderer that must know where a column's ground is (for example to tell which columns its
+own meshes cover) asks for a whole chunk column at once, on the client thread:
+
+```java
+// api.client.ICubeSource
+int NO_SURFACE = Integer.MIN_VALUE;
+int surfaceHeights(int columnX, int columnZ, int[] ground, int[] liquid, boolean[] fromLoaded);
+long surfaceVersion(int columnX, int columnZ);
+```
+
+`surfaceHeights` fills 256 entries of each array, at index `localZ << 4 | localX`, and
+returns how many block columns were answered from loaded cubes.
+
+- **Ground** is the highest block that blocks movement and is not liquid, not a log
+  (`BlockLog`) and not plant matter: the materials leaves, plants, vine, cactus and gourd,
+  the set the Distant Horizons integration files as leaves. Planks, glass and ice are ground.
+  Under a tree the ground is the soil; at an overhang it is the top of the overhang.
+- **Liquid** is the highest liquid block above that ground, or `NO_SURFACE` when there is
+  none.
+- A height is the Y of the block's top face: the block's Y plus one, as a preview run gives
+  its top.
+- **From loaded cubes** where they hold the column's surface: the search goes down from the
+  column's height index (the highest block that dims light, which the server keeps for the
+  whole column) through leaves, logs, plants, liquid and air to the first ground, at most 256
+  blocks. `fromLoaded` is true only then. If a cube on the way is not loaded, or no ground
+  is found, the loaded cubes do not say where the ground is, and both heights are the
+  preview's with `fromLoaded` false. Ground that lets all light through and stands above
+  everything that dims it (a glass roof over open air) is not seen: the search starts below
+  it.
+- **From the preview** otherwise, sampled at one-block cells: the highest ground run and the
+  highest liquid run above it. With no preview the ground is `NO_SURFACE`. A sample costs
+  what the generator's preview costs for a column (about 0.1 ms in Riven), on the client
+  thread, so a chunk column answered wholly from the preview costs about 256 of them the
+  first time. Answers are kept for the last 2,048 chunk columns and dropped when the preview
+  changes.
+
+`surfaceVersion` changes whenever what the loaded cubes say could have changed: a cube of
+the column loaded or unloaded, a block in one changed, or the server corrected the column's
+height index. A caller that holds the number can skip a column whose number has not moved.
+It does not cover the preview's answers; `terrainPreviewChanged()` does. It is one entry in
+a map per chunk column touched since the world attached, about 16 bytes each, cleared when
+the world detaches.
+
+Both methods have defaults (`NO_SURFACE` everywhere, 0 and -1), so a source that does not
+track surfaces still answers.
+
 ## 9. How the Celeritas integration maps onto this
 
 | Today (`CeleritasCompat` and the `selectable.celeritas` Mixins) | In this contract |

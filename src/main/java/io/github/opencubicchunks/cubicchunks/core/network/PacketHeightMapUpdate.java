@@ -143,6 +143,8 @@ public class PacketHeightMapUpdate implements IMessage {
                 index.setHeight(x, z, height);
                 lm.updateLightBetween(column, x, oldHeight, height, z);
             }
+            io.github.opencubicchunks.cubicchunks.core.client.source.ClientCubeSource.INSTANCE
+                    .heightsChanged(world, columnX, columnZ);
             io.github.opencubicchunks.cubicchunks.core.compat.distanthorizons.DistantHorizonsCompat.columnLoaded(column);
         }
     }
