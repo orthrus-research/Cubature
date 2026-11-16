@@ -105,8 +105,10 @@ public interface ICubeSource {
     void forEachLoaded(CubeVisitor visitor);
 
     /**
-     * An immutable copy of the cube and the 26 cubes around it, as they stand now. The center cube
-     * need not be loaded.
+     * An immutable copy of the cube and the 26 cubes around it, as they stand now. Neither the
+     * center cube nor any neighbor need be loaded, so a cube at the edge of what the client holds is
+     * snapshotted like any other: {@link ICubeSnapshot#present} says which cubes it holds, and an
+     * absent one reads as air with implicit sky light.
      */
     ICubeSnapshot snapshot(int cubeX, int cubeY, int cubeZ);
 

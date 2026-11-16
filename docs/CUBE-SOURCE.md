@@ -75,6 +75,11 @@ A snapshot is an immutable copy of a neighborhood, taken on the client thread.
    brightness from a neighbor in such a cube, until that cube arrives.
 6. **Empty is cheap.** A snapshot whose center cube is storage-less says so without being
    read block by block.
+7. **Edge cubes need nothing more.** A snapshot may be taken of any cube, whatever of its
+   neighborhood is loaded, so a renderer meshing the edge of what the client holds takes
+   an ordinary snapshot: `present(dx, dy, dz)` says which of the 27 cubes it holds, and
+   the rest read as point 5 says. No separate query of cube states is offered; a
+   renderer that wants only presence and versions reads `isLoaded` and `version`.
 
 **Cost.** A cube is copied once per version, and that copy serves every snapshot that
 includes the cube until its version moves. A cube sits in up to 27 neighborhoods, so it is
