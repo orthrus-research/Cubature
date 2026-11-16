@@ -130,6 +130,8 @@ final class ClientPreviewWork implements IClientPreviewWork {
                         thread.setDaemon(true);
                         thread.setPriority(Thread.MIN_PRIORITY + 1);
                         synchronized (started) {
+                            // Threads of earlier previews have stopped; keep only the living.
+                            started.removeIf(other -> !other.isAlive());
                             started.add(thread);
                         }
                         return thread;

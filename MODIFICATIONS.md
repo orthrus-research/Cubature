@@ -382,6 +382,14 @@ switches, off by default: `cubicchunks.lightChecksumDump` writes each side's
 checksums to files, and `cubicchunks.noClientBoundaryRelight` skips the client's
 relight of a cube's boundaries on arrival.
 
+Also on November 15, 2026, the cube source gained `previewWork`, a pool of
+Cubature's threads on which a renderer samples the client terrain preview
+instead of starting threads of its own (default null; nothing uses it yet). Its
+threads exist only while a preview is attached, run below normal priority, and
+take fewer jobs at once while frames or the integrated server's ticks run long.
+Two client options size and govern it: `clientPreviewThreads` and
+`clientPreviewFrameBudgetMs`.
+
 Both supported builds include `NOTICE.md`, this file, the upstream MIT text,
 the full LGPL-2.1 text and component notices in binary and matching sources
 JARs. The sources JAR includes the mod and API Java sources. It is not by
