@@ -184,6 +184,9 @@ A renderer need not start threads. Cubature provides a client-side executor with
 
 Tasks read snapshots and write only memory the renderer owns.
 
+Built for sampling the terrain preview: `ICubeSource.previewWork()` (section 8, Sampling
+threads). An executor for work on cube snapshots is not built.
+
 ## 6. Settled
 
 The source reports whether cube arrival for the current view is settled: every cube the
@@ -294,8 +297,9 @@ native generation already built is shared, not built twice.
 
 ### Not built
 
-- **The client work executor** (section 5). Samplers run on threads the renderer supplies
-  until it exists, and `ClientPreviewInputs.buildPool()` is null.
+- **The work executor for cube snapshots** (section 5); the one for preview sampling exists
+  (Sampling threads, below). `ClientPreviewInputs.buildPool()` is still null: a factory builds
+  its regional data on threads of its own choosing.
 - **A client derived-data directory**, with a size cap and eviction, keyed by preview
   identity: `ClientPreviewInputs.derivedDataDirectory()` is null, so regional data stays in
   memory and is rebuilt each session.
@@ -306,6 +310,58 @@ native generation already built is shared, not built twice.
   by identity) is an optimisation for fast links, not a requirement.
 - **Server tiles as the fallback of last resort**, for a withheld seed or a declining
   factory: the server pool samples and sends tiles, as it does for Distant Horizons today.
+
+### Sampling threads
+
+A renderer samples the preview on Cubature's threads, not its own:
+
+```java
+// api.client.ICubeSource
+@Nullable IClientPreviewWork previewWork();
+
+// api.client.IClientPreviewWork
+int QUEUED = 0, RUNNING = 1, DONE = 2, FAILED = 3, CANCELLED = 4, WITHDRAWN = 5;
+int threads();
+int running();
+Task submit(long priority, Job job);
+@Nullable Task poll();
+interface Job { void run(ICubicTerrainPreview.Sampler sampler, Task task) throws Exception; }
+interface Task { Job job(); int state(); void cancel(); boolean cancelled();
+                 @Nullable Throwable failure(); void checkpoint() throws InterruptedException; }
+```
+
+- **Jobs.** `submit` takes a job and a priority; the lowest priority runs first, and jobs of
+  one priority run in the order they arrived. A job runs on a pool thread with a sampler the
+  pool keeps for that thread, so the rule that a sampler belongs to one task at a time is
+  the pool's to keep: a job never makes or shares one. The job keeps its own result.
+- **Results.** `poll`, on the client thread, returns the next task whose job has ended,
+  `DONE` or `FAILED` (with what it threw), or null. It never waits; a renderer takes a few
+  a frame.
+- **Cancelling.** A cancelled task that was waiting never runs. One that is running sees
+  `cancelled()` and should return between its rows. Neither comes back from `poll`, nor
+  does a task cancelled after its job ended but before it was taken.
+- **A preview that goes or changes.** Tasks belong to the preview attached when they were
+  handed in. When it is withdrawn or replaced, waiting tasks become `WITHDRAWN` without
+  running, running ones are interrupted and end `WITHDRAWN` (a job that meets
+  `TerrainPreviewWithdrawnException` ends the same way), finished ones not yet taken are
+  dropped, and the pool's threads stop. A new preview gets new threads with the first job
+  handed in under it. No thread outlives the preview it sampled; with no preview attached a
+  task is `WITHDRAWN` at once.
+- **Threads.** `clientPreviewThreads` (default -1: a quarter of the processors, 1 to 4),
+  daemons one step above the lowest priority, never the common pool.
+- **Governor.** As on the server, the threads are a ceiling and permits say how many jobs
+  run at once: half the threads to start, never fewer than one. Once a second the governor
+  reads the last 120 frame times and, in single player, the integrated server's latest
+  ticks. While jobs ran and the frames' p95 is at or over `clientPreviewFrameBudgetMs`
+  (default 25), or the server's tick p95 is at or over the server pool's own 45 ms, it
+  halves the permits. When a job waited for a permit, two seconds have passed since the
+  last change, the frames' p95 is under four fifths of the budget and the tick p95 under
+  40 ms, it adds one. A long job calls `Task.checkpoint()` between rows, where it waits if
+  the permits have fallen below the jobs running. A client whose frames are longer than the
+  budget whatever the pool does stays at one job.
+
+Not run in a game: the tests cover order, cancelling, withdrawal, thread lifetime, permits
+and the governor's arithmetic, with stand-in previews.
 
 ### Surface heights
 

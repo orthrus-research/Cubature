@@ -195,6 +195,16 @@ public interface ICubeSource {
         return -1;
     }
 
+    /**
+     * Cubic Chunks' threads for sampling the {@linkplain #terrainPreview terrain preview}, so that a
+     * renderer starts none of its own; null from a source that has none. The same object for the
+     * life of the client: its tasks follow whichever preview is attached.
+     */
+    @Nullable
+    default IClientPreviewWork previewWork() {
+        return null;
+    }
+
     /** Receives one cube position. */
     @FunctionalInterface
     interface CubeVisitor {

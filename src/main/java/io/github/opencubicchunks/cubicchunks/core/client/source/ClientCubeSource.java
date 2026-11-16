@@ -23,6 +23,7 @@
  */
 package io.github.opencubicchunks.cubicchunks.core.client.source;
 
+import io.github.opencubicchunks.cubicchunks.api.client.IClientPreviewWork;
 import io.github.opencubicchunks.cubicchunks.api.client.ICubeSnapshot;
 import io.github.opencubicchunks.cubicchunks.api.client.ICubeSource;
 import io.github.opencubicchunks.cubicchunks.api.client.ICubeSourceListener;
@@ -32,6 +33,7 @@ import io.github.opencubicchunks.cubicchunks.api.world.ICube;
 import io.github.opencubicchunks.cubicchunks.api.world.IHeightMap;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
 import io.github.opencubicchunks.cubicchunks.api.worldgen.ICubicTerrainPreview;
+import io.github.opencubicchunks.cubicchunks.core.CubicChunksConfig;
 import io.github.opencubicchunks.cubicchunks.core.client.CubeProviderClient;
 import io.github.opencubicchunks.cubicchunks.core.world.cube.Cube;
 import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
@@ -39,6 +41,7 @@ import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.server.integrated.IntegratedServer;
 import net.minecraft.util.SoundCategory;
 import net.minecraft.util.SoundEvent;
 import net.minecraft.util.math.BlockPos;
@@ -80,6 +83,13 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
     /** The version at which every column last changed at once. */
     private long surfaceFloor;
     private final SurfaceHeights surfaces = new SurfaceHeights();
+    /** The preview pool and its governor, made when a renderer first asks for the pool. */
+    @Nullable private ClientPreviewWork previewWork;
+    @Nullable private ClientPreviewGovernor previewGovernor;
+    private final long[] frameNanos = new long[ClientPreviewGovernor.FRAMES];
+    private int frames;
+    private long lastFrame;
+    private long nextGoverning = Long.MIN_VALUE;
     private final LoadedSurface loadedSurface = new LoadedSurface();
 
     private ClientCubeSource() {
@@ -243,6 +253,11 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
             io.github.opencubicchunks.cubicchunks.core.lighting.LightChecksum.dump("client",
                     world.provider.getDimension(), cubes.loadedCubes());
         }
+        if (previewWork != null) {
+            // The pool's tasks belong to the attached preview: a change withdraws them and stops its threads.
+            previewWork.bind(world == null ? null : terrainPreview());
+            governPreviewWork(System.nanoTime());
+        }
         if (world == null || listener == null) {
             queue.clear();
             previews.takeChanged();
@@ -263,6 +278,45 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
         if (previews.takeChanged()) {
             listener.terrainPreviewChanged();
         }
+    }
+
+    /** The time between frames, for the preview pool's governor. */
+    @SubscribeEvent
+    public void onRenderTick(TickEvent.RenderTickEvent event) {
+        if (event.phase != TickEvent.Phase.START || previewWork == null) {
+            return;
+        }
+        long now = System.nanoTime();
+        if (lastFrame != 0) {
+            frameNanos[frames++ % frameNanos.length] = now - lastFrame;
+        }
+        lastFrame = now;
+    }
+
+    /** Once a second: the governor reads the latest frames and, in single player, the server's latest ticks. */
+    private void governPreviewWork(long now) {
+        if (now < nextGoverning) {
+            return;
+        }
+        nextGoverning = now + 1_000_000_000L;
+        int count = Math.min(frames, frameNanos.length);
+        long[] latestFrames = new long[count];
+        for (int i = 0; i < count; i++) {
+            latestFrames[i] = frameNanos[Math.floorMod(frames - count + i, frameNanos.length)];
+        }
+        long[] latestTicks = new long[0];
+        IntegratedServer server = Minecraft.getMinecraft().getIntegratedServer();
+        if (server != null) {
+            int tick = server.getTickCounter();
+            long[] ring = server.tickTimeArray;
+            int ticks = Math.min(ClientPreviewGovernor.RAISE_TICKS, Math.min(tick, ring.length));
+            latestTicks = new long[ticks];
+            for (int i = 0; i < ticks; i++) {
+                latestTicks[i] = ring[Math.floorMod(tick - ticks + 1 + i, ring.length)];
+            }
+        }
+        previewWork.permits(previewGovernor.update(now, latestFrames, latestTicks, previewWork.takeWaited(),
+                previewWork.takeRan()));
     }
 
     // ICubeSource.
@@ -473,6 +527,18 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
         public int floor() {
             return ((ICubicWorld) world).getMinHeight();
         }
+    }
+
+    @Override
+    public IClientPreviewWork previewWork() {
+        if (previewWork == null) {
+            int threads = ClientPreviewWork.size(CubicChunksConfig.clientPreviewThreads,
+                    Runtime.getRuntime().availableProcessors());
+            previewGovernor = new ClientPreviewGovernor(threads, CubicChunksConfig.clientPreviewFrameBudgetMs);
+            previewWork = new ClientPreviewWork(threads, previewGovernor.permits());
+            previewWork.bind(world == null ? null : terrainPreview());
+        }
+        return previewWork;
     }
 
     private CubeCopy copy(int x, int y, int z, boolean sky) {

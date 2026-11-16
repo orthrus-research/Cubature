@@ -124,6 +124,21 @@ public class CubicChunksConfig {
             + "the server, clients are told only that it is withheld, and they build no preview.")
     public static boolean sendSeedForClientPreview = true;
 
+    @Config.RangeInt(min = -1, max = 16)
+    @Config.RequiresMcRestart
+    @Config.Comment("Client: threads of the pool on which renderers sample the terrain preview, in place of threads "
+            + "of their own. They run below normal priority and exist only while a world's preview is attached. "
+            + "-1: a quarter of the processors, 1 to 4.")
+    public static int clientPreviewThreads = -1;
+
+    @Config.RangeInt(min = 5, max = 200)
+    @Config.RequiresMcRestart
+    @Config.Comment("Client: the frame time, in milliseconds, that the client preview pool keeps to. While its jobs "
+            + "run and more than one frame in twenty is longer than this, or the integrated server's ticks run "
+            + "long, it halves how many jobs run at once, never below one; it adds one back at a time while frames "
+            + "stay under four fifths of it. 25 keeps 40 frames a second.")
+    public static int clientPreviewFrameBudgetMs = 25;
+
     @Config.Comment("A cubic world's Distant Horizons arrival plan (LOD-DELIVERY step 5). Client: order requests by when "
             + "the player reaches each section, coarse detail first, and hold back sections the native view covers or "
             + "will cover before their data could arrive; the detail that goes first follows how the coarse sections "
