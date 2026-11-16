@@ -87,9 +87,30 @@ Holding one must not keep a cube loaded.
 
 ## 3. Versions and events
 
-Each loaded cube has a version: a number that increases whenever anything a snapshot
-would capture changes. A snapshot records the version of each cube it holds, so a renderer
-can discard a build whose center cube has since changed.
+Each loaded cube has a version, its generation: a number that increases whenever anything
+a snapshot would capture changes, and with every arrival of its data. A snapshot records
+the version of each cube it holds, so a renderer can discard a build whose center cube has
+since changed. Versions come from one counter for the whole client world, so a cube that
+leaves and arrives again never repeats a version it had before. A version may move when
+nothing a snapshot shows differs (a render update the game asks for
+without a change); it never stays still
+when something does.
+
+```java
+// api.client.ICubeSource
+long version(int cubeX, int cubeY, int cubeZ);
+long blockVersion(int cubeX, int cubeY, int cubeZ);
+long lightVersion(int cubeX, int cubeY, int cubeZ);
+```
+
+The version is split in two for a renderer that keeps light apart from geometry.
+`blockVersion` moves when the cube's blocks or biomes change or its data arrives;
+`lightVersion` moves when its block light or sky light changes or its data arrives. Each
+is at most the version, and the version moves whenever either does, so a renderer that
+reads only `version` loses nothing. A mesh whose `blockVersion` is unmoved needs only its
+light redone. A block edit moves both, since light may follow it, and so does a render
+update the game asks for over a range, which does not say what changed. All three are -1
+for a cube that is not loaded. The defaults answer `version` for both halves.
 
 Cubature delivers events to one listener, on the client thread, after the data they
 describe is readable:
@@ -118,12 +139,23 @@ Events are delivered once per client tick, at its end.
    queued in the same tick is covered by the arrival.
 5. A cube that arrives and leaves within one tick is reported as both, in order; by the
    time the arrival is delivered the cube is already gone.
+6. **The bounds of a change are a contract.** They always contain every block that
+   changed; they may contain more, never less. A change to one block carries that block.
+   Changes merged within a tick carry the box around all of them. A `NEIGHBOR` change
+   carries the whole cube (0 to 15 on every axis), whatever part of the boundary was
+   touched. A render update the game asks for over a range carries the part of the range
+   inside each cube; one over more than 32,768 cubes is taken to mean the whole world, and
+   every loaded cube receives a change of blocks and light over the whole cube. An arrival
+   covers the whole cube and carries no bounds; a change merged into an arrival queued in
+   the same tick raises nothing further. A renderer may rebuild exactly the bounds it is
+   given.
 
 ## 4. Queries
 
 - The set of loaded cube positions, for a renderer that starts or restarts while a world
   is already loaded.
-- Whether a given cube is loaded, and its current version.
+- Whether a given cube is loaded, and its current version, block version and light
+  version.
 
 ## 5. Work executor
 

@@ -361,6 +361,14 @@ server's generator, which the server takes back before it closes the world. It
 is additive: the vanilla, Celeritas, Demonica and Distant Horizons paths do not
 use it, and a server whose generator offers nothing sends nothing.
 
+Also on November 15, 2026, the cube source gained further additive defaults,
+all read on the client thread (`docs/CUBE-SOURCE.md`): `surfaceHeights` can
+leave the preview unsampled, `cubeContent` says whether a cube is loaded and
+holds any block, and `blockVersion` and `lightVersion` split a cube's version
+so that a change of light alone can be told from a change of blocks. Each
+client cube carries the two halves beside its version. The bounds that cube
+change events carry are now a stated contract.
+
 Both supported builds include `NOTICE.md`, this file, the upstream MIT text,
 the full LGPL-2.1 text and component notices in binary and matching sources
 JARs. The sources JAR includes the mod and API Java sources. It is not by

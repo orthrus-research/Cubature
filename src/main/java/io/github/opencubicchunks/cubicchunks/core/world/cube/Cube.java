@@ -93,8 +93,13 @@ public class Cube implements ICube {
     @Nullable
     private byte[] blockBiomeArray = null;
 
-    /** Client only, for the cube source: the cube's version, and the copy made of it at that version. */
+    /**
+     * Client only, for the cube source: the cube's version, the versions at which its blocks or
+     * biomes and its light last changed, and the copy made of it at that version.
+     */
     public long sourceVersion;
+    public long sourceBlockVersion;
+    public long sourceLightVersion;
     @Nullable public Object sourceCopy;
 
     /**

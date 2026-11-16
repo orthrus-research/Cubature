@@ -62,6 +62,8 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
     public static final ClientCubeSource INSTANCE = new ClientCubeSource();
 
     private static final int ALL = ICubeSourceListener.BLOCKS | ICubeSourceListener.LIGHT;
+    /** An arrival replaces everything a cube holds. */
+    private static final int ARRIVED = ALL | ICubeSourceListener.BIOMES;
     /** A render update over more cubes than this is taken to mean every loaded cube. */
     private static final int WHOLE_WORLD_CUBES = 32768;
 
@@ -90,7 +92,7 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
         if (!follow(cube.getWorld())) {
             return;
         }
-        cube.sourceVersion = ++versions;
+        stamp(cube, ARRIVED, ++versions);
         surfaceVersions.put(ChunkPos.asLong(cube.getX(), cube.getZ()), versions);
         queue.loaded(cube.getX(), cube.getY(), cube.getZ(), isLoaded);
     }
@@ -160,11 +162,25 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
     }
 
     private void changed(Cube cube, int kinds, int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {
-        cube.sourceVersion = ++versions;
+        stamp(cube, kinds, ++versions);
         if ((kinds & ICubeSourceListener.BLOCKS) != 0) {
             surfaceVersions.put(ChunkPos.asLong(cube.getX(), cube.getZ()), versions);
         }
         queue.changed(cube.getX(), cube.getY(), cube.getZ(), kinds, minX, minY, minZ, maxX, maxY, maxZ, isLoaded);
+    }
+
+    /**
+     * Moves a cube's versions to the given one: its version always, its block version for a change
+     * of blocks or biomes, its light version for a change of light.
+     */
+    static void stamp(Cube cube, int kinds, long version) {
+        cube.sourceVersion = version;
+        if ((kinds & (ICubeSourceListener.BLOCKS | ICubeSourceListener.BIOMES)) != 0) {
+            cube.sourceBlockVersion = version;
+        }
+        if ((kinds & ICubeSourceListener.LIGHT) != 0) {
+            cube.sourceLightVersion = version;
+        }
     }
 
     // The world the source follows.
@@ -288,6 +304,18 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
     public long version(int cubeX, int cubeY, int cubeZ) {
         Cube cube = cubes == null ? null : cubes.getLoadedCube(cubeX, cubeY, cubeZ);
         return cube == null ? -1 : cube.sourceVersion;
+    }
+
+    @Override
+    public long blockVersion(int cubeX, int cubeY, int cubeZ) {
+        Cube cube = cubes == null ? null : cubes.getLoadedCube(cubeX, cubeY, cubeZ);
+        return cube == null ? -1 : cube.sourceBlockVersion;
+    }
+
+    @Override
+    public long lightVersion(int cubeX, int cubeY, int cubeZ) {
+        Cube cube = cubes == null ? null : cubes.getLoadedCube(cubeX, cubeY, cubeZ);
+        return cube == null ? -1 : cube.sourceLightVersion;
     }
 
     @Override

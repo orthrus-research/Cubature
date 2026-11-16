@@ -61,6 +61,13 @@ public interface ICubeSourceListener {
      * Something a snapshot captures changed. Several changes to one cube within a tick arrive as one
      * call, their kinds combined and their bounds united.
      *
+     * <p>The bounds are a contract: they always contain every block that changed, and may contain
+     * more. A change to one block carries that block; merged changes carry the box around them all;
+     * a {@link #NEIGHBOR} change carries the whole cube; a render update over a range carries the
+     * part of the range inside the cube, and one too wide to follow carries the whole cube for every
+     * loaded cube. An arrival ({@link #cubeLoaded}) covers the whole cube, and a change merged into
+     * an arrival queued in the same tick raises no call of its own.
+     *
      * @param kinds a combination of {@link #BLOCKS}, {@link #LIGHT}, {@link #BIOMES} and {@link #NEIGHBOR}
      * @param minX the bounds of the change within the cube, 0 to 15, inclusive at both ends
      */

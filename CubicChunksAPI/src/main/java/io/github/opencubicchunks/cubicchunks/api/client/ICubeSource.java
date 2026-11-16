@@ -73,10 +73,33 @@ public interface ICubeSource {
     boolean isLoaded(int cubeX, int cubeY, int cubeZ);
 
     /**
-     * The cube's version: a number that increases whenever anything a snapshot would capture of it
-     * changes. -1 for a cube that is not loaded.
+     * The cube's version, its generation: a number that increases whenever anything a snapshot would
+     * capture of it changes, and with every arrival of its data. Versions are drawn from one counter
+     * for the whole world, so a cube that leaves and arrives again never repeats an earlier version.
+     * A change only at a neighbor's boundary ({@link ICubeSourceListener#NEIGHBOR}) does not move it.
+     * It may move when nothing a snapshot shows differs. -1 for a cube that is not loaded.
      */
     long version(int cubeX, int cubeY, int cubeZ);
+
+    /**
+     * The version at which the cube's blocks or biomes last changed or its data arrived: what a mesh
+     * is built from, apart from light. It never exceeds {@link #version}, and {@link #version} moves
+     * whenever it does. A block edit moves both this and {@link #lightVersion}, since light may follow
+     * it. -1 for a cube that is not loaded. The default is {@link #version}.
+     */
+    default long blockVersion(int cubeX, int cubeY, int cubeZ) {
+        return version(cubeX, cubeY, cubeZ);
+    }
+
+    /**
+     * The version at which the cube's block light or sky light last changed or its data arrived. A
+     * cube whose {@link #blockVersion} is unmoved since a mesh was built needs only its light redone.
+     * It never exceeds {@link #version}, and {@link #version} moves whenever it does. -1 for a cube
+     * that is not loaded. The default is {@link #version}.
+     */
+    default long lightVersion(int cubeX, int cubeY, int cubeZ) {
+        return version(cubeX, cubeY, cubeZ);
+    }
 
     /** Visits every loaded cube, in no particular order. */
     void forEachLoaded(CubeVisitor visitor);
