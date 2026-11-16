@@ -8,9 +8,25 @@ import net.minecraft.world.biome.Biome;
  * generate, load, populate or save gameplay cubes. Implementations must use the
  * same content rules as their cube generator and must not access a live world.
  * Native chunk snapshots supersede these SURFACE previews after exploration.
+ *
+ * <p><b>Threads.</b> A preview is shared: it must be safe to use from any number of threads
+ * at once, and {@link #createTerrainPreviewSampler} may be called concurrently. A
+ * {@link Sampler} is confined to one thread at a time; the pools that run samplers keep one a
+ * thread and use it for many tasks in turn, so a sampler may be called again for any column
+ * after any earlier one, and may be handed to another thread between tasks (never during one).
+ *
+ * <p><b>Caches.</b> Anything a preview or a sampler keeps from one call to the next must be a
+ * pure function of the preview's inputs (the seed, the world's definitions and generator
+ * options) and the coordinates asked for, so that a column samples the same whatever was
+ * sampled before it, on whatever thread. Scratch buffers a sampler reuses and overwrites on
+ * each call are not caches. A cache shared by the samplers of one preview must itself be safe
+ * across threads.
  */
 public interface ICubicTerrainPreview {
-    /** A new task-confined sampler; different samplers may run concurrently. */
+    /**
+     * A new sampler, confined to one thread at a time. May be called from several threads at
+     * once; different samplers may run concurrently.
+     */
     Sampler createTerrainPreviewSampler();
 
     interface Sampler {

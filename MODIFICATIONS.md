@@ -459,6 +459,11 @@ and a pool running full as demand, not only a job that waited for a permit, so
 a renderer that hands in no more jobs than may run still lets the pool grow, and
 it logs each change of the permits with what decided it.
 
+Also on November 16, 2026, `ICubicTerrainPreview` states its threading contract:
+a preview is shared across threads, a sampler is confined to one thread at a time
+and may serve many tasks there, and what either keeps between calls is a pure
+function of the preview's inputs and the coordinates. The interface is unchanged.
+
 Both supported builds include `NOTICE.md`, this file, the upstream MIT text,
 the full LGPL-2.1 text and component notices in binary and matching sources
 JARs. The sources JAR includes the mod and API Java sources. It is not by

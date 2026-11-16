@@ -378,7 +378,7 @@ count is a parameter.
 | Run a build task | A thread of `buildWork()` |
 | Submit, reprioritize, cancel or poll a build task | Client thread |
 | Read `terrainPreview()` | Client thread |
-| Create and run a terrain preview sampler | Any; one sampler per task |
+| Create and run a terrain preview sampler | Any; a preview is shared, a sampler confined to one thread at a time (`ICubicTerrainPreview`) |
 
 ## 8. Terrain preview
 
