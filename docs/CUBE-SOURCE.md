@@ -471,11 +471,22 @@ native generation already built is shared, not built twice.
   belongs to the work executor.
 - A world opened to LAN leaves the host on the shared generator; guests build their own.
 
+### The build pool
+
+A factory that builds a client preview gets `ClientPreviewInputs.buildPool()`: the preview's
+own `ForkJoinPool` of 1 or 2 daemon threads just above the lowest priority (half the preview
+pool's threads, at most 2), made with each build of a preview and shut down with it: when it is
+withdrawn or replaced, when the world goes, and when the factory declines, fails or finishes for
+a world that is no longer the client's. The preview is revoked first and its pool shut down
+after, so no sampler starts a build on a pool that is going; work queued there is dropped and
+work running is interrupted, and the client log says so in one line (`Client preview build pool
+stopped:`). It is never the preview pool's threads and takes no permit of the shared budget, so
+a sampling job that waits on a build split over it waits on other threads, which a join helps
+rather than blocks. Its running threads count to the governor as work that ran. A preview
+borrowed from the integrated server keeps that server's own build pool.
+
 ### Not built
 
-- **The work executor for cube snapshots** (section 5); the one for preview sampling exists
-  (Sampling threads, below). `ClientPreviewInputs.buildPool()` is still null: a factory builds
-  its regional data on threads of its own choosing.
 - **A client derived-data directory**, with a size cap and eviction, keyed by preview
   identity: `ClientPreviewInputs.derivedDataDirectory()` is null, so regional data stays in
   memory and is rebuilt each session.

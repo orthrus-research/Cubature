@@ -468,6 +468,11 @@ Also on November 16, 2026, the lab gained named reduced view profiles below the
 baseline (`near-8`), chosen when an instance is prepared and fixed for its life;
 such an instance is never raised, and its runs are not compared with others.
 
+Also on November 16, 2026, a client that builds a terrain preview gives the
+factory a build pool of its own (`ClientPreviewInputs.buildPool()`, before null):
+a small ForkJoinPool of 1 or 2 low-priority daemon threads, shut down with the
+preview, separate from the sampling pool's threads and permits.
+
 Both supported builds include `NOTICE.md`, this file, the upstream MIT text,
 the full LGPL-2.1 text and component notices in binary and matching sources
 JARs. The sources JAR includes the mod and API Java sources. It is not by

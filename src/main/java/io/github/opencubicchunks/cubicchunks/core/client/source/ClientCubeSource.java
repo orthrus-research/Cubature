@@ -446,7 +446,8 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
         // that hands in no more than running() allows never makes a job wait, yet keeps the pool full.
         boolean waited = previewWaited || buildWaited;
         boolean demand = waited || queued > 0 || previewFull || buildFull;
-        boolean ran = previewRan || buildRan;
+        // The preview's own build pool counts as work that ran: it shares the machine, not the permits.
+        boolean ran = previewRan || buildRan || ClientTerrainPreviews.INSTANCE.buildActive() > 0;
         int before = workBudget.permits();
         int after = workGovernor.update(now, latestFrames, latestTicks, demand, ran);
         workBudget.set(after);

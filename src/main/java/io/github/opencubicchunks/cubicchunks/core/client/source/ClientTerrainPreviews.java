@@ -31,6 +31,7 @@ import io.github.opencubicchunks.cubicchunks.api.worldgen.ICubicTerrainPreview;
 import io.github.opencubicchunks.cubicchunks.api.worldgen.ICubicTerrainPreviewFactory;
 import io.github.opencubicchunks.cubicchunks.api.worldgen.TerrainPreviewFactories;
 import io.github.opencubicchunks.cubicchunks.core.CubicChunks;
+import io.github.opencubicchunks.cubicchunks.core.CubicChunksConfig;
 import io.github.opencubicchunks.cubicchunks.core.worldgen.SharedTerrainPreviews;
 import io.github.opencubicchunks.cubicchunks.core.worldgen.WithdrawablePreview;
 import net.minecraft.client.Minecraft;
@@ -53,6 +54,8 @@ public final class ClientTerrainPreviews {
 
     @Nullable private World owner;
     @Nullable private WithdrawablePreview preview;
+    /** The build pool of the preview this client built, shut down with it; none for a borrowed one. */
+    @Nullable private ClientPreviewBuildPool buildPool;
     private boolean borrowed;
     /** Moves whenever the owner changes, so a build finishing for an earlier world is dropped. */
     private long generation;
@@ -105,9 +108,12 @@ public final class ClientTerrainPreviews {
                     offer.factory());
             return;
         }
-        // No build pool and no derived-data directory yet: regional builds run on the sampling
-        // thread and stay in memory (docs/CUBE-SOURCE.md, section 8, what is not built).
-        ClientPreviewInputs inputs = new ClientPreviewInputs(dimension, offer, null, null);
+        // The preview's own small build pool, never the sampling pool's threads; no derived-data
+        // directory yet, so what it builds stays in memory (docs/CUBE-SOURCE.md, section 8).
+        ClientPreviewBuildPool buildPoolFor = new ClientPreviewBuildPool(ClientPreviewBuildPool.size(ClientPreviewWork.size(
+                CubicChunksConfig.clientPreviewThreads, Runtime.getRuntime().availableProcessors())),
+                "dimension " + dimension);
+        ClientPreviewInputs inputs = new ClientPreviewInputs(dimension, offer, buildPoolFor.pool(), null);
         long mine = generation;
         Thread build = new Thread(() -> {
             ICubicTerrainPreview built = null;
@@ -117,21 +123,26 @@ public final class ClientTerrainPreviews {
                 CubicChunks.LOGGER.error("Terrain preview factory " + offer.factory() + " failed", failure);
             }
             ICubicTerrainPreview result = built;
-            Minecraft.getMinecraft().addScheduledTask(() -> built(mine, dimension, offer.factory(), result));
+            Minecraft.getMinecraft().addScheduledTask(() -> built(mine, dimension, offer.factory(), result, buildPoolFor));
         }, "Cubature client terrain preview");
         build.setDaemon(true);
         build.start();
     }
 
-    private void built(long forGeneration, int dimension, String factory, @Nullable ICubicTerrainPreview result) {
+    private void built(long forGeneration, int dimension, String factory, @Nullable ICubicTerrainPreview result,
+            ClientPreviewBuildPool build) {
         if (forGeneration != generation || preview != null) {
+            // Built for a world that is gone, or after another: neither it nor its pool is kept.
+            build.shutdown(0);
             return;
         }
         if (result == null) {
+            build.shutdown(0);
             CubicChunks.LOGGER.info("Terrain preview for dimension {}: factory {} declined", dimension, factory);
             return;
         }
         preview = new WithdrawablePreview(result);
+        buildPool = build;
         borrowed = false;
         changed = true;
         CubicChunks.LOGGER.info("Terrain preview for dimension {}: built by factory {}", dimension, factory);
@@ -154,6 +165,7 @@ public final class ClientTerrainPreviews {
             preview = null;
             borrowed = false;
             changed = true;
+            stopBuildPool();
         }
     }
 
@@ -178,7 +190,9 @@ public final class ClientTerrainPreviews {
             if (borrowed) {
                 SharedTerrainPreviews.giveBack(preview);
             } else {
-                preview.revoke();
+                WithdrawablePreview gone = preview;
+                new ClientPreviewBuildPool.Owned(buildPool).close(gone::revoke);
+                buildPool = null;
             }
             preview = null;
             borrowed = false;
@@ -186,6 +200,19 @@ public final class ClientTerrainPreviews {
         }
         owner = null;
         generation++;
+    }
+
+    private void stopBuildPool() {
+        if (buildPool != null) {
+            buildPool.shutdown(0);
+            buildPool = null;
+        }
+    }
+
+    /** Threads of the preview's build pool running build work now, for the governor. */
+    public int buildActive() {
+        ClientPreviewBuildPool build = buildPool;
+        return build == null ? 0 : build.active();
     }
 
     private static boolean integrated() {
