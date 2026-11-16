@@ -33,6 +33,7 @@ import io.github.opencubicchunks.cubicchunks.api.worldgen.TerrainPreviewWithdraw
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.init.Blocks;
 import net.minecraft.init.Bootstrap;
+import net.minecraft.world.chunk.storage.ExtendedBlockStorage;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -106,6 +107,30 @@ public class TestSurfaceHeights {
         @Override public int floor() {
             return FLOOR;
         }
+
+        @Override public int highestBlocks() {
+            int highest = stoneTop;
+            for (int key : set.keySet()) {
+                highest = Math.max(highest, (key >> 8) + FLOOR);
+            }
+            return highest >= loadedTo ? loadedTo - 1 : (highest >> 4 << 4) + 15;
+        }
+
+        @Override public boolean holdsBlocks(int cubeY) {
+            int from = cubeY << 4;
+            if (from < loadedFrom || from >= loadedTo) {
+                return false;
+            }
+            if (from <= stoneTop) {
+                return true;
+            }
+            for (int key : set.keySet()) {
+                if ((key >> 8) + FLOOR >> 4 == cubeY) {
+                    return true;
+                }
+            }
+            return false;
+        }
     }
 
     /** A preview whose every column is stone to a level, then water to another, then air. */
@@ -131,7 +156,7 @@ public class TestSurfaceHeights {
             column.put(3, y, 4, log);
         }
         column.put(3, 77, 4, leaves).put(4, 76, 4, leaves).put(5, 71, 4, grass);
-        int answered = new SurfaceHeights().fill(column, null, 0, 0, ground, liquid, fromLoaded);
+        int answered = new SurfaceHeights().fill(column, null, 0, 0, ground, liquid, fromLoaded, true);
         assertEquals(256, answered);
         assertEquals("Under the trunk", 71, ground[4 << 4 | 3]);
         assertEquals("Under a leaf with air below it", 71, ground[4 << 4 | 4]);
@@ -144,7 +169,7 @@ public class TestSurfaceHeights {
     @Test public void anOverhangsTopIsTheGround() {
         Loaded column = new Loaded(60);
         column.put(8, 90, 8, stone).put(8, 91, 8, dirt);
-        new SurfaceHeights().fill(column, null, 0, 0, ground, liquid, fromLoaded);
+        new SurfaceHeights().fill(column, null, 0, 0, ground, liquid, fromLoaded, true);
         assertEquals("The top of the overhang, not the ground open to the sky beside it", 92, ground[8 << 4 | 8]);
         assertEquals(61, ground[8 << 4 | 9]);
     }
@@ -154,7 +179,7 @@ public class TestSurfaceHeights {
         for (int y = 41; y <= 62; y++) {
             column.put(1, y, 2, water);
         }
-        new SurfaceHeights().fill(column, null, 0, 0, ground, liquid, fromLoaded);
+        new SurfaceHeights().fill(column, null, 0, 0, ground, liquid, fromLoaded, true);
         assertEquals("The bed", 41, ground[2 << 4 | 1]);
         assertEquals("The water's surface", 63, liquid[2 << 4 | 1]);
         assertEquals("No liquid over dry ground", NONE, liquid[0]);
@@ -166,7 +191,7 @@ public class TestSurfaceHeights {
         Loaded column = new Loaded(70);
         column.put(0, 71, 0, stone).put(0, 72, 0, stone);
         SurfaceHeights heights = new SurfaceHeights();
-        int answered = heights.fill(column, preview(71, 0, sampled), 5, -3, ground, liquid, fromLoaded);
+        int answered = heights.fill(column, preview(71, 0, sampled), 5, -3, ground, liquid, fromLoaded, true);
         assertEquals(256, answered);
         assertEquals("Two blocks placed on the generated ground", 73, ground[0]);
         assertEquals(71, ground[1]);
@@ -177,13 +202,13 @@ public class TestSurfaceHeights {
     @Test public void anUnloadedColumnIsAnsweredByThePreviewAndSaysSo() {
         int[] sampled = new int[1];
         SurfaceHeights heights = new SurfaceHeights();
-        int answered = heights.fill(null, preview(90, 101, sampled), 2, 2, ground, liquid, fromLoaded);
+        int answered = heights.fill(null, preview(90, 101, sampled), 2, 2, ground, liquid, fromLoaded, true);
         assertEquals(0, answered);
         assertEquals(90, ground[17]);
         assertEquals(101, liquid[17]);
         assertFalse(fromLoaded[17]);
         assertEquals(256, sampled[0]);
-        heights.fill(null, preview(90, 101, sampled), 2, 2, ground, liquid, fromLoaded);
+        heights.fill(null, preview(90, 101, sampled), 2, 2, ground, liquid, fromLoaded, true);
         assertEquals("A second preview is sampled afresh", 512, sampled[0]);
     }
 
@@ -191,8 +216,8 @@ public class TestSurfaceHeights {
         int[] sampled = new int[1];
         ICubicTerrainPreview preview = preview(90, 0, sampled);
         SurfaceHeights heights = new SurfaceHeights();
-        heights.fill(null, preview, 2, 2, ground, liquid, fromLoaded);
-        heights.fill(null, preview, 2, 2, ground, liquid, fromLoaded);
+        heights.fill(null, preview, 2, 2, ground, liquid, fromLoaded, true);
+        heights.fill(null, preview, 2, 2, ground, liquid, fromLoaded, true);
         assertEquals(256, sampled[0]);
         assertEquals(90, ground[0]);
         assertEquals("Dry ground has no liquid", NONE, liquid[0]);
@@ -203,7 +228,7 @@ public class TestSurfaceHeights {
         Loaded column = new Loaded(70);
         // The server's height index knows the top; the client holds only cubes far below it.
         column.loadedTo = 32;
-        int answered = new SurfaceHeights().fill(column, preview(71, 0, sampled), 0, 0, ground, liquid, fromLoaded);
+        int answered = new SurfaceHeights().fill(column, preview(71, 0, sampled), 0, 0, ground, liquid, fromLoaded, true);
         assertEquals(0, answered);
         assertEquals(71, ground[0]);
         assertFalse(fromLoaded[0]);
@@ -213,14 +238,14 @@ public class TestSurfaceHeights {
             sea.put(0, y, 0, water);
         }
         sea.loadedFrom = 48;
-        new SurfaceHeights().fill(sea, preview(21, 63, sampled), 0, 0, ground, liquid, fromLoaded);
+        new SurfaceHeights().fill(sea, preview(21, 63, sampled), 0, 0, ground, liquid, fromLoaded, true);
         assertFalse(fromLoaded[0]);
         assertEquals(21, ground[0]);
         assertEquals(63, liquid[0]);
     }
 
     @Test public void withNoPreviewAnUnloadedColumnIsUnknown() {
-        int answered = new SurfaceHeights().fill(null, null, 0, 0, ground, liquid, fromLoaded);
+        int answered = new SurfaceHeights().fill(null, null, 0, 0, ground, liquid, fromLoaded, true);
         assertEquals(0, answered);
         for (int i = 0; i < 256; i++) {
             assertEquals(NONE, ground[i]);
@@ -233,9 +258,74 @@ public class TestSurfaceHeights {
         ICubicTerrainPreview gone = () -> (x, z, consumer) -> {
             throw new TerrainPreviewWithdrawnException();
         };
-        new SurfaceHeights().fill(null, gone, 0, 0, ground, liquid, fromLoaded);
+        new SurfaceHeights().fill(null, gone, 0, 0, ground, liquid, fromLoaded, true);
         assertEquals(NONE, ground[0]);
         assertEquals(NONE, ground[255]);
+    }
+
+    @Test public void withoutLeaveToSampleOnlyLoadedCubesAndKeptAnswersAreUsed() {
+        int[] sampled = new int[1];
+        ICubicTerrainPreview preview = preview(90, 101, sampled);
+        SurfaceHeights heights = new SurfaceHeights();
+        int answered = heights.fill(null, preview, 2, 2, ground, liquid, fromLoaded, false);
+        assertEquals(0, answered);
+        assertEquals("The preview was not sampled", 0, sampled[0]);
+        assertEquals(NONE, ground[17]);
+        assertEquals(NONE, liquid[17]);
+        assertFalse(fromLoaded[17]);
+        // Loaded cubes still answer.
+        Loaded column = new Loaded(70);
+        assertEquals(256, heights.fill(column, preview, 3, 3, ground, liquid, fromLoaded, false));
+        assertEquals(71, ground[0]);
+        assertEquals(0, sampled[0]);
+        // An answer the preview gave before is free, and is used.
+        heights.fill(null, preview, 2, 2, ground, liquid, fromLoaded, true);
+        assertEquals(256, sampled[0]);
+        java.util.Arrays.fill(ground, 0);
+        heights.fill(null, preview, 2, 2, ground, liquid, fromLoaded, false);
+        assertEquals(256, sampled[0]);
+        assertEquals(90, ground[17]);
+        assertEquals(101, liquid[17]);
+        assertFalse(fromLoaded[17]);
+    }
+
+    @Test public void groundThatLetsLightThroughAboveTheHeightIndexIsFound() {
+        Loaded column = new Loaded(70);
+        IBlockState glass = Blocks.GLASS.getDefaultState();
+        column.put(6, 100, 6, glass).put(7, 300, 7, glass);
+        assertEquals("Glass dims no light, so the height index stays on the stone", 70, column.top(6, 6));
+        int answered = new SurfaceHeights().fill(column, null, 0, 0, ground, liquid, fromLoaded, true);
+        assertEquals(256, answered);
+        assertEquals("A glass roof 30 blocks up", 101, ground[6 << 4 | 6]);
+        assertTrue(fromLoaded[6 << 4 | 6]);
+        assertEquals("Across empty cubes, 230 blocks up", 301, ground[7 << 4 | 7]);
+        assertEquals("Beside them the stone", 71, ground[0]);
+        // Beyond the search above the index, the ground is the one below.
+        Loaded far = new Loaded(70);
+        far.put(1, 70 + SurfaceHeights.SCAN_ABOVE + 40, 1, glass);
+        new SurfaceHeights().fill(far, null, 0, 0, ground, liquid, fromLoaded, true);
+        assertEquals(71, ground[1 << 4 | 1]);
+        // A column in which nothing dims light, with glass in a loaded cube.
+        Loaded hollow = new Loaded(FLOOR - 1);
+        hollow.put(2, 10, 2, glass);
+        java.util.Arrays.fill(hollow.tops, Integer.MIN_VALUE + 32);
+        new SurfaceHeights().fill(hollow, null, 0, 0, ground, liquid, fromLoaded, true);
+        assertEquals(11, ground[2 << 4 | 2]);
+        assertTrue(fromLoaded[2 << 4 | 2]);
+        assertFalse(fromLoaded[0]);
+    }
+
+    @Test public void aCubesContentComesFromItsBlockCount() {
+        assertEquals(ICubeSource.NOT_LOADED, SurfaceHeights.content(false, null));
+        assertEquals("A loaded cube with no storage", ICubeSource.EMPTY, SurfaceHeights.content(true, null));
+        ExtendedBlockStorage storage = new ExtendedBlockStorage(0, true);
+        assertEquals("Storage that holds only air", ICubeSource.EMPTY, SurfaceHeights.content(true, storage));
+        storage.set(3, 4, 5, stone);
+        assertEquals(ICubeSource.HAS_BLOCKS, SurfaceHeights.content(true, storage));
+        storage.set(3, 4, 5, air);
+        assertEquals("Emptied again", ICubeSource.EMPTY, SurfaceHeights.content(true, storage));
+        storage.set(0, 0, 0, grass);
+        assertEquals("A plant is a block", ICubeSource.HAS_BLOCKS, SurfaceHeights.content(true, storage));
     }
 
     @Test public void groundIsWhatBlocksMovementLessPlantsLogsAndLiquid() {

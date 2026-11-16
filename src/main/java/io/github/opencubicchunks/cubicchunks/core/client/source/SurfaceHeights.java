@@ -30,6 +30,7 @@ import net.minecraft.block.BlockLog;
 import net.minecraft.block.material.Material;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.world.biome.Biome;
+import net.minecraft.world.chunk.storage.ExtendedBlockStorage;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -59,6 +60,12 @@ final class SurfaceHeights {
      */
     static final int SCAN_DEPTH = 256;
 
+    /**
+     * How far above that block the loaded cubes are searched for ground that lets light through,
+     * such as a glass roof. Cubes that hold nothing are passed over whole.
+     */
+    static final int SCAN_ABOVE = 256;
+
     /** Chunk columns whose preview answers are kept: 4 KiB each. */
     private static final int CACHED = 2048;
     private static final int UNSAMPLED = Integer.MIN_VALUE + 1;
@@ -75,6 +82,12 @@ final class SurfaceHeights {
 
         /** The world's lowest block. */
         int floor();
+
+        /** The Y of the top block of the highest loaded cube that holds a block, or less than the floor. */
+        int highestBlocks();
+
+        /** Whether the cube is loaded and holds any block. */
+        boolean holdsBlocks(int cubeY);
     }
 
     private final Map<Long, int[]> cache = new LinkedHashMap<Long, int[]>(256, 0.75f, true) {
@@ -87,6 +100,14 @@ final class SurfaceHeights {
     private final int[] pair = new int[2];
     @Nullable private ICubicTerrainPreview sampled;
     @Nullable private ICubicTerrainPreview.Sampler sampler;
+
+    /** {@link ICubeSource#cubeContent} from what a cube keeps: its block storage and that storage's count. */
+    static int content(boolean loaded, @Nullable ExtendedBlockStorage storage) {
+        if (!loaded) {
+            return ICubeSource.NOT_LOADED;
+        }
+        return storage == null || storage.isEmpty() ? ICubeSource.EMPTY : ICubeSource.HAS_BLOCKS;
+    }
 
     static boolean liquid(IBlockState state) {
         return state.getMaterial().isLiquid();
@@ -104,10 +125,11 @@ final class SurfaceHeights {
      *
      * @param loaded  the column's loaded cubes, or null when the column is not loaded
      * @param preview the world's terrain preview, or null
+     * @param sample  whether the preview may be sampled; if not, only answers it gave before are used
      * @return how many block columns were answered from loaded cubes
      */
     int fill(@Nullable LoadedColumn loaded, @Nullable ICubicTerrainPreview preview, int columnX, int columnZ,
-            int[] ground, int[] liquid, boolean[] fromLoaded) {
+            int[] ground, int[] liquid, boolean[] fromLoaded, boolean sample) {
         if (ground.length < COLUMNS || liquid.length < COLUMNS || fromLoaded.length < COLUMNS) {
             throw new IllegalArgumentException("Surface heights need arrays of 256");
         }
@@ -135,12 +157,23 @@ final class SurfaceHeights {
                 continue;
             }
             if (previewed == null) {
-                previewed = cache.computeIfAbsent(key(columnX, columnZ), SurfaceHeights::blank);
+                previewed = sample ? cache.computeIfAbsent(key(columnX, columnZ), SurfaceHeights::blank)
+                        : cache.get(key(columnX, columnZ));
+                if (previewed == null) {
+                    // Nothing kept for this chunk column, and nothing may be sampled.
+                    preview = null;
+                    continue;
+                }
             }
-            if (previewed[i] == UNSAMPLED && !sample(preview, (columnX << 4) + x, (columnZ << 4) + z, previewed, i)) {
-                // Withdrawn: this world's preview answers nothing more.
-                preview = null;
-                continue;
+            if (previewed[i] == UNSAMPLED) {
+                if (!sample) {
+                    continue;
+                }
+                if (!sample(preview, (columnX << 4) + x, (columnZ << 4) + z, previewed, i)) {
+                    // Withdrawn: this world's preview answers nothing more.
+                    preview = null;
+                    continue;
+                }
             }
             ground[i] = previewed[i];
             liquid[i] = previewed[COLUMNS + i];
@@ -156,14 +189,33 @@ final class SurfaceHeights {
     }
 
     /**
-     * A block column's surface from loaded cubes: downward from the highest block that dims light
-     * to the first ground. Liquid met on the way is the liquid surface. False when a cube on the
-     * way is not loaded, when nothing in the column dims light, or when no ground is found within
-     * {@link #SCAN_DEPTH}: the loaded cubes do not say where this column's ground is.
+     * A block column's surface from loaded cubes. First, ground that lets light through, above
+     * everything that dims it: the loaded cubes that hold blocks are searched from the highest
+     * down to the height index. Then downward from the highest block that dims light to the first
+     * ground; liquid met on the way is the liquid surface. False when a cube on that way is not
+     * loaded, when nothing in the column dims light and no ground stands in the loaded cubes, or
+     * when no ground is found within {@link #SCAN_DEPTH}: the loaded cubes do not say where this
+     * column's ground is.
      */
     static boolean fromLoaded(LoadedColumn loaded, int localX, int localZ, int[] out) {
-        int top = loaded.top(localX, localZ);
         int floor = loaded.floor();
+        int top = Math.max(loaded.top(localX, localZ), floor - 1);
+        // With nothing that dims light there is no index to measure from: every cube that holds blocks is searched.
+        int high = top < floor ? loaded.highestBlocks()
+                : (int) Math.min(loaded.highestBlocks(), (long) top + SCAN_ABOVE);
+        for (int y = high; y > top;) {
+            if (!loaded.holdsBlocks(y >> 4)) {
+                y = (y >> 4 << 4) - 1;
+                continue;
+            }
+            IBlockState state = loaded.state(localX, y, localZ);
+            if (state != null && ground(state)) {
+                out[0] = y + 1;
+                out[1] = NONE;
+                return true;
+            }
+            y--;
+        }
         if (top < floor) {
             return false;
         }

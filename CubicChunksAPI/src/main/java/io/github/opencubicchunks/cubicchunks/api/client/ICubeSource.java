@@ -37,6 +37,13 @@ public interface ICubeSource {
     /** In {@link #surfaceHeights}: no ground is known, or no liquid stands above the ground. */
     int NO_SURFACE = Integer.MIN_VALUE;
 
+    /** {@link #cubeContent}: the cube is not loaded on the client. */
+    int NOT_LOADED = 0;
+    /** {@link #cubeContent}: the cube is loaded and holds nothing but air. */
+    int EMPTY = 1;
+    /** {@link #cubeContent}: the cube is loaded and may hold blocks. */
+    int HAS_BLOCKS = 2;
+
     /**
      * Sets the one listener that receives world and cube events, or removes it with null. A listener
      * set while a world is attached receives no events for what is already loaded; it reads that
@@ -113,10 +120,33 @@ public interface ICubeSource {
      * @return how many of the 256 block columns were answered from loaded cubes
      */
     default int surfaceHeights(int columnX, int columnZ, int[] ground, int[] liquid, boolean[] fromLoaded) {
+        return surfaceHeights(columnX, columnZ, ground, liquid, fromLoaded, true);
+    }
+
+    /**
+     * {@link #surfaceHeights(int, int, int[], int[], boolean[])}, with the choice of leaving the
+     * preview unsampled. With {@code allowPreview} false no column of the preview is sampled, so
+     * the call costs only its search of loaded cubes: a block column they cannot answer gets a
+     * preview answer kept from an earlier call if there is one, and {@link #NO_SURFACE} otherwise,
+     * with {@code fromLoaded} false either way.
+     */
+    default int surfaceHeights(int columnX, int columnZ, int[] ground, int[] liquid, boolean[] fromLoaded,
+            boolean allowPreview) {
         java.util.Arrays.fill(ground, 0, 256, NO_SURFACE);
         java.util.Arrays.fill(liquid, 0, 256, NO_SURFACE);
         java.util.Arrays.fill(fromLoaded, 0, 256, false);
         return 0;
+    }
+
+    /**
+     * What a cube holds, without a snapshot: {@link #NOT_LOADED}, {@link #EMPTY} or
+     * {@link #HAS_BLOCKS}. {@link #EMPTY} is given only for a loaded cube whose every block is air.
+     * {@link #HAS_BLOCKS} is given for any other loaded cube. It reads the count of blocks the cube
+     * keeps, so it costs no more than {@link #isLoaded}. A source that does not know answers
+     * {@link #NOT_LOADED}.
+     */
+    default int cubeContent(int cubeX, int cubeY, int cubeZ) {
+        return NOT_LOADED;
     }
 
     /**

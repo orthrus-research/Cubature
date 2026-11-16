@@ -268,6 +268,8 @@ own meshes cover) asks for a whole chunk column at once, on the client thread:
 // api.client.ICubeSource
 int NO_SURFACE = Integer.MIN_VALUE;
 int surfaceHeights(int columnX, int columnZ, int[] ground, int[] liquid, boolean[] fromLoaded);
+int surfaceHeights(int columnX, int columnZ, int[] ground, int[] liquid, boolean[] fromLoaded,
+        boolean allowPreview);
 long surfaceVersion(int columnX, int columnZ);
 ```
 
@@ -288,14 +290,20 @@ returns how many block columns were answered from loaded cubes.
   blocks. `fromLoaded` is true only then. If a cube on the way is not loaded, or no ground
   is found, the loaded cubes do not say where the ground is, and both heights are the
   preview's with `fromLoaded` false. Ground that lets all light through and stands above
-  everything that dims it (a glass roof over open air) is not seen: the search starts below
-  it.
+  everything that dims it (a glass roof over open air) is looked for first: the column's
+  loaded cubes that hold blocks are searched from the highest down to the height index, at
+  most 256 blocks above it, and cubes that hold nothing are passed over whole. A roof in a
+  cube that is not loaded is not seen.
 - **From the preview** otherwise, sampled at one-block cells: the highest ground run and the
   highest liquid run above it. With no preview the ground is `NO_SURFACE`. A sample costs
   what the generator's preview costs for a column (about 0.1 ms in Riven), on the client
   thread, so a chunk column answered wholly from the preview costs about 256 of them the
   first time. Answers are kept for the last 2,048 chunk columns and dropped when the preview
   changes.
+- **Without sampling.** With `allowPreview` false the preview is not sampled, so the call
+  costs only the search of loaded cubes. A block column they cannot answer takes an answer
+  the preview gave in an earlier call, if one is kept, and `NO_SURFACE` otherwise;
+  `fromLoaded` is false either way. The five-argument form is the same call with true.
 
 `surfaceVersion` changes whenever what the loaded cubes say could have changed: a cube of
 the column loaded or unloaded, a block in one changed, or the server corrected the column's
@@ -304,8 +312,23 @@ It does not cover the preview's answers; `terrainPreviewChanged()` does. It is o
 a map per chunk column touched since the world attached, about 16 bytes each, cleared when
 the world detaches.
 
-Both methods have defaults (`NO_SURFACE` everywhere, 0 and -1), so a source that does not
+All three have defaults (`NO_SURFACE` everywhere, 0 and -1), so a source that does not
 track surfaces still answers.
+
+### What a cube holds
+
+```java
+// api.client.ICubeSource
+int NOT_LOADED = 0, EMPTY = 1, HAS_BLOCKS = 2;
+int cubeContent(int cubeX, int cubeY, int cubeZ);
+```
+
+Answers without a snapshot whether a cube is loaded and whether it holds anything. `EMPTY`
+is given only for a loaded cube whose every block is air: the cube has no block storage, or
+its storage's count of blocks that are not air is zero. The game keeps that count as blocks
+are set, and Cubature recounts it when a cube arrives from the server, so a cube emptied by
+edits reads `EMPTY` again and a cube with any block, a plant included, reads `HAS_BLOCKS`.
+It costs one cube look-up. The default answers `NOT_LOADED`.
 
 ## 9. How the Celeritas integration maps onto this
 
