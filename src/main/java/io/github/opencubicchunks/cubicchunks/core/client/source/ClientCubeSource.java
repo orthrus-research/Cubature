@@ -159,6 +159,22 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
         }
     }
 
+    /**
+     * The server replaced a cube's light (PacketCubeLight): the cube's light changed and nothing else,
+     * so only the vanilla renderer is told to rebuild, not every world listener.
+     */
+    public void lightReplaced(Cube cube) {
+        if (cube.getWorld() != world) {
+            return;
+        }
+        changed(cube, ICubeSourceListener.LIGHT, 0, 0, 0, 15, 15, 15);
+        int x = cube.getX() << 4;
+        int y = cube.getY() << 4;
+        int z = cube.getZ() << 4;
+        // One block wider: neighbors' faces against this cube take light from it.
+        Minecraft.getMinecraft().renderGlobal.markBlockRangeForRenderUpdate(x - 1, y - 1, z - 1, x + 16, y + 16, z + 16);
+    }
+
     /** The server corrected a column's height index, which the surface search starts from. */
     public void heightsChanged(World changed, int columnX, int columnZ) {
         if (changed == world) {

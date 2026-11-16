@@ -158,7 +158,12 @@ Events are delivered once per client tick, at its end.
 3. Cubature translates every route by which a cube changes into these events: whole-cube
    packets (`PacketCubes`), small block-change packets (`PacketCubeBlockChange`), the
    game's own block and light notifications, and its own lighting. A renderer listens to
-   nothing else.
+   nothing else. When the server changes the light of a cube it has already sent and no
+   block changed with it (the light of the cube's neighbors arriving, first light ending
+   around it), it sends the cube's whole light again (`PacketCubeLight`, 4,109 bytes with
+   sky light), at most once every 10 ticks a cube, and the client raises a change of kind
+   `LIGHT` over the whole cube, which moves its light version only. The server option
+   `deliverLightChanges` (default on) turns it off.
 4. Events may be coalesced within a tick: several changes to one cube may arrive as one
    event with their kinds and bounds combined, and a change to a cube whose arrival is
    queued in the same tick is covered by the arrival.
@@ -346,9 +351,10 @@ count is a parameter.
 
 **What settled does not say:**
 
-- that the client's light equals the server's. Until light-only changes are delivered
-  (open point 5), cubes within a few cubes of the box's edge can hold light the server has
-  since changed; the interior has measured the same (Verification);
+- that the client's light equals the server's at that moment. The server sends a cube's
+  light again when it changes without a block, at most every 10 ticks a cube (section 3),
+  so light the server changed in the last half second may not have arrived; measured, a
+  handful of cubes near the box's edge, none deeper than four cubes (Verification);
 - anything of cubes outside the box, which the client may hold too;
 - that a renderer has built what arrived: that is the renderer's own queue;
 - anything of entities, block entities' contents, or Distant Horizons' level of detail;
@@ -659,10 +665,24 @@ Every difference lies within five cubes of the edge of what the side holds; none
 Between servers they lie mostly within four cubes of the top face, under the lowest cubes
 not yet loaded. Between client and server 275 cubes differ in all six runs, so that part
 is systematic, not a matter of order. Single-threaded generation and turning the client's
-boundary relight off change neither. The likely cause of the client's part: the server
-relights a cube it has already sent as cubes beyond it arrive, and a change of light alone
-is not sent (the server's world listener ignores `notifyLightSet`; only changed blocks are
-queued for a player), so the client keeps the light it was sent. That is not yet shown.
+boundary relight off change neither. The client's part had a cause: the server relit
+cubes it had already sent as cubes beyond them arrived, and a change of light alone was not
+sent (the server's world listener ignores `notifyLightSet`; only changed blocks were queued
+for a player), so the client kept the light it was first sent.
+
+Measured 2026-11-16, same seed and views, with the server counting the cubes whose light
+changed after they were sent (`server-lightafter-<dimension>.tsv` in the dump):
+
+| Run | Light changed after a send | Light sends | Client against its server |
+|---|---|---|---|
+| `deliverLightChanges` off | 2,441 cubes, 3,216 changes | none | 405 cubes differ; 398 of them had changed after a send |
+| `deliverLightChanges` on | 2,449 cubes, 3,201 changes | 3,120, 12.8 MB in the run | 19 cubes differ, none deeper than four cubes inside the edge |
+
+The 19 left lie near the top of the box. The client's dump is written every 200 ticks
+and the server's as it stops, so the two can be up to ten seconds apart; light the server
+changed in between, or within the 10 ticks a send waits, is not in the client's. Nothing
+more than five cubes inside the edge has differed in any run. The cubes that differ between
+two servers (21 to 46, by generation order) are untouched by this and remain open.
 
 ## Open points
 
@@ -691,7 +711,9 @@ keeping.
    not is a defect against guarantee 3 of section 3. Light checksums (Verification) find
    light identical between runs and between client and server more than five cubes inside
    what is loaded, and differing nearer the edge: by order between servers, and
-   systematically between a client and its server. *Proposed next:* count on the server
-   the light changes made to cubes already sent to a player; if they match the client's
-   differences, send light-only changes (or resend the cube) when a sent cube's light
-   changes.
+   systematically between a client and its server. The client's part is answered: the
+   server now sends light that changes after a cube was sent (section 3), and a client
+   matches its server but for a few cubes near the edge (Verification). Left open: two
+   servers still differ in a few dozen cubes near the top of what is loaded, by the order
+   in which cubes were generated and first lit, and whether that is what frame captures
+   saw under canopy is not shown.

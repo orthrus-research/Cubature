@@ -423,6 +423,15 @@ thread is about to be free, go stale when their cube leaves or changes as their
 mask says, and release their snapshot whatever way they end. The pool shares its
 running jobs with the preview pool under the preview pool's governor.
 
+Also on November 16, 2026, the server sends a cube's light again when it changes
+the light of a cube a player already has and no block changed with it (a new
+client message, PacketCubeLight: the cube's block light and sky light, 4,109
+bytes), at most every 10 ticks a cube, and the client raises a light change for
+it. Before, the client kept the light it was first sent: measured, 405 cubes
+near the edge of what was loaded differed from the server's, against 19 with the
+change. The new server option `deliverLightChanges` (default on) turns it off.
+Every cube records whether its light was written since the server's last tick.
+
 Both supported builds include `NOTICE.md`, this file, the upstream MIT text,
 the full LGPL-2.1 text and component notices in binary and matching sources
 JARs. The sources JAR includes the mod and API Java sources. It is not by

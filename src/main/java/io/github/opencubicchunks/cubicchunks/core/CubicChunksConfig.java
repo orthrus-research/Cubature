@@ -139,6 +139,11 @@ public class CubicChunksConfig {
             + "1 to 4.")
     public static int clientBuildThreads = -1;
 
+    @Config.Comment("Server: when the light of a cube a player already has changes and no block changed with it, send "
+            + "the cube's light again, at most once every 10 ticks a cube, so the client's light follows the server's. "
+            + "Off, the client keeps the light it was first sent until a block of the cube changes.")
+    public static boolean deliverLightChanges = true;
+
     @Config.RangeInt(min = 5, max = 200)
     @Config.RequiresMcRestart
     @Config.Comment("Client: the frame time, in milliseconds, that the client preview pool keeps to. While its jobs "

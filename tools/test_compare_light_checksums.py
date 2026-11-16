@@ -43,5 +43,16 @@ class CompareTests(unittest.TestCase):
             self.assertEqual(result["compared"], 0)
 
 
+class LightAfterTests(unittest.TestCase):
+    def test_counts_are_read_and_edges_measured(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "after.tsv"
+            path.write_text("x\ty\tz\tticks\n-1\t2\t3\t4\n", encoding="utf-8")
+            self.assertEqual(compare.read_light_after(path), {(-1, 2, 3): 4})
+            cubes = {p: {} for p in block(5)}
+            self.assertEqual(compare.edge_distance((2, 2, 2), cubes), 2)
+            self.assertEqual(compare.edge_distance((0, 2, 2), cubes), 0)
+
+
 if __name__ == "__main__":
     unittest.main()

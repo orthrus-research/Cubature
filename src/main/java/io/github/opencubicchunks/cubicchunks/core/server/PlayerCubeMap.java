@@ -121,6 +121,20 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
      */
     private final Set<CubeWatcher> cubeWatchersToUpdate = new HashSet<>();
 
+    /** Cubes whose light was written since the last tick, from any thread that lights. */
+    private final java.util.concurrent.ConcurrentLinkedQueue<Cube> lightWritten =
+            new java.util.concurrent.ConcurrentLinkedQueue<>();
+    /** Watchers of sent cubes whose light changed, waiting for their next allowed send. */
+    private final Set<CubeWatcher> lightToSend = new java.util.LinkedHashSet<>();
+    /** Ticks between two sends of one cube's light. */
+    private static final int LIGHT_SEND_SPACING = 10;
+    /** For diagnostics: per cube, the ticks its light changed after it was sent; totals. */
+    private final it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap lightAfterSend =
+            new it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap();
+    private long lightChangesAfterSend;
+    private long lightSends;
+    private long lightBytes;
+
     /**
      * All columnWatchers that have pending height updates to send.
      */
@@ -394,6 +408,8 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
             }
         }
 
+
+        followLight(currentTime);
 
         //process instances to update
         if (!cubeWatchersToUpdate.isEmpty()) {
@@ -1008,6 +1024,64 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
     @Override
     public void removeEntry(PlayerChunkMapEntry entry) {
         throw new UnsupportedOperationException();
+    }
+
+    /** A cube's light was written; called by the cube, on any thread, at most once a tick a cube. */
+    public void lightWritten(Cube cube) {
+        lightWritten.add(cube);
+    }
+
+    /**
+     * Each tick: of the cubes whose light was written, those already sent to a player changed after
+     * the player got them. Each is counted and, with deliverLightChanges, its light is sent again,
+     * no more often than every LIGHT_SEND_SPACING ticks a cube.
+     */
+    private void followLight(long now) {
+        for (Cube cube = lightWritten.poll(); cube != null; cube = lightWritten.poll()) {
+            cube.lightTouched = false;
+            CubeWatcher watcher = getCubeWatcher(cube.getCoords());
+            if (watcher == null || watcher.getCube() != cube || !watcher.isSentToPlayers()) {
+                continue;
+            }
+            lightChangesAfterSend++;
+            if (io.github.opencubicchunks.cubicchunks.core.lighting.LightChecksum.DUMP != null) {
+                lightAfterSend.addTo(io.github.opencubicchunks.cubicchunks.core.lighting.LightChecksum.key(cube), 1);
+            }
+            if (io.github.opencubicchunks.cubicchunks.core.CubicChunksConfig.deliverLightChanges) {
+                lightToSend.add(watcher);
+            }
+        }
+        if (lightToSend.isEmpty()) {
+            return;
+        }
+        Iterator<CubeWatcher> waiting = lightToSend.iterator();
+        while (waiting.hasNext()) {
+            CubeWatcher watcher = waiting.next();
+            if (getCubeWatcher(watcher.getCubePos()) != watcher) {
+                waiting.remove();
+                continue;
+            }
+            if (!CubeWatcher.lightDue(now, watcher.lightSentTick, LIGHT_SEND_SPACING)) {
+                continue;
+            }
+            long bytes = watcher.sendLight();
+            if (bytes > 0) {
+                lightSends++;
+                lightBytes += bytes;
+            }
+            watcher.lightSentTick = now;
+            waiting.remove();
+        }
+    }
+
+    /** For diagnostics: per cube key, the ticks its light changed after it was sent. */
+    public it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap lightAfterSend() {
+        return lightAfterSend;
+    }
+
+    /** For diagnostics: light changes on sent cubes, light sends and their bytes. */
+    public long[] lightDeliveryTotals() {
+        return new long[] {lightChangesAfterSend, lightSends, lightBytes};
     }
 
     void addToUpdateEntry(CubeWatcher cubeWatcher) {

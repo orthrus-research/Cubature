@@ -63,6 +63,54 @@ public final class LightChecksum {
         return named == null || named.isEmpty() ? null : Paths.get(named);
     }
 
+    /** A cube's position as one key, for the server's count of light changes after a send. */
+    public static long key(Cube cube) {
+        return key(cube.getX(), cube.getY(), cube.getZ());
+    }
+
+    /** 21 bits a coordinate, enough for any cube position a world can hold. */
+    static long key(int x, int y, int z) {
+        return ((long) x & 0x1FFFFF) << 42 | ((long) y & 0x1FFFFF) << 21 | (long) z & 0x1FFFFF;
+    }
+
+    static int keyX(long key) {
+        return (int) (key << 1 >> 43);
+    }
+
+    static int keyY(long key) {
+        return (int) (key << 22 >> 43);
+    }
+
+    static int keyZ(long key) {
+        return (int) (key << 43 >> 43);
+    }
+
+    /**
+     * Writes the server's count of light changes after a send, {@code <dump>/server-lightafter-<dimension>.tsv}:
+     * cube X, Y and Z and the ticks in which its light changed after it was sent, then the totals.
+     */
+    public static void dumpLightAfterSend(int dimension, it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap counts,
+            long[] totals) {
+        if (DUMP == null) {
+            return;
+        }
+        Path out = DUMP.resolve("server-lightafter-" + dimension + ".tsv");
+        try {
+            Files.createDirectories(DUMP);
+            try (Writer writer = Files.newBufferedWriter(out, StandardCharsets.UTF_8)) {
+                writer.write("x\ty\tz\tticks\n");
+                for (it.unimi.dsi.fastutil.longs.Long2IntMap.Entry entry : counts.long2IntEntrySet()) {
+                    long key = entry.getLongKey();
+                    writer.write(keyX(key) + "\t" + keyY(key) + "\t" + keyZ(key) + "\t" + entry.getIntValue() + "\n");
+                }
+            }
+            CubicChunks.LOGGER.info("Light checksums: {} cubes changed light after they were sent ({} changes); {} light "
+                    + "sends, {} bytes; written to {}", counts.size(), totals[0], totals[1], totals[2], out);
+        } catch (IOException e) {
+            CubicChunks.LOGGER.error("Light checksums: could not write {}", out, e);
+        }
+    }
+
     /** The checksum of a loaded cube: never negative, so never -1. */
     public static long of(Cube cube) {
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();

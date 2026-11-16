@@ -210,6 +210,12 @@ public class CubicChunks {
                             world.provider.getDimension(),
                             ((io.github.opencubicchunks.cubicchunks.core.server.CubeProviderServer) world.getChunkProvider())
                                     .loadedCubes());
+                    if (world.getPlayerChunkMap() instanceof io.github.opencubicchunks.cubicchunks.core.server.PlayerCubeMap) {
+                        io.github.opencubicchunks.cubicchunks.core.server.PlayerCubeMap map =
+                                (io.github.opencubicchunks.cubicchunks.core.server.PlayerCubeMap) world.getPlayerChunkMap();
+                        io.github.opencubicchunks.cubicchunks.core.lighting.LightChecksum.dumpLightAfterSend(
+                                world.provider.getDimension(), map.lightAfterSend(), map.lightDeliveryTotals());
+                    }
                 }
             }
         }

@@ -98,6 +98,8 @@ public class Cube implements ICube {
      * biomes and its light last changed, and the copy made of it at that version.
      */
     public long sourceVersion;
+    /** Server only: whether a light write since the last tick queued this cube for its watcher to look at. */
+    public volatile boolean lightTouched;
     public long sourceBlockVersion;
     public long sourceLightVersion;
     @Nullable public Object sourceCopy;
@@ -334,6 +336,14 @@ public class Cube implements ICube {
     @Override
     public void setLightFor(EnumSkyBlock lightType, BlockPos pos, int light) {
         column.setLightFor(lightType, pos, light);
+        if (!lightTouched && world instanceof net.minecraft.world.WorldServer
+                && ((net.minecraft.world.WorldServer) world).getPlayerChunkMap()
+                        instanceof io.github.opencubicchunks.cubicchunks.core.server.PlayerCubeMap) {
+            // Once a tick at most: the watcher decides whether the player needs this cube's light again.
+            lightTouched = true;
+            ((io.github.opencubicchunks.cubicchunks.core.server.PlayerCubeMap)
+                    ((net.minecraft.world.WorldServer) world).getPlayerChunkMap()).lightWritten(this);
+        }
     }
 
     @Override

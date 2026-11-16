@@ -291,6 +291,40 @@ public class CubeWatcher implements ITicket, ICubeWatcher, BucketSorterEntry {
         this.previousWorldTime = now;
     }
 
+    /** The tick this cube's light was last sent on its own, for spacing such sends; never sent yet: none. */
+    long lightSentTick = NEVER_SENT;
+    static final long NEVER_SENT = Long.MIN_VALUE;
+
+    /** Whether a cube whose light was last sent at {@code last} may be sent again at {@code now}. */
+    static boolean lightDue(long now, long last, int spacing) {
+        // No subtraction from NEVER_SENT: it would overflow and never come due.
+        return last == NEVER_SENT || now - last >= spacing || now < last;
+    }
+
+    /**
+     * Sends the cube's light to every player that has the cube (PacketCubeLight).
+     *
+     * @return the bytes sent, 0 when nothing was
+     */
+    long sendLight() {
+        if (!this.sentToPlayers || cube == null || cube.getStorage() == null) {
+            return 0;
+        }
+        io.github.opencubicchunks.cubicchunks.core.network.PacketCubeLight packet = null;
+        long bytes = 0;
+        for (EntityPlayerMP player : this.players) {
+            if (!isSentToPlayer(player)) {
+                continue; // The base snapshot that player gets carries this light.
+            }
+            if (packet == null) {
+                packet = new io.github.opencubicchunks.cubicchunks.core.network.PacketCubeLight(cube);
+            }
+            PacketDispatcher.sendTo(packet, player);
+            bytes += packet.size();
+        }
+        return bytes;
+    }
+
     // CHECKED: 1.10.2-12.18.1.2092
     void blockChanged(int localX, int localY, int localZ) {
         //if we are adding the first one, add it to update list
