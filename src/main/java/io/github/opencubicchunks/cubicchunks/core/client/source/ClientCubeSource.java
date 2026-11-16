@@ -175,6 +175,22 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
         Minecraft.getMinecraft().renderGlobal.markBlockRangeForRenderUpdate(x - 1, y - 1, z - 1, x + 16, y + 16, z + 16);
     }
 
+    /**
+     * The server sent the light of some blocks of a cube (PacketCubeLightChanges); the bounds are local,
+     * 0 to 15, inclusive. Only the vanilla renderer is told to rebuild, not every world listener.
+     */
+    public void lightChanged(Cube cube, int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {
+        if (cube.getWorld() != world) {
+            return;
+        }
+        changed(cube, ICubeSourceListener.LIGHT, minX, minY, minZ, maxX, maxY, maxZ);
+        int x = cube.getX() << 4;
+        int y = cube.getY() << 4;
+        int z = cube.getZ() << 4;
+        Minecraft.getMinecraft().renderGlobal.markBlockRangeForRenderUpdate(x + minX - 1, y + minY - 1, z + minZ - 1,
+                x + maxX + 1, y + maxY + 1, z + maxZ + 1);
+    }
+
     /** The server corrected a column's height index, which the surface search starts from. */
     public void heightsChanged(World changed, int columnX, int columnZ) {
         if (changed == world) {

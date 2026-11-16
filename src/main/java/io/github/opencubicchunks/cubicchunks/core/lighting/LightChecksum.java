@@ -53,8 +53,32 @@ public final class LightChecksum {
 
     /** Where the dumps go, or null when none is asked for. */
     @Nullable public static final Path DUMP = dumpDirectory();
+    /** With a dump: the server also writes one every this many world ticks, named by the tick; 0 never. */
+    public static final int EVERY = Integer.getInteger("cubicchunks.lightChecksumEvery", 0);
+    /** With a dump: cubes, one {@code x y z} a line in this file, whose every block's light the server also writes. */
+    @Nullable private static final java.util.Set<Long> DETAIL = detailCubes();
 
     private LightChecksum() {
+    }
+
+    @Nullable
+    private static java.util.Set<Long> detailCubes() {
+        String named = System.getProperty("cubicchunks.lightDetail");
+        if (named == null || named.isEmpty()) {
+            return null;
+        }
+        java.util.Set<Long> cubes = new java.util.HashSet<>();
+        try {
+            for (String line : Files.readAllLines(Paths.get(named), StandardCharsets.UTF_8)) {
+                String[] parts = line.trim().split("\\s+");
+                if (parts.length == 3) {
+                    cubes.add(key(Integer.parseInt(parts[0]), Integer.parseInt(parts[1]), Integer.parseInt(parts[2])));
+                }
+            }
+        } catch (IOException | NumberFormatException e) {
+            CubicChunks.LOGGER.error("Light checksums: could not read the cubes to detail from {}", named, e);
+        }
+        return cubes;
     }
 
     @Nullable
@@ -111,6 +135,31 @@ public final class LightChecksum {
         }
     }
 
+    /** Every block of the listed cubes: cube, local position, block light, sky light, state id. */
+    private static void writeDetail(Path out, Iterable<Cube> cubes) throws IOException {
+        try (Writer writer = Files.newBufferedWriter(out, StandardCharsets.UTF_8)) {
+            writer.write("cx\tcy\tcz\tx\ty\tz\tblock\tsky\tstate\n");
+            BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+            for (Cube cube : cubes) {
+                if (!DETAIL.contains(key(cube))) {
+                    continue;
+                }
+                ExtendedBlockStorage storage = cube.getStorage();
+                for (int y = 0; y < 16; y++) {
+                    for (int z = 0; z < 16; z++) {
+                        for (int x = 0; x < 16; x++) {
+                            pos.setPos((cube.getX() << 4) + x, (cube.getY() << 4) + y, (cube.getZ() << 4) + z);
+                            writer.write(cube.getX() + "\t" + cube.getY() + "\t" + cube.getZ() + "\t" + x + "\t" + y + "\t"
+                                    + z + "\t" + cube.getCachedLightFor(EnumSkyBlock.BLOCK, pos) + "\t"
+                                    + cube.getCachedLightFor(EnumSkyBlock.SKY, pos) + "\t"
+                                    + (storage == null ? 0 : Block.getStateId(storage.get(x, y, z))) + "\n");
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     /** The checksum of a loaded cube: never negative, so never -1. */
     public static long of(Cube cube) {
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
@@ -152,23 +201,49 @@ public final class LightChecksum {
      * the block checksum, whether the cube has block storage and whether its first light is done.
      */
     public static void dump(String side, int dimension, Iterable<Cube> cubes) {
+        dump(side + "-" + dimension, side, cubes);
+    }
+
+    /** A server dump named by world tick, {@code server-<dimension>-t<tick>.tsv}, every {@link #EVERY} ticks. */
+    public static void dumpAt(int dimension, long worldTick, Iterable<Cube> cubes) {
+        if (DUMP != null && EVERY > 0 && worldTick % EVERY == 0) {
+            dump("server-" + dimension + "-t" + worldTick, "server", cubes);
+        }
+    }
+
+    /** Pending checks of a cube's boundaries, sky and block, as bit counts: light waiting for a neighbor. */
+    private static String pendingChecks(Cube cube) {
+        Object data = cube.getCubeLightData();
+        if (!(data instanceof io.github.opencubicchunks.cubicchunks.core.lighting.LightingManager.CubeLightData)) {
+            return "0\t0";
+        }
+        io.github.opencubicchunks.cubicchunks.core.lighting.LightingManager.CubeLightData light =
+                (io.github.opencubicchunks.cubicchunks.core.lighting.LightingManager.CubeLightData) data;
+        return Long.bitCount(light.neighborLightChecksSky) + "\t" + Long.bitCount(light.neighborLightChecksBlock);
+    }
+
+    private static void dump(String name, String side, Iterable<Cube> cubes) {
         if (DUMP == null) {
             return;
         }
-        Path out = DUMP.resolve(side + "-" + dimension + ".tsv");
-        Path temporary = DUMP.resolve(side + "-" + dimension + ".tsv.tmp");
+        Path out = DUMP.resolve(name + ".tsv");
+        Path temporary = DUMP.resolve(name + ".tsv.tmp");
+        Path detail = DUMP.resolve(name + "-detail.tsv");
         int count = 0;
         try {
             Files.createDirectories(DUMP);
             try (Writer writer = Files.newBufferedWriter(temporary, StandardCharsets.UTF_8)) {
-                writer.write("x\ty\tz\tchecksum\tblocks\tstorage\tfirstLight\n");
+                writer.write("x\ty\tz\tchecksum\tblocks\tstorage\tfirstLight\tpendingSky\tpendingBlock\n");
                 for (Cube cube : cubes) {
                     writer.write(cube.getX() + "\t" + cube.getY() + "\t" + cube.getZ() + "\t"
                             + Long.toHexString(of(cube)) + "\t" + Long.toHexString(blocks(cube)) + "\t"
                             + (cube.getStorage() != null ? 1 : 0) + "\t"
-                            + (cube.isInitialLightingDone() ? 1 : 0) + "\n");
+                            + (cube.isInitialLightingDone() ? 1 : 0) + "\t" + pendingChecks(cube) + "\n");
                     count++;
                 }
+            }
+            if (DETAIL != null && !DETAIL.isEmpty()) {
+                writeDetail(detail, cubes);
             }
             // A client that is closed while writing leaves its last whole dump in place.
             Files.move(temporary, out, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);

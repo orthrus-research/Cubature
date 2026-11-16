@@ -73,6 +73,7 @@ public class PacketDispatcher {
         registerMessage(PacketHeldBox.Handler.class, PacketHeldBox.class);
         registerMessage(PacketHeldBoxSent.Handler.class, PacketHeldBoxSent.class);
         registerMessage(PacketCubeLight.Handler.class, PacketCubeLight.class);
+        registerMessage(PacketCubeLightChanges.Handler.class, PacketCubeLightChanges.class);
 
     }
 

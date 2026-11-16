@@ -259,6 +259,8 @@ public class CubeWatcher implements ITicket, ICubeWatcher, BucketSorterEntry {
         this.dirtyBlocks.clear();
         // Eligible for publication. Actual delivery remains per player until the base packet is enqueued.
         this.sentToPlayers = true;
+        // From here every light write is recorded: one made before the base packet is built is in both.
+        this.cube.lightTracked = true;
 
         for (EntityPlayerMP playerEntry : this.players) {
             sendToPlayer(playerEntry);
@@ -310,20 +312,45 @@ public class CubeWatcher implements ITicket, ICubeWatcher, BucketSorterEntry {
         if (!this.sentToPlayers || cube == null || cube.getStorage() == null) {
             return 0;
         }
-        io.github.opencubicchunks.cubicchunks.core.network.PacketCubeLight packet = null;
+        // The blocks whose light was written since the last send; their values are read now.
+        int changed = 0;
+        io.github.opencubicchunks.cubicchunks.core.world.cube.LightChanges record = cube.lightChanges;
+        if (record != null) {
+            changed = record.drainTo(CHANGED);
+        }
+        if (changed == 0) {
+            return 0;
+        }
+        net.minecraftforge.fml.common.network.simpleimpl.IMessage packet = null;
+        int size = 0;
         long bytes = 0;
         for (EntityPlayerMP player : this.players) {
             if (!isSentToPlayer(player)) {
                 continue; // The base snapshot that player gets carries this light.
             }
             if (packet == null) {
-                packet = new io.github.opencubicchunks.cubicchunks.core.network.PacketCubeLight(cube);
+                io.github.opencubicchunks.cubicchunks.core.network.PacketCubeLight whole =
+                        new io.github.opencubicchunks.cubicchunks.core.network.PacketCubeLight(cube);
+                if (changed <= CHANGED.length && io.github.opencubicchunks.cubicchunks.core.CubicChunksConfig.deliverOnlyChangedLight) {
+                    io.github.opencubicchunks.cubicchunks.core.network.PacketCubeLightChanges some =
+                            new io.github.opencubicchunks.cubicchunks.core.network.PacketCubeLightChanges(cube, CHANGED,
+                                    changed);
+                    packet = some.size() < whole.size() ? some : whole;
+                    size = Math.min(some.size(), whole.size());
+                } else {
+                    packet = whole;
+                    size = whole.size();
+                }
             }
             PacketDispatcher.sendTo(packet, player);
-            bytes += packet.size();
+            bytes += size;
         }
         return bytes;
     }
+
+    /** Server thread: where the changed blocks are drained to, as many as a changes message carries. */
+    private static final short[] CHANGED =
+            new short[io.github.opencubicchunks.cubicchunks.core.network.PacketCubeLightChanges.MOST];
 
     // CHECKED: 1.10.2-12.18.1.2092
     void blockChanged(int localX, int localY, int localZ) {

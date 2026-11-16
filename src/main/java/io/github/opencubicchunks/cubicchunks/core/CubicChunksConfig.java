@@ -144,6 +144,11 @@ public class CubicChunksConfig {
             + "Off, the client keeps the light it was first sent until a block of the cube changes.")
     public static boolean deliverLightChanges = true;
 
+    @Config.Comment("Server: with deliverLightChanges, send only the light of the blocks that changed (3 bytes a "
+            + "block) instead of the cube's whole light (4,109 bytes) when that is smaller. About a fifth of the bytes, "
+            + "but the whole light also corrects sky light the client darkened on its own, so off by default.")
+    public static boolean deliverOnlyChangedLight = false;
+
     @Config.RangeInt(min = 5, max = 200)
     @Config.RequiresMcRestart
     @Config.Comment("Client: the frame time, in milliseconds, that the client preview pool keeps to. While its jobs "

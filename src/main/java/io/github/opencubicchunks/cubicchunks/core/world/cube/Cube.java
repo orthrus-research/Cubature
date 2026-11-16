@@ -100,6 +100,10 @@ public class Cube implements ICube {
     public long sourceVersion;
     /** Server only: whether a light write since the last tick queued this cube for its watcher to look at. */
     public volatile boolean lightTouched;
+    /** Server only: whether the cube has been sent, so its light writes are recorded block by block. */
+    public volatile boolean lightTracked;
+    /** Server only: the blocks whose light was written since it was last sent on its own, or null. */
+    @Nullable public volatile LightChanges lightChanges;
     public long sourceBlockVersion;
     public long sourceLightVersion;
     @Nullable public Object sourceCopy;
@@ -333,9 +337,28 @@ public class Cube implements ICube {
         }
     }
 
+    /** The cube's record of changed light, made once even when two threads ask together. */
+    private static LightChanges lightChangesOf(Cube cube) {
+        synchronized (cube) {
+            LightChanges changes = cube.lightChanges;
+            if (changes == null) {
+                changes = new LightChanges();
+                cube.lightChanges = changes;
+            }
+            return changes;
+        }
+    }
+
     @Override
     public void setLightFor(EnumSkyBlock lightType, BlockPos pos, int light) {
         column.setLightFor(lightType, pos, light);
+        if (lightTracked) {
+            LightChanges changes = lightChanges;
+            if (changes == null) {
+                changes = lightChangesOf(this);
+            }
+            changes.mark(blockToLocal(pos.getY()) << 8 | blockToLocal(pos.getZ()) << 4 | blockToLocal(pos.getX()));
+        }
         if (!lightTouched && world instanceof net.minecraft.world.WorldServer
                 && ((net.minecraft.world.WorldServer) world).getPlayerChunkMap()
                         instanceof io.github.opencubicchunks.cubicchunks.core.server.PlayerCubeMap) {

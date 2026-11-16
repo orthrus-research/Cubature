@@ -31,6 +31,7 @@ def read(path: Path) -> dict[Position, dict]:
                 "blocks": row.get("blocks"),
                 "storage": row["storage"] == "1",
                 "firstLight": row["firstLight"] == "1",
+                "pending": int(row.get("pendingSky") or 0) + int(row.get("pendingBlock") or 0),
             }
             for row in csv.DictReader(stream, delimiter="\t")
         }

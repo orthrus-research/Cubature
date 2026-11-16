@@ -410,6 +410,12 @@ public class PlayerCubeMap extends PlayerChunkMap implements CubeDemand, Surface
 
 
         followLight(currentTime);
+        if (io.github.opencubicchunks.cubicchunks.core.lighting.LightChecksum.EVERY > 0
+                && getWorldServer().getChunkProvider() instanceof CubeProviderServer) {
+            io.github.opencubicchunks.cubicchunks.core.lighting.LightChecksum.dumpAt(
+                    getWorldServer().provider.getDimension(), currentTime,
+                    ((CubeProviderServer) getWorldServer().getChunkProvider()).loadedCubes());
+        }
 
         //process instances to update
         if (!cubeWatchersToUpdate.isEmpty()) {

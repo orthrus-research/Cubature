@@ -162,8 +162,14 @@ Events are delivered once per client tick, at its end.
    block changed with it (the light of the cube's neighbors arriving, first light ending
    around it), it sends the cube's whole light again (`PacketCubeLight`, 4,109 bytes with
    sky light), at most once every 10 ticks a cube, and the client raises a change of kind
-   `LIGHT` over the whole cube, which moves its light version only. The server option
-   `deliverLightChanges` (default on) turns it off.
+   `LIGHT` over the whole cube, which moves its light version only. The server records,
+   block by block, which blocks' light it wrote since the cube was sent, and sends nothing
+   when none was. With the server option `deliverOnlyChangedLight` (default off) it sends
+   only those blocks' light as it then stands (`PacketCubeLightChanges`, 3 bytes a block,
+   the whole light from 1,365 blocks up), and the client's change covers the box of the
+   blocks it was sent: about a fifth of the bytes, but the client keeps sky light it
+   darkened on its own, which the whole light corrects (Verification). The server option
+   `deliverLightChanges` (default on) turns both off.
 4. Events may be coalesced within a tick: several changes to one cube may arrive as one
    event with their kinds and bounds combined, and a change to a cube whose arrival is
    queued in the same tick is covered by the arrival.
@@ -684,6 +690,33 @@ changed in between, or within the 10 ticks a send waits, is not in the client's.
 more than five cubes inside the edge has differed in any run. The cubes that differ between
 two servers (21 to 46, by generation order) are untouched by this and remain open.
 
+**Only the changed light.** Measured 2026-11-16, same seed and views, 1,200 ticks a view,
+with `deliverOnlyChangedLight` on: 3,093 to 3,154 light sends of 2.4 MB in a run, against
+12.8 MB for the whole light, and 36 to 66 cubes differing between a client and its server
+in four runs, against 19 with the whole light. In the cubes that still differ every block
+that differs is sky light, the client darker than the server by 1 to 8 and more, at blocks
+the server never changed: the client darkens sky light on its own, and only the whole light
+undid it. The option stays off until that is found.
+
+**Between two servers.** Measured 2026-11-16 on two pairs of fresh worlds of one seed,
+dumps every 600 ticks over 2,400 ticks at the views, then each world reloaded from its save
+and visited again, then 64 blocks higher so that four layers of cubes load above the old
+top:
+
+- Blocks: identical in every comparison of every run (the block checksum hashes the state
+  of all 4,096 blocks of each cube). Generation is deterministic.
+- Light: 30 to 43 of 12,167 cubes differ. The count falls for the first 1,800 ticks and
+  then holds; no differing cube has a boundary check pending; after the reload the same 30
+  differ, and after the cubes above load, 32. It is not a transient of the loaded edge:
+  the light is final, saved and never revisited.
+- What differs: only sky light, almost only in air (13,132 of 13,434 differing blocks), in
+  cubes 13 to 16 under the crowns of the tallest trees. In each cube one world holds sky
+  light 0 where the other holds light that came in from the side (1 to 15): light that
+  never spread there. Which world goes dark changes from cube to cube and run to run.
+- Not the cause: concurrent generation (single-threaded generation differs as much), the
+  client, storage made after first light (relighting those blocks changed nothing,
+  measured), storage-less cubes (every differing cube has storage in both worlds).
+
 ## Open points
 
 Each has a proposed answer. None is settled until it is implemented and measured.
@@ -714,6 +747,10 @@ keeping.
    systematically between a client and its server. The client's part is answered: the
    server now sends light that changes after a cube was sent (section 3), and a client
    matches its server but for a few cubes near the edge (Verification). Left open: two
-   servers still differ in a few dozen cubes near the top of what is loaded, by the order
-   in which cubes were generated and first lit, and whether that is what frame captures
-   saw under canopy is not shown.
+   servers differ in a few dozen cubes of air under tall crowns, where one never received
+   sky light from the side; the difference is final and saved (Verification, Between two
+   servers). It is a defect of light propagation that depends on the order cubes are lit
+   in, and the pass that drops the light is not found. *Proposed next:* record, for the
+   cubes that go dark, when each was first lit, the column tops it was lit against, and
+   every later change of those tops and of its neighbors' arrival, and compare a dark run
+   with a bright one.
