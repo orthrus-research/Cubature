@@ -52,10 +52,30 @@ public class TestPoolStopCheck {
     }
 
     @Test
-    public void aThreadLeftBehindIsCounted() {
-        check.stopped("Client preview pool", () -> 1, 10);
-        check.poll(10 + 2 * PoolStopCheck.DELAY_NANOS);
-        assertEquals(List.of("Client preview pool 1 2000"), lines);
+    public void aThreadLeftBehindIsCountedAgainUntilItEnds() {
+        AtomicInteger live = new AtomicInteger(3);
+        long second = PoolStopCheck.DELAY_NANOS;
+        check.stopped("Client preview pool", live::get, 0);
+        check.poll(second);
+        check.poll(2 * second);
+        live.set(1);
+        check.poll(5 * second);
+        live.set(0);
+        check.poll(10 * second);
+        assertEquals(List.of("Client preview pool 3 1000", "Client preview pool 3 2000", "Client preview pool 1 5000",
+                "Client preview pool 0 10000"), lines);
+        assertEquals("No count after it reached none", 0, check.pending());
+    }
+
+    @Test
+    public void aThreadThatNeverEndsIsCountedAtTheLastDelayAndNoMore() {
+        check.stopped("Client preview pool", () -> 2, 0);
+        for (int s = 1; s <= 30; s++) {
+            check.poll(s * PoolStopCheck.DELAY_NANOS);
+        }
+        assertEquals(PoolStopCheck.DELAYS_NANOS.length, lines.size());
+        assertEquals("Client preview pool 2 10000", lines.get(lines.size() - 1));
+        assertEquals(0, check.pending());
     }
 
     @Test

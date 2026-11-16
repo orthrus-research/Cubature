@@ -280,7 +280,7 @@ its snapshot released, and the threads stop; the client log says so in one line 
 pool stopped:` with the threads told to stop, the tasks dropped, waiting and admitted, and the
 jobs interrupted), and `liveThreads()` falls to 0. A second later the log counts them
 (`Client build pool threads 1000 ms after its stop: 0 still alive`), so a thread left behind
-is measured, not assumed. A pool that never ran a job started no threads and logs neither.
+is measured, not assumed; while any is alive it counts again at 2, 5 and 10 seconds. A pool that never ran a job started no threads and logs neither.
 
 **Bounds.** `clientBuildThreads` threads (default a quarter of the processors, 1 to 4),
 daemons just above the lowest priority, started with the first job and stopped when the

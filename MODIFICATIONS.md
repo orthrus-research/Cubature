@@ -480,6 +480,10 @@ alive. The lab's cube source check counts a departed cube's mesh as still drawn
 only once the game has had its chance to rebuild the chunk, and the stale-mesh
 tour ends looking back over the edge the cubes left from.
 
+Also on November 16, 2026, a client pool whose threads are not all gone a second
+after its stop is counted again at 2, 5 and 10 seconds, so a thread that ends
+late is told from one that never ends.
+
 Both supported builds include `NOTICE.md`, this file, the upstream MIT text,
 the full LGPL-2.1 text and component notices in binary and matching sources
 JARs. The sources JAR includes the mod and API Java sources. It is not by

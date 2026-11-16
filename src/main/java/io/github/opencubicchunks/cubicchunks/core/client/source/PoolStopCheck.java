@@ -32,14 +32,18 @@ import java.util.function.IntSupplier;
 
 /**
  * Counts, a moment after a client pool logged its stop line, the pool's threads still alive, and
- * logs that count, so a thread left behind by a stop is measured rather than assumed. A pool hands
+ * logs that count, so a thread left behind by a stop is measured rather than assumed. While any
+ * is still alive it counts again later, up to {@link #DELAYS_NANOS}'s last, so a thread that ends
+ * late is told from one that never ends. A pool hands
  * its stop in here; the client tick polls, with or without a world, so the count is taken without
  * blocking the client thread on a join.
  */
 final class PoolStopCheck {
 
-    /** How long after a stop its threads are counted: well past an interrupted job's end. */
+    /** How long after a stop its threads are first counted: well past an interrupted job's end. */
     static final long DELAY_NANOS = 1_000_000_000L;
+    /** When after a stop its threads are counted, each while some are still alive. */
+    static final long[] DELAYS_NANOS = {DELAY_NANOS, 2 * DELAY_NANOS, 5 * DELAY_NANOS, 10 * DELAY_NANOS};
     /** Stops waiting to be counted; more are counted at once rather than kept. */
     static final int MAX_PENDING = 16;
 
@@ -54,11 +58,14 @@ final class PoolStopCheck {
         final String pool;
         final IntSupplier live;
         final long stoppedAt;
+        /** Which of {@link #DELAYS_NANOS} it is counted at next. */
+        final int step;
 
-        Pending(String pool, IntSupplier live, long stoppedAt) {
+        Pending(String pool, IntSupplier live, long stoppedAt, int step) {
             this.pool = pool;
             this.live = live;
             this.stoppedAt = stoppedAt;
+            this.step = step;
         }
     }
 
@@ -81,7 +88,7 @@ final class PoolStopCheck {
             if (pending.size() >= MAX_PENDING) {
                 first = pending.remove(0);
             }
-            pending.add(new Pending(pool, live, now));
+            pending.add(new Pending(pool, live, now, 0));
         }
         if (first != null) {
             count(first, now);
@@ -94,7 +101,7 @@ final class PoolStopCheck {
         synchronized (pending) {
             for (Iterator<Pending> it = pending.iterator(); it.hasNext(); ) {
                 Pending stop = it.next();
-                if (now - stop.stoppedAt >= DELAY_NANOS) {
+                if (now - stop.stoppedAt >= DELAYS_NANOS[stop.step]) {
                     due.add(stop);
                     it.remove();
                 }
@@ -119,6 +126,12 @@ final class PoolStopCheck {
     }
 
     private void count(Pending stop, long now) {
-        report.live(stop.pool, stop.live.getAsInt(), (now - stop.stoppedAt) / 1_000_000L);
+        int live = stop.live.getAsInt();
+        report.live(stop.pool, live, (now - stop.stoppedAt) / 1_000_000L);
+        if (live > 0 && stop.step + 1 < DELAYS_NANOS.length) {
+            synchronized (pending) {
+                pending.add(new Pending(stop.pool, stop.live, stop.stoppedAt, stop.step + 1));
+            }
+        }
     }
 }
