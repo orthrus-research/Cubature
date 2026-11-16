@@ -30,6 +30,7 @@ import io.github.opencubicchunks.cubicchunks.core.world.ICubeProviderInternal;
 import io.github.opencubicchunks.cubicchunks.api.util.CubePos;
 import io.github.opencubicchunks.cubicchunks.api.util.XYZMap;
 import io.github.opencubicchunks.cubicchunks.api.world.IColumn;
+import io.github.opencubicchunks.cubicchunks.api.world.ICube;
 import io.github.opencubicchunks.cubicchunks.core.asm.mixin.ICubicWorldInternal;
 import io.github.opencubicchunks.cubicchunks.core.compat.celeritas.CeleritasCompat;
 import io.github.opencubicchunks.cubicchunks.core.world.cube.BlankCube;
@@ -39,6 +40,9 @@ import net.minecraft.client.multiplayer.ChunkProviderClient;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -152,6 +156,31 @@ public class CubeProviderClient extends ChunkProviderClient implements ICubeProv
         cube.getColumn().removeCube(pos.getY());
         CeleritasCompat.cubeUnloaded(cube);
         io.github.opencubicchunks.cubicchunks.core.client.source.ClientCubeSource.INSTANCE.cubeUnloaded(cube);
+    }
+
+    /**
+     * The server unloads a column's cubes before the column, but the vanilla column unload this
+     * replaces would drop the column and leave any cube still held in the cube map, where it stays
+     * loaded for every reader and no unload event is raised for it. Any such cube is unloaded first,
+     * as an unload of the cube itself would be.
+     */
+    @Override
+    public void unloadChunk(int x, int z) {
+        Chunk column = getLoadedColumn(x, z);
+        if (column != null && !((IColumn) column).getLoadedCubes().isEmpty()) {
+            List<CubePos> held = new ArrayList<>();
+            for (ICube cube : ((IColumn) column).getLoadedCubes()) {
+                held.add(cube.getCoords());
+            }
+            for (CubePos pos : held) {
+                Cube cube = getLoadedCube(pos);
+                if (cube != null) {
+                    cube.markForRenderUpdate();
+                }
+                unloadCube(pos);
+            }
+        }
+        super.unloadChunk(x, z);
     }
 
     @Override

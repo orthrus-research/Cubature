@@ -477,6 +477,12 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
         return cubes == null ? null : cubes.getLoadedCube(x, y, z);
     }
 
+    /** For the diagnostic: the client's cube cache, or null with no world attached. */
+    @Nullable
+    CubeProviderClient cubes() {
+        return cubes;
+    }
+
     // The rest of the game's world listener, which the source has no use for.
 
     @Override

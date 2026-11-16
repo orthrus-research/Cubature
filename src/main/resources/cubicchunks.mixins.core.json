@@ -52,6 +52,7 @@
         "client.IGuiOptionsRowList",
         "client.IGuiScreen",
         "client.INetHandlerPlayClient",
+        "client.IRenderGlobal",
         "client.IViewFrustum",
         "client.MixinChunk_Cubes",
         "client.MixinChunkCache_HeightLimits",

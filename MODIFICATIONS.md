@@ -369,6 +369,13 @@ so that a change of light alone can be told from a change of blocks. Each
 client cube carries the two halves beside its version. The bounds that cube
 change events carry are now a stated contract.
 
+Also on November 15, 2026, two client unload paths changed. A vanilla render
+chunk more than 24 blocks from the player whose own cube has left is now built
+(to nothing) instead of waiting for its neighbors, which had left the mesh of
+the departed cube drawn. A column unload on the client first unloads every cube
+the client still holds in it, as a cube unload would, instead of leaving those
+cubes in the client's cube map.
+
 Both supported builds include `NOTICE.md`, this file, the upstream MIT text,
 the full LGPL-2.1 text and component notices in binary and matching sources
 JARs. The sources JAR includes the mod and API Java sources. It is not by

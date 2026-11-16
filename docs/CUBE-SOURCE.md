@@ -154,6 +154,12 @@ Events are delivered once per client tick, at its end.
    covers the whole cube and carries no bounds; a change merged into an arrival queued in
    the same tick raises nothing further. A renderer may rebuild exactly the bounds it is
    given.
+7. **An unload is final when it is delivered.** `cubeUnloaded` arrives at the end of the
+   client tick in which the unload was applied, and by then the cube is gone: `isLoaded`
+   is false and a snapshot reads it as absent. There is no retiring state between the two.
+   A column that leaves takes every cube still held in it, each with its own
+   `cubeUnloaded`. The game's own renderer clears its mesh of the cube within its usual
+   rebuild latency, at any distance from the player.
 
 ## 4. Queries
 
@@ -400,6 +406,10 @@ cubes were loaded and 15 differing beside a cube that was not (guarantee 5 of se
 133,798 cubes rechecked with their version unmoved, none changed. The tour changes no
 blocks by hand, so the small block-change packet route is exercised only by what the
 server does on its own.
+
+The same switch also follows each removal: five ticks after a cube leaves, the vanilla
+render chunk at its position, if the render grid still covers it, must hold no mesh, and
+every report counts the cubes the client still holds in a column it no longer has.
 
 ## Open points
 
