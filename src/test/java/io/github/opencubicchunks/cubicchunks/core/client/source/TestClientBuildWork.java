@@ -405,7 +405,9 @@ public class TestClientBuildWork {
         while (back < 64) {
             pollOne(pool);
             back++;
-            assertTrue(world.snapshots.get() - world.released.get() <= 5);
+            int taken = world.snapshots.get();
+            int released = world.released.get();
+            assertTrue("held " + (taken - released) + " after " + back + " back, queued " + pool.queued() + " admitted " + pool.admitted(), taken - released <= 5);
         }
         assertEquals(64, world.snapshots.get());
     }

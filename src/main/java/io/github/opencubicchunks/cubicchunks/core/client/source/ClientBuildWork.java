@@ -330,6 +330,8 @@ final class ClientBuildWork implements IClientBuildWork {
         private final AtomicReference<ICubeSnapshot> snapshot = new AtomicReference<>();
         /** Set by the thread about to run the job, or by a canceller that got there first. */
         private final java.util.concurrent.atomic.AtomicBoolean claimed = new java.util.concurrent.atomic.AtomicBoolean();
+        /** Set by whoever releases the snapshot, so it is released once. */
+        private final java.util.concurrent.atomic.AtomicBoolean releasing = new java.util.concurrent.atomic.AtomicBoolean();
         private long blockVersion = -1;
         private long lightVersion = -1;
         private volatile long centerVersion = -1;
@@ -418,9 +420,12 @@ final class ClientBuildWork implements IClientBuildWork {
 
         /** Releases the snapshot once, whoever gets here first. */
         void releaseSnapshot() {
-            ICubeSnapshot held = snapshot.getAndSet(null);
-            if (held != null) {
+            ICubeSnapshot held = snapshot.get();
+            // The reference is cleared only once release() has returned, so the pool counts a snapshot
+            // as held until it truly is not, and the bound on held snapshots is exact.
+            if (held != null && releasing.compareAndSet(false, true)) {
                 held.release();
+                snapshot.set(null);
             }
         }
 
