@@ -140,3 +140,9 @@ Measured 2026-11-16 at client render 20 against server 12, before the look back 
 the check waited on rebuilds: 61 views each, 21,250 departures, all inside the grid, and 3,840
 still drawn with the fix and without, the same cubes. The walk faced east, away from the
 departed edge, so none of those chunks had been in view to be rebuilt.
+
+Measured again 2026-11-16 with the look back and the check waiting on rebuilds, same
+distances, 63 views each: 21,875 departures, 125 back, 16,250 outside the grid by the time
+they were checked, and 4,400 checked after the game had had its chance to rebuild them (all
+21,875 waited on a rebuild first, none still waiting at the end). Without the fix 1,916 of
+those 4,400 were still drawn; with it, none.
