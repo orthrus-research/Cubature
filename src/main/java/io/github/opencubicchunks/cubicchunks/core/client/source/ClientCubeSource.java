@@ -33,6 +33,7 @@ import io.github.opencubicchunks.cubicchunks.api.world.ICube;
 import io.github.opencubicchunks.cubicchunks.api.world.IHeightMap;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
 import io.github.opencubicchunks.cubicchunks.api.worldgen.ICubicTerrainPreview;
+import io.github.opencubicchunks.cubicchunks.core.CubicChunks;
 import io.github.opencubicchunks.cubicchunks.core.CubicChunksConfig;
 import io.github.opencubicchunks.cubicchunks.core.client.CubeProviderClient;
 import io.github.opencubicchunks.cubicchunks.core.world.cube.Cube;
@@ -438,8 +439,25 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
         boolean buildWaited = buildWork != null && buildWork.takeWaited();
         boolean previewRan = previewWork != null && previewWork.takeRan();
         boolean buildRan = buildWork != null && buildWork.takeRan();
-        workBudget.set(workGovernor.update(now, latestFrames, latestTicks, previewWaited || buildWaited,
-                previewRan || buildRan));
+        boolean previewFull = previewWork != null && previewWork.takeFull();
+        boolean buildFull = buildWork != null && buildWork.takeFull();
+        int queued = (previewWork == null ? 0 : previewWork.queuedNow()) + (buildWork == null ? 0 : buildWork.queuedNow());
+        // Demand is a job that waited for a permit, work not yet started, or a pool that ran full: a renderer
+        // that hands in no more than running() allows never makes a job wait, yet keeps the pool full.
+        boolean waited = previewWaited || buildWaited;
+        boolean demand = waited || queued > 0 || previewFull || buildFull;
+        boolean ran = previewRan || buildRan;
+        int before = workBudget.permits();
+        int after = workGovernor.update(now, latestFrames, latestTicks, demand, ran);
+        workBudget.set(after);
+        if (after != before) {
+            CubicChunks.LOGGER.info("Client work permits {} -> {}: {} (frame p95 {} ms, server tick p95 {}, waited {}, "
+                            + "ran {}, queued {}, full {})", before, after, workGovernor.lastReason(),
+                    String.format(java.util.Locale.ROOT, "%.1f", workGovernor.lastFrameMs()),
+                    server == null ? "remote server"
+                            : String.format(java.util.Locale.ROOT, "%.1f ms", workGovernor.lastTickMs()),
+                    waited, ran, queued, previewFull || buildFull);
+        }
     }
 
     // ICubeSource.

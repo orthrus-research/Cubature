@@ -55,6 +55,7 @@ final class ClientPreviewWork implements IClientPreviewWork {
     @Nullable private Bound bound;
     private volatile boolean waited;
     private volatile boolean ran;
+    private volatile boolean full;
 
     /** One attached preview: its threads, and whether it still stands. */
     private static final class Bound {
@@ -179,6 +180,19 @@ final class ClientPreviewWork implements IClientPreviewWork {
         return was;
     }
 
+    /** Whether a job started with every permit taken since the last call: the pool ran full. */
+    boolean takeFull() {
+        boolean was = full;
+        full = false;
+        return was;
+    }
+
+    /** Tasks handed in and not yet started: work the threads have not reached. */
+    int queuedNow() {
+        Bound now = bound;
+        return now == null || now.threads == null ? 0 : now.threads.getQueue().size();
+    }
+
     boolean takeRan() {
         boolean was = ran || permits.active() > 0;
         ran = false;
@@ -233,6 +247,10 @@ final class ClientPreviewWork implements IClientPreviewWork {
                 }
                 permits.acquire();
                 held = true;
+                if (permits.active() >= permits.permits()) {
+                    // Every permit taken as this job starts: the pool is running full.
+                    full = true;
+                }
                 if (!task.start()) {
                     return;
                 }

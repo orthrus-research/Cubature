@@ -527,14 +527,24 @@ interface Task { Job job(); int state(); void cancel(); boolean cancelled();
   daemons one step above the lowest priority, never the common pool.
 - **Governor.** As on the server, the threads are a ceiling and permits say how many jobs
   run at once: half the threads to start, never fewer than one. Once a second the governor
-  reads the last 120 frame times and, in single player, the integrated server's latest
-  ticks. While jobs ran and the frames' p95 is at or over `clientPreviewFrameBudgetMs`
-  (default 25), or the server's tick p95 is at or over the server pool's own 45 ms, it
-  halves the permits. When a job waited for a permit, two seconds have passed since the
-  last change, the frames' p95 is under four fifths of the budget and the tick p95 under
-  40 ms, it adds one. A long job calls `Task.checkpoint()` between rows, where it waits if
-  the permits have fallen below the jobs running. A client whose frames are longer than the
-  budget whatever the pool does stays at one job.
+  reads the last 120 frame times (the time between render ticks) and, in single player, the
+  integrated server's latest ticks. A dedicated server's ticks are never read: they are in
+  another process, so on a remote server only the frames decide.
+  - It halves the permits while jobs ran and the frames' p95 is at or over
+    `clientPreviewFrameBudgetMs` (default 25), or the integrated server's tick p95 over 20
+    ticks is at or over the server pool's own 45 ms.
+  - It adds one when there was demand, two seconds have passed since the last change, the
+    frames' p95 is under four fifths of the budget and the tick p95 over 40 ticks under 40 ms.
+    Demand is any of: a job waited for a permit, work was handed in and not yet started (in
+    either pool), or a job started with every permit taken. The last matters for a renderer
+    that hands in no more than `running()` allows: it never makes a job wait, but keeps the
+    pool full, and that alone now raises it.
+  - A long job calls `Task.checkpoint()` between rows, where it waits if the permits have
+    fallen below the jobs running. A client whose frames are longer than the budget whatever
+    the pool does stays at one job.
+  - Each change of the permits is logged in one line (`Client work permits 1 -> 2:`) with what
+    decided it, the frame p95, the server tick p95 or `remote server`, and whether a job
+    waited, ran, was queued and whether the pool ran full.
 - **Shared.** The permits are one budget for this pool and the build pool (section 5): the
   ceiling is the larger of the two pools' threads, a job of either takes a permit, and the
   governor reads both pools' waits and runs.

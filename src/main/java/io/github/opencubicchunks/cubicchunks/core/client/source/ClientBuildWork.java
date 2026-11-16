@@ -76,6 +76,7 @@ final class ClientBuildWork implements IClientBuildWork {
     private long sequence;
     private volatile boolean waited;
     private volatile boolean ran;
+    private volatile boolean full;
 
     ClientBuildWork(int size, LivePermits permits) {
         this.size = Math.max(1, size);
@@ -285,6 +286,18 @@ final class ClientBuildWork implements IClientBuildWork {
         return was;
     }
 
+    /** Whether a job started with every permit taken since the last call: the pool ran full. */
+    boolean takeFull() {
+        boolean was = full;
+        full = false;
+        return was;
+    }
+
+    /** Tasks waiting in the heap or for a thread: work the threads have not reached. Client thread. */
+    int queuedNow() {
+        return heap.size() + (threads == null ? 0 : threads.getQueue().size());
+    }
+
     boolean takeRan() {
         boolean was = ran;
         ran = false;
@@ -322,6 +335,10 @@ final class ClientBuildWork implements IClientBuildWork {
                 }
                 permits.acquire();
                 held = true;
+                if (permits.active() >= permits.permits()) {
+                    // Every permit taken as this job starts: the pool is running full.
+                    full = true;
+                }
                 if (task.cancelled()) {
                     return;
                 }

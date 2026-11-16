@@ -50,6 +50,10 @@ final class ClientPreviewGovernor {
     private final double frameBudgetMs;
     private int permits;
     private long lastChange = Long.MIN_VALUE;
+    /** What the last update read and why it changed the permits, for the log. */
+    private double lastFrameMs;
+    private double lastTickMs;
+    private String lastReason = "unchanged";
 
     /**
      * @param ceiling       the pool's threads
@@ -72,16 +76,41 @@ final class ClientPreviewGovernor {
      */
     int update(long now, long[] frames, long[] ticks, boolean waiting, boolean ran) {
         double frameTail = p95Ms(frames, FRAMES);
-        if (ran && (frameTail >= frameBudgetMs || p95Ms(ticks, CUT_TICKS) >= CUT_TICK_MS)) {
+        double tickCut = p95Ms(ticks, CUT_TICKS);
+        double tickRaise = p95Ms(ticks, RAISE_TICKS);
+        lastFrameMs = frameTail;
+        lastTickMs = tickCut;
+        lastReason = "unchanged";
+        if (ran && (frameTail >= frameBudgetMs || tickCut >= CUT_TICK_MS)) {
+            int before = permits;
             permits = Math.max(1, permits / 2);
             lastChange = now;
+            lastReason = permits == before ? "held at the floor"
+                    : frameTail >= frameBudgetMs ? "cut: frame p95 at or over " + frameBudgetMs + " ms"
+                    : "cut: server tick p95 at or over " + CUT_TICK_MS + " ms";
         } else if (waiting && permits < ceiling && (lastChange == Long.MIN_VALUE || now - lastChange >= SETTLE)
                 && frames.length > 0 && frameTail < RAISE_SHARE * frameBudgetMs
-                && p95Ms(ticks, RAISE_TICKS) < RAISE_TICK_MS) {
+                && tickRaise < RAISE_TICK_MS) {
             permits++;
             lastChange = now;
+            lastReason = "raised: work waited and frames and ticks are under their raise marks";
         }
         return permits;
+    }
+
+    /** The frame p95 the last update read, in milliseconds. */
+    double lastFrameMs() {
+        return lastFrameMs;
+    }
+
+    /** The server tick p95 the last update read, in milliseconds; 0 without ticks. */
+    double lastTickMs() {
+        return lastTickMs;
+    }
+
+    /** Why the last update changed the permits, or "unchanged". */
+    String lastReason() {
+        return lastReason;
     }
 
     int permits() {

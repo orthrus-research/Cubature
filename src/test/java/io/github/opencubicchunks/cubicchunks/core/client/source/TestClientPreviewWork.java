@@ -141,6 +141,32 @@ public class TestClientPreviewWork {
         awaitNoThreads(work);
     }
 
+    @Test public void aPoolKeptFullOrWithWorkQueuedShowsDemandWithoutAnyJobWaiting() throws Exception {
+        // One thread, one permit: a renderer that hands in no more than running() never makes a job wait.
+        ClientPreviewWork work = new ClientPreviewWork(1, 1);
+        work.bind(new Preview());
+        CountDownLatch entered = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        work.submit(0, (sampler, task) -> {
+            entered.countDown();
+            release.await();
+        });
+        assertTrue(entered.await(5, TimeUnit.SECONDS));
+        assertFalse("No job waited for a permit", work.takeWaited());
+        assertTrue("But the pool ran full", work.takeFull());
+        assertFalse(work.takeFull());
+        assertEquals(0, work.queuedNow());
+        work.submit(0, (sampler, task) -> { });
+        assertEquals("A job behind the running one is queued", 1, work.queuedNow());
+        release.countDown();
+        for (int i = 0; i < 2000 && work.queuedNow() > 0; i++) {
+            Thread.sleep(1);
+        }
+        assertEquals(0, work.queuedNow());
+        work.bind(null);
+        awaitNoThreads(work);
+    }
+
     @Test public void aWithdrawnPreviewEndsItsTasksAndItsThreads() throws Exception {
         ClientPreviewWork work = new ClientPreviewWork(2, 2);
         Preview first = new Preview();

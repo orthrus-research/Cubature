@@ -52,6 +52,27 @@ public class TestClientPreviewGovernor {
         assertEquals("Never over the threads", 4, governor.update(9 * SECOND, frames, new long[0], true, true));
     }
 
+    @Test public void eachChangeSaysWhatDecidedIt() {
+        ClientPreviewGovernor governor = new ClientPreviewGovernor(4, 25);
+        governor.update(0, all(120, 30), new long[0], true, true);
+        assertEquals("cut: frame p95 at or over 25.0 ms", governor.lastReason());
+        assertEquals(30.0, governor.lastFrameMs(), 0.01);
+        assertEquals(0.0, governor.lastTickMs(), 0.01);
+        governor.update(SECOND, all(120, 2), all(40, 50), true, true);
+        assertEquals("held at the floor", governor.lastReason());
+        assertEquals(50.0, governor.lastTickMs(), 0.01);
+        governor.update(4 * SECOND, all(120, 2), new long[0], true, false);
+        assertEquals("raised: work waited and frames and ticks are under their raise marks", governor.lastReason());
+        governor.update(5 * SECOND, all(120, 2), new long[0], false, false);
+        assertEquals("unchanged", governor.lastReason());
+    }
+
+    @Test public void withNoServerTicksOnlyFramesDecide() {
+        // A dedicated server in its own process: its ticks are not read, so they never cut or hold back a raise.
+        ClientPreviewGovernor governor = new ClientPreviewGovernor(4, 25);
+        assertEquals(3, governor.update(0, all(120, 2), new long[0], true, true));
+    }
+
     @Test public void nothingWaitingRaisesNothing() {
         ClientPreviewGovernor governor = new ClientPreviewGovernor(4, 25);
         assertEquals(2, governor.update(0, all(120, 8), new long[0], false, true));
