@@ -32,6 +32,20 @@ python -m pip install -r tools/requirements.txt
 python -B -m unittest discover -s tools -p "test_*.py"
 ```
 
+### View distance
+
+Every instance is prepared at the baseline view distance: 12 cubes for the server's horizontal
+and vertical view distances and 12 chunks for the client's render distance, so runs compare. A
+run may raise any of the three above the baseline, freely, and nothing goes below it. Riven's
+`tools/runtime.py play` takes `--view-distance`, `--vertical-view-distance` and
+`--client-render-distance`, and a tour may ask for raised distances itself (below). Before the
+launch the instance is set to the run's distances, the baseline for a run that asks for nothing,
+and the instance's `standalone.json` records them in `viewDistance` with `viewDistanceLabel`:
+`baseline`, or what was raised, such as `raised: clientRender 20 (baseline 12)`. The checks
+before launch and in each capture compare the files and the measured distances with that
+record. The game clamps the server's distances above 32 and Cubature's render distance above 64,
+so those are the highest a run may ask for.
+
 | Path | Contents |
 | --- | --- |
 | `src/` | The lab mod: scenarios, probes and their Mixins |
@@ -97,9 +111,15 @@ whose cube the server unloaded, its outer neighbor already gone. Prepare the ins
 render chunk and counts the departed cubes still drawn. `-Dcubicchunks.noUnloadedMeshFix=true`
 puts back the game's wait, to compare.
 
-Measured 2026-11-16, with the fix and without: 61 views, 36,875 arrivals and 21,250
-departures, every departed cube already outside the render grid, so neither run reached the
-case. At equal view distances it cannot arise: the grid spans the client's render distance
-around the player's chunk and the server's box its view distance around the player's cube,
-and the lab keeps both at 12. It needs a client whose render distance is above the server's
-view distance, which the lab's view-distance check refuses.
+A tour file is a list of views, or an object with `views` and the view distances the tour
+asks for: `{"viewDistance": {"horizontal": 12, "vertical": 12, "clientRender": 20}, "views":
+[...]}`, any of the three left out staying at the baseline. Options given to `play` win over the
+tour's.
+
+Measured 2026-11-16, with the fix and without, at the baseline distances: 61 views, 36,875
+arrivals and 21,250 departures, every departed cube already outside the render grid, so
+neither run reached the case. At equal view distances it cannot arise: the grid spans the
+client's render distance around the player's chunk and the server's box its view distance
+around the player's cube. The tour therefore asks for a client render distance of 20 against
+the server's 12, so the cubes 13 to 20 cubes away leave the server while still in the grid. It
+has not been run that way yet.

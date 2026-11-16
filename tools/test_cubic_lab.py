@@ -273,6 +273,64 @@ class LabControlTest(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'prepare a new instance'):
             profiles.validate_view_distance_inputs({'viewDistance': {'horizontal': 3, 'vertical': 3, 'clientRender': 3}})
 
+    def _prepared(self, root):
+        server = root / 'server'; client = root / 'client'
+        for directory in [server, client]: (directory / 'config').mkdir(parents=True)
+        (server / 'server.properties').write_text('level-name=fresh-test\nview-distance=12\n', encoding='utf-8')
+        (server / 'config/cubicchunks.cfg').write_text('general {\n    I:verticalCubeLoadDistance=12\n}\n', encoding='utf-8')
+        (client / 'config/cubicchunks.cfg').write_text('general {\n    I:verticalCubeLoadDistance=12\n}\n', encoding='utf-8')
+        (client / 'options.txt').write_text(profiles.client_options(), encoding='utf-8')
+        return {'server': str(server), 'client': str(client), 'viewDistance': profiles.view_distance_profile()}
+
+    def test_a_run_may_raise_any_distance_and_it_is_recorded(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            manifest = self._prepared(Path(temporary))
+            raised = profiles.view_distance_profile(client_render=20)
+            self.assertTrue(profiles.apply_view_distance(manifest, raised))
+            profiles.validate_view_distance_inputs(manifest)
+            self.assertEqual(manifest['viewDistance'], {'horizontal': 12, 'vertical': 12, 'clientRender': 20})
+            self.assertEqual(manifest['viewDistanceLabel'], 'raised: clientRender 20 (baseline 12)')
+            options = (Path(manifest['client']) / 'options.txt').read_text()
+            self.assertIn('renderDistance:20\nmaxFps:120', options)
+            # The server and both vertical distances raise the same way, and the baseline comes back.
+            profiles.apply_view_distance(manifest, profiles.view_distance_profile(16, 14, 24))
+            profiles.validate_view_distance_inputs(manifest)
+            self.assertIn('view-distance=16', (Path(manifest['server']) / 'server.properties').read_text())
+            for side in ['server', 'client']:
+                self.assertIn('I:verticalCubeLoadDistance=14', (Path(manifest[side]) / 'config/cubicchunks.cfg').read_text())
+            self.assertTrue(profiles.apply_view_distance(manifest, profiles.view_distance_profile()))
+            profiles.validate_view_distance_inputs(manifest)
+            self.assertEqual(manifest['viewDistanceLabel'], 'baseline')
+            self.assertFalse(profiles.apply_view_distance(manifest, profiles.view_distance_profile()))
+
+    def test_below_the_baseline_or_above_the_game_is_refused(self):
+        for bad in [dict(horizontal=11), dict(vertical=3), dict(client_render=8), dict(horizontal=33),
+                    dict(client_render=65), dict(horizontal=12.5)]:
+            with self.assertRaises(RuntimeError, msg=str(bad)):
+                profiles.view_distance_profile(**bad)
+        self.assertEqual(profiles.view_distance_profile(32, 32, 64)['clientRender'], 64)
+        with tempfile.TemporaryDirectory() as temporary:
+            manifest = self._prepared(Path(temporary))
+            with self.assertRaisesRegex(RuntimeError, 'below the baseline'):
+                profiles.apply_view_distance(manifest, {'horizontal': 8, 'vertical': 12, 'clientRender': 12})
+            self.assertEqual(manifest['viewDistance'], profiles.view_distance_profile())
+
+    def test_a_raised_lab_still_refuses_files_that_drifted_from_its_record(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            manifest = self._prepared(Path(temporary))
+            profiles.apply_view_distance(manifest, profiles.view_distance_profile(client_render=20))
+            (Path(manifest['client']) / 'options.txt').write_text('renderDistance:12\n', encoding='utf-8')
+            with self.assertRaisesRegex(RuntimeError, 'changed or is ambiguous'):
+                profiles.validate_view_distance_inputs(manifest)
+
+    def test_a_raised_capture_is_checked_against_its_own_profile(self):
+        manifest = {'viewDistance': profiles.view_distance_profile(16, 14, 20)}
+        server = {'horizontalViewDistance': 16, 'verticalViewDistance': 14}
+        client = {'renderDistance': 20, 'verticalViewDistance': 14}
+        profiles.validate_view_distance_capture(manifest, server, client)
+        client['renderDistance'] = 12
+        with self.assertRaises(RuntimeError): profiles.validate_view_distance_capture(manifest, server, client)
+
     def test_duplicate_view_settings_are_rejected(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary); (root / 'server.properties').write_text('view-distance=12\nview-distance=3\n', encoding='utf-8')

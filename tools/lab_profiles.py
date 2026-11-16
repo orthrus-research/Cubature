@@ -3,7 +3,12 @@ preparations configure, and their checks before launch and in each capture."""
 from pathlib import Path
 import re
 
+# The baseline view distance, in cubes: the server's horizontal and vertical distances and the
+# client's render distance. A run may raise any of them by exception; none goes below it.
 VIEW_DISTANCE = 12
+VIEW_DISTANCE_KEYS = ('horizontal', 'vertical', 'clientRender')
+# Above these the game clamps the value: the server's view distances to 32, Cubature's render distance to 64.
+VIEW_DISTANCE_LIMITS = {'horizontal': 32, 'vertical': 32, 'clientRender': 64}
 # Cubature's CubicChunksConfig.DeliveryMode, in stage order.
 DELIVERY_MODES = ('BASELINE', 'MAINTENANCE', 'SAVE', 'PREFETCH')
 JVM_ARGUMENTS = ['-Xms1G', '-Xmx8G', '-XX:+UseZGC']
@@ -109,18 +114,47 @@ def validate_cube_experiments(manifest):
         if actual != [expected]: raise RuntimeError('Prepared cube experiment changed: ' + name)
 
 
-def view_distance_profile():
-    return {'horizontal': VIEW_DISTANCE, 'vertical': VIEW_DISTANCE, 'clientRender': VIEW_DISTANCE}
+def view_distance_profile(horizontal=None, vertical=None, client_render=None):
+    """The view distances of a run: the baseline, or any of them raised by exception."""
+    profile = {'horizontal': VIEW_DISTANCE if horizontal is None else horizontal,
+               'vertical': VIEW_DISTANCE if vertical is None else vertical,
+               'clientRender': VIEW_DISTANCE if client_render is None else client_render}
+    check_view_distance_profile(profile)
+    return profile
 
 
-def configure_view_distance(server):
-    """Apply the shared test distance only to a newly owned preparation directory."""
-    properties = server / 'server.properties'
-    text = re.sub(r'^view-distance=.*\n?', '', properties.read_text(), flags=re.M)
-    properties.write_text(text + f'view-distance={VIEW_DISTANCE}\n', encoding='utf-8')
-    config = server / 'config/cubicchunks.cfg'
+def check_view_distance_profile(profile):
+    """Refuses a profile that is not one: a missing or extra key, a value that is not a whole number,
+    one below the baseline, or one above what the game would clamp it to."""
+    if not isinstance(profile, dict) or set(profile) != set(VIEW_DISTANCE_KEYS):
+        raise RuntimeError('This lab has no view-distance profile; preserve this older lab and prepare a new instance')
+    for key in VIEW_DISTANCE_KEYS:
+        value = profile[key]
+        if type(value) is not int:
+            raise RuntimeError(f'View distance {key} is not a whole number: {value!r}')
+        if value < VIEW_DISTANCE:
+            raise RuntimeError(f'View distance {key} {value} is below the baseline {VIEW_DISTANCE}; '
+                               'preserve this older lab and prepare a new instance')
+        if value > VIEW_DISTANCE_LIMITS[key]:
+            raise RuntimeError(f'View distance {key} {value} is above what the game allows, '
+                               f'{VIEW_DISTANCE_LIMITS[key]}')
+
+
+def is_baseline_view_distance(profile):
+    return profile == view_distance_profile()
+
+
+def view_distance_label(profile):
+    """How a run's view distances read in its records: 'baseline', or what was raised."""
+    if is_baseline_view_distance(profile):
+        return 'baseline'
+    raised = [f'{key} {profile[key]}' for key in VIEW_DISTANCE_KEYS if profile[key] != VIEW_DISTANCE]
+    return 'raised: ' + ', '.join(raised) + f' (baseline {VIEW_DISTANCE})'
+
+
+def _set_vertical(config, vertical):
     text = config.read_text()
-    setting = f'    I:verticalCubeLoadDistance={VIEW_DISTANCE}'
+    setting = f'    I:verticalCubeLoadDistance={vertical}'
     if re.search(r'^\s*I:verticalCubeLoadDistance=.*$', text, flags=re.M):
         text = re.sub(r'^\s*I:verticalCubeLoadDistance=.*$', setting, text, flags=re.M)
     else:
@@ -129,30 +163,63 @@ def configure_view_distance(server):
     config.write_text(text, encoding='utf-8')
 
 
-def client_options():
-    return (f'renderDistance:{VIEW_DISTANCE}\nmaxFps:120\nenableVsync:false\nfancyGraphics:false\n'
+def configure_view_distance(server, profile=None):
+    """Applies a run's server distances (the baseline unless given) to a preparation directory."""
+    profile = view_distance_profile() if profile is None else profile
+    check_view_distance_profile(profile)
+    properties = server / 'server.properties'
+    text = re.sub(r'^view-distance=.*\n?', '', properties.read_text(), flags=re.M)
+    properties.write_text(text + f'view-distance={profile["horizontal"]}\n', encoding='utf-8')
+    _set_vertical(server / 'config/cubicchunks.cfg', profile['vertical'])
+
+
+def client_options(profile=None):
+    profile = view_distance_profile() if profile is None else profile
+    check_view_distance_profile(profile)
+    return (f'renderDistance:{profile["clientRender"]}\nmaxFps:120\nenableVsync:false\nfancyGraphics:false\n'
             'renderClouds:false\nfullscreen:false\npauseOnLostFocus:false\nshowSubtitles:false\ntutorialStep:none\n')
 
 
-def validate_view_distance_inputs(manifest):
-    if manifest.get('viewDistance') != view_distance_profile():
-        raise RuntimeError('Native testing requires view distance 12; preserve this older lab and prepare a new instance')
+def apply_view_distance(manifest, profile):
+    """Sets a prepared instance's view distances for the next run, and records them in its manifest:
+    the server's view-distance and vertical distance, the client's render distance, and the client's
+    vertical distance, which follows the server's. Returns whether anything changed."""
+    check_view_distance_profile(profile)
+    if manifest.get('viewDistance') == profile:
+        return False
     server, client = Path(manifest['server']), Path(manifest['client'])
-    checks = [(server / 'server.properties', r'^view-distance=(\d+)\s*$'),
-              (client / 'options.txt', r'^renderDistance:(\d+)\s*$')]
-    checks += [(directory / 'config/cubicchunks.cfg', r'^\s*I:verticalCubeLoadDistance=(\d+)\s*$')
-               for directory in [server, client]]
-    for path, pattern in checks:
+    configure_view_distance(server, profile)
+    _set_vertical(client / 'config/cubicchunks.cfg', profile['vertical'])
+    options = client / 'options.txt'
+    text = options.read_text()
+    text, count = re.subn(r'^renderDistance:\d+[ \t]*$', f'renderDistance:{profile["clientRender"]}', text, flags=re.M)
+    if count != 1:
+        raise RuntimeError('Client options have no single renderDistance in ' + str(options))
+    options.write_text(text, encoding='utf-8')
+    manifest['viewDistance'] = dict(profile)
+    manifest['viewDistanceLabel'] = view_distance_label(profile)
+    return True
+
+
+def validate_view_distance_inputs(manifest):
+    profile = manifest.get('viewDistance')
+    check_view_distance_profile(profile)
+    server, client = Path(manifest['server']), Path(manifest['client'])
+    checks = [(server / 'server.properties', r'^view-distance=(\d+)\s*$', profile['horizontal']),
+              (client / 'options.txt', r'^renderDistance:(\d+)\s*$', profile['clientRender'])]
+    checks += [(directory / 'config/cubicchunks.cfg', r'^\s*I:verticalCubeLoadDistance=(\d+)\s*$',
+                profile['vertical']) for directory in [server, client]]
+    for path, pattern, expected in checks:
         values = re.findall(pattern, path.read_text(), flags=re.M)
-        if values != [str(VIEW_DISTANCE)]:
+        if values != [str(expected)]:
             raise RuntimeError('Test view distance changed or is ambiguous in ' + str(path) + '; prepare a new revision')
 
 
 def validate_view_distance_capture(manifest, server, client):
     expected = manifest.get('viewDistance')
-    if expected != view_distance_profile(): raise RuntimeError('Missing current view-distance profile')
+    check_view_distance_profile(expected)
     observed = {'horizontal': server.get('horizontalViewDistance'), 'vertical': server.get('verticalViewDistance'),
                 'clientRender': client.get('renderDistance')}
-    if observed != expected or client.get('verticalViewDistance') != VIEW_DISTANCE:
-        raise RuntimeError('Measured view distances differ from required 12: ' + str(observed)
+    if observed != expected or client.get('verticalViewDistance') != expected['vertical']:
+        raise RuntimeError('Measured view distances differ from the run\'s ' + str(expected) + ': ' + str(observed)
                            + '; client vertical=' + str(client.get('verticalViewDistance')))

@@ -441,6 +441,11 @@ per-block light for listed cubes (`cubicchunks.lightDetail`) and each cube's
 pending boundary checks. A lab switch, `cubicchunks.noUnloadedMeshFix`, puts back
 the game's wait in the render worker, and `lab/tours` holds a one-off walking tour.
 
+Also on November 16, 2026, the lab's view distances became a baseline instead of a fixed
+value: instances are prepared at 12, a run may raise the server's view distances (up to 32)
+or the client's render distance (up to 64) by exception, and the run's distances are recorded
+with a label that marks a raised run. Lower than 12 is still refused.
+
 Both supported builds include `NOTICE.md`, this file, the upstream MIT text,
 the full LGPL-2.1 text and component notices in binary and matching sources
 JARs. The sources JAR includes the mod and API Java sources. It is not by
