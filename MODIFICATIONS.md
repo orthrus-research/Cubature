@@ -473,6 +473,13 @@ factory a build pool of its own (`ClientPreviewInputs.buildPool()`, before null)
 a small ForkJoinPool of 1 or 2 low-priority daemon threads, shut down with the
 preview, separate from the sampling pool's threads and permits.
 
+Also on November 16, 2026, the governor of the client pools does nothing while
+no world is attached, and drops what the pools flagged meanwhile; and a second
+after each client pool's stop line the log counts the pool's threads still
+alive. The lab's cube source check counts a departed cube's mesh as still drawn
+only once the game has had its chance to rebuild the chunk, and the stale-mesh
+tour ends looking back over the edge the cubes left from.
+
 Both supported builds include `NOTICE.md`, this file, the upstream MIT text,
 the full LGPL-2.1 text and component notices in binary and matching sources
 JARs. The sources JAR includes the mod and API Java sources. It is not by

@@ -330,6 +330,8 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
         if (event.phase != TickEvent.Phase.END) {
             return;
         }
+        // Each pool's threads are counted a moment after its stop, with a world or without one.
+        PoolStopCheck.INSTANCE.poll(System.nanoTime());
         World current = Minecraft.getMinecraft().world;
         ClientTerrainPreviews previews = ClientTerrainPreviews.INSTANCE;
         previews.tick(current);
@@ -359,7 +361,11 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
             buildWork.pump();
         }
         if (workGovernor != null) {
-            governWork(System.nanoTime());
+            if (world != null) {
+                governWork(System.nanoTime());
+            } else {
+                restGovernor();
+            }
         }
         if (world == null || listener == null) {
             queue.clear();
@@ -410,6 +416,27 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
             buildWork.bind(world == null ? null : buildCubes);
             buildWork.pump();
         }
+    }
+
+    /**
+     * With no world attached the governor does nothing: no cut, no raise, no permit-change line. What
+     * the pools flagged and the frames drawn meanwhile are dropped, so the next world's first second
+     * is judged on its own.
+     */
+    private void restGovernor() {
+        if (previewWork != null) {
+            previewWork.takeWaited();
+            previewWork.takeRan();
+            previewWork.takeFull();
+        }
+        if (buildWork != null) {
+            buildWork.takeWaited();
+            buildWork.takeRan();
+            buildWork.takeFull();
+        }
+        frames = 0;
+        lastFrame = 0;
+        nextGoverning = Long.MIN_VALUE;
     }
 
     /** Once a second: the governor reads the latest frames and, in single player, the server's latest ticks. */

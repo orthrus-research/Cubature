@@ -119,6 +119,7 @@ final class ClientBuildWork implements IClientBuildWork {
                     "Client build pool stopped: {} threads told to stop, {} tasks dropped ({} waiting, {} admitted), "
                             + "{} running interrupted ({})", count, queuedDropped + admittedDropped, queuedDropped,
                     admittedDropped, running, now == null ? "world gone" : "world replaced");
+            PoolStopCheck.INSTANCE.stopped("Client build pool", this::liveThreads, System.nanoTime());
         }
         ended.clear();
         cubes = now;

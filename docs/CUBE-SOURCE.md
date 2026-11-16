@@ -278,7 +278,9 @@ its geometry task with `STALE_ON_BLOCKS` only. `cancel()` ends a task at any sta
 cancelled task never comes back either. When the world changes every task is `DROPPED`,
 its snapshot released, and the threads stop; the client log says so in one line (`Client build
 pool stopped:` with the threads told to stop, the tasks dropped, waiting and admitted, and the
-jobs interrupted), and `liveThreads()` falls to 0.
+jobs interrupted), and `liveThreads()` falls to 0. A second later the log counts them
+(`Client build pool threads 1000 ms after its stop: 0 still alive`), so a thread left behind
+is measured, not assumed. A pool that never ran a job started no threads and logs neither.
 
 **Bounds.** `clientBuildThreads` threads (default a quarter of the processors, 1 to 4),
 daemons just above the lowest priority, started with the first job and stopped when the
@@ -556,6 +558,9 @@ interface Task { Job job(); int state(); void cancel(); boolean cancelled();
   - Each change of the permits is logged in one line (`Client work permits 1 -> 2:`) with what
     decided it (for a raise, the demand: work queued, a pool that ran full, a job that waited), the frame p95, the server tick p95 or `remote server`, and whether a job
     waited, ran, was queued and whether the pool ran full.
+  - With no world attached it does nothing: no cut, no raise, no line. What the pools flagged
+    and the frames drawn meanwhile are dropped, so a new world's first second is judged on
+    its own.
 - **Shared.** The permits are one budget for this pool and the build pool (section 5): the
   ceiling is the larger of the two pools' threads, a job of either takes a permit, and the
   governor reads both pools' waits and runs.
@@ -563,7 +568,10 @@ interface Task { Job job(); int state(); void cancel(); boolean cancelled();
   client log says so in one line (`Client preview pool stopped:` with the threads told to stop,
   the waiting tasks withdrawn and the running ones interrupted). `liveThreads()` counts the
   pool's threads still alive, 0 once they have stopped; -1 from a pool that does not track
-  them.
+  them. A second after the stop line the log counts them (`Client preview pool threads 1000
+  ms after its stop: 0 still alive`), and the preview's own build pool does the same
+  (`Client preview build pool threads …`). The count is polled from the client tick, which
+  runs with or without a world, so the client thread never waits on a join.
 
 Not run in a game: the tests cover order, cancelling, withdrawal, thread lifetime, permits
 and the governor's arithmetic, with stand-in previews.

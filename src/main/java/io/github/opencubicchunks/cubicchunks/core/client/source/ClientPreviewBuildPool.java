@@ -88,6 +88,7 @@ final class ClientPreviewBuildPool {
         pool.shutdownNow();
         CubicChunks.LOGGER.info("Client preview build pool stopped: {} threads told to stop, {} queued tasks dropped, "
                 + "{} running interrupted", threads, queued, running);
+        PoolStopCheck.INSTANCE.stopped("Client preview build pool", this::liveThreads, System.nanoTime());
         if (waitMillis <= 0) {
             return pool.isTerminated();
         }
@@ -97,6 +98,11 @@ final class ClientPreviewBuildPool {
             Thread.currentThread().interrupt();
             return false;
         }
+    }
+
+    /** Worker threads not yet ended: 0 once the pool has terminated. */
+    int liveThreads() {
+        return pool.isTerminated() ? 0 : pool.getPoolSize();
     }
 
     boolean isShutdown() {

@@ -187,6 +187,8 @@ public class TestClientPreviewWork {
         work.bind(null);
         // The stop is counted as it is logged: two threads, two waiting tasks withdrawn, two running interrupted.
         org.junit.Assert.assertArrayEquals(new int[] {2, 2, 2}, work.lastStop);
+        assertEquals("Its threads are counted a moment after the stop", "Client preview pool",
+                PoolStopCheck.INSTANCE.latest());
         assertEquals("A waiting task is withdrawn where it stands", IClientPreviewWork.WITHDRAWN, queued.state());
         assertEquals(IClientPreviewWork.WITHDRAWN, done.state());
         awaitNoThreads(work);

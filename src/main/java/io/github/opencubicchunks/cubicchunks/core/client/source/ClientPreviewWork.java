@@ -110,6 +110,7 @@ final class ClientPreviewWork implements IClientPreviewWork {
                         "Client preview pool stopped: {} threads told to stop, {} waiting tasks withdrawn, {} running "
                                 + "interrupted ({})", threads, withdrawn, running,
                         preview == null ? "preview withdrawn" : "preview replaced");
+                PoolStopCheck.INSTANCE.stopped("Client preview pool", this::liveThreads, System.nanoTime());
             }
         }
         // What the old preview's jobs finished is not handed back.
