@@ -1,10 +1,10 @@
 # Cube source
 
-Status: sections 1 to 4, 7 and 8 are built. The interfaces are in the public API module,
-package `api.client` (`CubeSource`, `ICubeSource`, `ICubeSourceListener`, `ICubeSnapshot`)
-and, for the terrain preview, `api.worldgen`; the implementation is `core.client.source`.
-Sections 5 and 6, the work executor and the settled signal, are design and not built. No
-renderer reads the source yet.
+Status: sections 1 to 8 are built. The interfaces are in the public API module, package
+`api.client` (`CubeSource`, `ICubeSource`, `ICubeSourceListener`, `ICubeSnapshot`,
+`IClientBuildWork`, `IClientPreviewWork`) and, for the terrain preview, `api.worldgen`; the
+implementation is `core.client.source`. What is still design is listed under "Not built" in
+section 8. Quadrature's near and distant terrain read the source.
 
 A cube source is what Cubature supplies to a client-side renderer that builds its geometry
 from cubes instead of from the game's 16-section columns. Cubature owns this contract. A
@@ -435,8 +435,8 @@ public interface ICubicTerrainPreviewFactory {
 ```
 
 `ClientPreviewInputs` carries the dimension, the fields of the offer, a `ForkJoinPool` for
-in-build parallelism and a derived-data directory; both of the last two may be null and
-today always are (see "Not built").
+in-build parallelism and a derived-data directory. The pool is the preview's own build pool
+("The build pool" below); the directory may be null and today always is (see "Not built").
 
 Rules:
 
