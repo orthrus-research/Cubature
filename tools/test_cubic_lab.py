@@ -150,6 +150,28 @@ class LabControlTest(unittest.TestCase):
             value=json.loads((root/'.local/cubic-lab/native-measurement.lock').read_bytes()[1:])
             self.assertEqual(value['name'],'second')
 
+    def test_launcher_joins_a_turn_lease_only_with_its_token(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary); path=root/'.local/cubic-lab/native-measurement.lock'
+            with lab.native_measurement_lease(root,'turn'):
+                # A turn holder adds its token to the record it wrote.
+                with open(path,'r+b',buffering=0) as stream:
+                    stream.seek(1); stream.write(json.dumps({'name':'turn','turnToken':'t-1'}).encode()); stream.truncate()
+                self.assertTrue(lab.lease_occupied(path))
+                with mock.patch.dict('os.environ',{lab.TURN_LEASE_ENV:'t-1'}):
+                    with lab.native_measurement_lease(root,'tour'): pass
+                for env in ({lab.TURN_LEASE_ENV:'other'}, {}):
+                    with mock.patch.dict('os.environ',env,clear=False):
+                        if not env: __import__('os').environ.pop(lab.TURN_LEASE_ENV,None)
+                        with self.assertRaisesRegex(RuntimeError,'Another native lab'):
+                            with lab.native_measurement_lease(root,'outsider'): self.fail('joined without the token')
+                self.assertEqual(lab.lease_owner(path)['turnToken'],'t-1')
+            self.assertFalse(lab.lease_occupied(path))
+            with mock.patch.dict('os.environ',{lab.TURN_LEASE_ENV:'t-1'}):
+                # A stale token on a released lease takes it normally.
+                with lab.native_measurement_lease(root,'after'): pass
+            self.assertEqual(lab.lease_owner(path)['name'],'after')
+
     def test_reviewed_jvm_experiments_keep_equal_max_heap_and_verify_effective_collectors(self):
         for variant in profiles.JVM_VARIANTS:
             profile = profiles.jvm_profile(variant)

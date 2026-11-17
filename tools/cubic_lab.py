@@ -28,10 +28,64 @@ from riven_workspace import riven_workspace
 PREGENERATION_INPUTS = ('mods', 'controllerSources', 'generationInputsSha256')
 
 
+TURN_LEASE_ENV = 'CUBIC_LAB_TURN_LEASE'
+
+
+def lease_occupied(path):
+    """Whether some handle holds the lease. On Windows this reads byte 0, which the holder's
+    lock makes unreadable to every other handle, and never takes the lock: taking it even
+    briefly can make a launch that starts at that moment fail. POSIX flock does not block
+    reads, so there a non-blocking flock probe is the only test."""
+    try:
+        stream = open(path, 'rb', buffering=0)
+    except OSError:
+        return False
+    with stream:
+        if os.name == 'nt':
+            try:
+                stream.read(1)
+                return False
+            except OSError:
+                return True
+        import fcntl
+        try:
+            fcntl.flock(stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            return True
+        fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
+        return False
+
+
+def lease_owner(path):
+    """The JSON the holder (or, once released, the last holder) wrote from byte 1."""
+    try:
+        with open(path, 'rb', buffering=0) as stream:
+            stream.seek(1)
+            owner = json.loads(stream.read(65536).decode('utf-8'))
+    except (OSError, UnicodeError, ValueError):
+        return None
+    return owner if isinstance(owner, dict) else None
+
+
+def held_by_turn(path, token):
+    """True when a queued turn's holder owns the lease under this token (see gpu_queue.py in Riven)."""
+    if not token or not lease_occupied(path):
+        return False
+    owner = lease_owner(path)
+    return bool(owner) and owner.get('turnToken') == token
+
+
 @contextmanager
 def native_measurement_lease(root, name):
-    """One measured pair per workspace; the OS releases the lease if a controller exits."""
+    """One measured pair per workspace; the OS releases the lease if a controller exits.
+
+    Inside a queued turn, the turn holder keeps the lease from its first tour to its last and
+    passes its token in CUBIC_LAB_TURN_LEASE; a launcher under it joins that lease instead of
+    taking it again, so no other job can start between the turn's tours."""
     path = root / '.local/cubic-lab/native-measurement.lock'
+    if held_by_turn(path, os.environ.get(TURN_LEASE_ENV)):
+        yield
+        return
     path.parent.mkdir(parents=True, exist_ok=True)
     with os.fdopen(os.open(path, os.O_RDWR | os.O_CREAT, 0o600), 'r+b') as stream:
         if path.stat().st_size == 0: stream.write(b' '); stream.flush()
@@ -45,11 +99,17 @@ def native_measurement_lease(root, name):
                 fcntl.flock(stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError as error:
             raise RuntimeError('Another native lab owns this workspace measurement lease; preserve that run') from error
+        owner = {'pid':os.getpid(),'name':name,'startedUtc':datetime.now(timezone.utc).isoformat()}
         try:
-            stream.seek(1); stream.write(json.dumps({'pid':os.getpid(),'name':name,'startedUtc':datetime.now(timezone.utc).isoformat()}).encode())
+            stream.seek(1); stream.write(json.dumps(owner).encode())
             stream.truncate(); stream.flush()
             yield
         finally:
+            # Stamped while still held, so queues can tell when the lease became free.
+            try:
+                stream.seek(1); stream.write(json.dumps(dict(owner, releasedUtc=datetime.now(timezone.utc).isoformat())).encode())
+                stream.truncate(); stream.flush()
+            except OSError: pass
             stream.seek(0)
             if os.name == 'nt': msvcrt.locking(stream.fileno(), msvcrt.LK_UNLCK, 1)
             else: fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
