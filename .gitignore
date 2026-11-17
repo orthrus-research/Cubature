@@ -114,14 +114,3 @@ VERSION
 
 # Compile-only inputs fetched by tools/fetch_build_inputs.py
 cleanroom/build-inputs/
-
-# Agent tooling: local only, never committed
-AGENTS.md
-CLAUDE.md
-CLAUDE.local.md
-GEMINI.md
-.mcp.json
-.claude/
-.codex/
-.cursor/
-.agents/
