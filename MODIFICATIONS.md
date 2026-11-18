@@ -503,4 +503,6 @@ substitute for these obligations.
 On November 18, 2026, the client build pool takes snapshots ahead of its threads for as many
 jobs as the running permits finish between two frames, measured from a moving average of a job's
 time and of the time between frames, at least one and at most 16 a thread; before, it took one a
-thread, so its threads stood idle between frames.
+thread, so its threads stood idle between frames. A submission to the pool now only admits
+waiting tasks; the staleness check of the tasks already held is left to the pumps of each tick,
+frame and poll, and the pool counts the snapshots it holds as it takes and releases them.

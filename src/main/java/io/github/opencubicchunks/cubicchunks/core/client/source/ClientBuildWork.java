@@ -78,6 +78,8 @@ final class ClientBuildWork implements IClientBuildWork {
     /** Tasks holding or having held a snapshot and not yet taken back, client thread. */
     private final List<BuildTask<?>> admitted = new ArrayList<>();
     private final ConcurrentLinkedQueue<BuildTask<?>> ended = new ConcurrentLinkedQueue<>();
+    /** Snapshots held now: taken when a task is admitted, let go when it is released. Any thread. */
+    private final AtomicInteger holding = new AtomicInteger();
     private final List<Thread> started = new ArrayList<>();
     @Nullable private Cubes cubes;
     @Nullable private ThreadPoolExecutor threads;
@@ -138,9 +140,6 @@ final class ClientBuildWork implements IClientBuildWork {
         if (now == null) {
             return;
         }
-        // Room is counted by the snapshots still held, not by state: a task that ended or was cancelled
-        // keeps its snapshot until its thread lets go of it, and it counts until then.
-        int holding = 0;
         for (int i = admitted.size() - 1; i >= 0; i--) {
             BuildTask<?> task = admitted.get(i);
             int state = task.state();
@@ -150,13 +149,22 @@ final class ClientBuildWork implements IClientBuildWork {
                     state = STALE;
                 }
             }
-            if (task.holdsSnapshot()) {
-                holding++;
-            } else if (state != ADMITTED && state != DONE && state != FAILED) {
+            if (!task.holdsSnapshot() && state != ADMITTED && state != DONE && state != FAILED) {
                 admitted.remove(i);
             }
         }
-        int room = permits.permits() + lookahead() - holding;
+        admit(now);
+    }
+
+    /**
+     * Admits waiting tasks while there is room, with no check of the tasks already held: what
+     * {@link #submit} does, where a burst of submissions would otherwise check every held task each
+     * time. Room is counted by the snapshots still held, not by state: a task that ended or was
+     * cancelled keeps its snapshot until its thread lets go of it, and it counts until then. Client
+     * thread.
+     */
+    private void admit(Cubes now) {
+        int room = permits.permits() + lookahead() - holding.get();
         while (room > 0 && heap.size() > 0) {
             BuildTask<?> task = heap.poll();
             if (!now.isLoaded(task.x, task.y, task.z)) {
@@ -243,13 +251,7 @@ final class ClientBuildWork implements IClientBuildWork {
 
     @Override
     public int admitted() {
-        int holding = 0;
-        for (BuildTask<?> task : admitted) {
-            if (task.holdsSnapshot()) {
-                holding++;
-            }
-        }
-        return holding;
+        return holding.get();
     }
 
     @Override
@@ -273,7 +275,7 @@ final class ClientBuildWork implements IClientBuildWork {
             return task;
         }
         heap.add(task);
-        pump();
+        admit(cubes);
         return task;
     }
 
@@ -451,6 +453,7 @@ final class ClientBuildWork implements IClientBuildWork {
 
         void admit(Cubes cubes) {
             snapshot.set(cubes.snapshot(x, y, z, centerOnly));
+            pool.holding.incrementAndGet();
             blockVersion = cubes.blockVersion(x, y, z);
             lightVersion = cubes.lightVersion(x, y, z);
             centerVersion = cubes.version(x, y, z);
@@ -522,6 +525,7 @@ final class ClientBuildWork implements IClientBuildWork {
             if (held != null && releasing.compareAndSet(false, true)) {
                 held.release();
                 snapshot.set(null);
+                pool.holding.decrementAndGet();
             }
         }
 

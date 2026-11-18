@@ -478,6 +478,29 @@ public class TestClientBuildWork {
     }
 
     @Test
+    public void aSubmitAdmitsWithoutCheckingHeldTasksAndAPumpChecksThem() throws Exception {
+        World world = new World().load(0, 0, 0).load(1, 0, 0);
+        ClientBuildWork pool = pool(1, new LivePermits(1), world);
+        CountDownLatch gate = new CountDownLatch(1);
+        CountDownLatch started = new CountDownLatch(1);
+        IClientBuildWork.Task<Integer> held = pool.submit(0, 0, 0, 0, false, IClientBuildWork.STALE_ON_CENTER,
+                gated(gate, started));
+        started.await();
+        world.changeBlocks(0, 0, 0);
+        IClientBuildWork.Task<Integer> next = pool.submit(1, 1, 0, 0, false, 0, gated(gate, new CountDownLatch(1)));
+        // The submit took the second task's snapshot and left the first as it was.
+        assertEquals(IClientBuildWork.ADMITTED, held.state());
+        assertEquals(IClientBuildWork.ADMITTED, next.state());
+        assertEquals(2, pool.admitted());
+        pool.pump();
+        assertEquals(IClientBuildWork.STALE, held.state());
+        gate.countDown();
+        assertEquals(next, pollOne(pool));
+        assertEquals(0, pool.admitted());
+        assertEquals(world.snapshots.get(), world.released.get());
+    }
+
+    @Test
     public void thePreviewPoolAndTheBuildPoolShareOneBudget() throws Exception {
         LivePermits shared = new LivePermits(1);
         World world = new World().load(0, 0, 0);
