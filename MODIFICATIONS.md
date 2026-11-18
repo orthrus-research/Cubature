@@ -499,3 +499,8 @@ required build inputs and patches, with component notices. Keep the LGPL
 replacement/relinking and reverse-engineering permissions intact, and review
 the actual distribution's combination terms. Do not use an NRR notice as a
 substitute for these obligations.
+
+On November 18, 2026, the client build pool takes snapshots ahead of its threads for as many
+jobs as the running permits finish between two frames, measured from a moving average of a job's
+time and of the time between frames, at least one and at most 16 a thread; before, it took one a
+thread, so its threads stood idle between frames.

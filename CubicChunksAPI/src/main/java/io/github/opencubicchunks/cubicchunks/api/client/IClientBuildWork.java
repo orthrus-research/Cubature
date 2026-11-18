@@ -93,7 +93,8 @@ public interface IClientBuildWork {
 
     /**
      * Tasks holding a snapshot: admitted and waiting for a thread, or running. Never more than
-     * {@link #running()} plus {@link #threads()}.
+     * {@link #running()} plus sixteen times {@link #threads()}: the pool takes snapshots ahead of its
+     * threads for as many jobs as they finish between two frames.
      */
     int admitted();
 

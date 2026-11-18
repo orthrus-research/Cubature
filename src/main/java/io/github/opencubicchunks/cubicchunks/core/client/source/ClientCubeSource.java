@@ -412,9 +412,10 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
         }
         lastFrame = now;
         if (buildWork != null) {
-            // Once a frame as well as once a tick, so threads that finish between ticks get work.
+            // Once a frame as well as once a tick, so threads that finish between ticks get work; the frame's
+            // time sets how far ahead of the threads the pool takes snapshots.
             buildWork.bind(world == null ? null : buildCubes);
-            buildWork.pump();
+            buildWork.frame(now);
         }
     }
 

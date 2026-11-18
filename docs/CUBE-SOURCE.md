@@ -249,7 +249,7 @@ int threads(), running(), queued(), admitted(), finished(), liveThreads();
 **How a task moves.** A task names a cube and a priority, lowest first, equal priorities in
 order of arrival. It waits on the client thread in a heap and holds no snapshot while it
 waits. Each client tick and each frame, and on every `submit` and `poll`, the pool admits
-waiting tasks while fewer are admitted than the permits allow plus one a thread: it takes
+waiting tasks while fewer are admitted than the permits allow plus a lookahead: it takes
 each one's snapshot then (`snapshotCenter` when `centerOnly`), on the client thread, and
 hands it to a thread in that order. A cube that is not loaded when its turn comes makes
 its task `STALE` without a snapshot. The job runs with the snapshot and returns a result;
@@ -287,10 +287,17 @@ daemons just above the lowest priority, started with the first job and stopped w
 world goes. They share their permits with the preview pool: one governor (section 8,
 Sampling threads) sets how many jobs of the two pools together may run, from the frame
 times and, in single player, the server's ticks, and `running()` reads it. A job that runs
-long calls `checkpoint()` between parts, where it waits if the permits were lowered. At
-most the permits plus one a thread hold snapshots at once (`admitted()`), so memory stays
-bounded however many tasks wait; `finished()` counts results not yet taken back, which hold
-no snapshot.
+long calls `checkpoint()` between parts, where it waits if the permits were lowered.
+
+The pool takes snapshots only when it is pumped, about once a frame, so it takes them ahead of
+its threads: the lookahead is as many jobs as the running permits finish between two frames,
+from a moving average of a job's time on its thread and of the time between frames, at least
+one a thread and at most 16 a thread, and one a thread until both are measured. At most the
+permits plus the lookahead hold snapshots at once (`admitted()`), so memory stays bounded
+however many tasks wait; `finished()` counts results not yet taken back, which hold no
+snapshot. Measured with Quadrature's terrain on 2026-11-18, 4 threads at 120 frames a second:
+with one a thread the pool built about 950 meshes a second while 20,000 waited, its threads idle
+for most of each frame; with the measured lookahead, up to 3,330.
 
 ## 6. Settled
 

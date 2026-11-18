@@ -35,6 +35,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.ToLongFunction;
 
@@ -43,8 +44,9 @@ import javax.annotation.Nullable;
 /**
  * The client's pool for work on cube snapshots (docs/CUBE-SOURCE.md, section 5). Waiting tasks sit
  * in a heap on the client thread and hold no snapshot; {@link #pump} admits as many as the shared
- * permits and a lookahead of one per thread leave room for, taking their snapshots then, and hands
- * them to the threads in that order. Each pump also checks the admitted tasks against the cubes as
+ * permits and a lookahead leave room for, taking their snapshots then, and hands them to the threads
+ * in that order. The lookahead covers what the threads finish between two frames, from the measured
+ * time of a job and of a frame. Each pump also checks the admitted tasks against the cubes as
  * they stand now and marks stale the ones whose mask says so. The threads exist while a world is
  * attached and a job has been handed in.
  */
@@ -64,8 +66,14 @@ final class ClientBuildWork implements IClientBuildWork {
     }
 
     private final int size;
-    private final int lookahead;
     private final LivePermits permits;
+    /** The most snapshots taken ahead of the running jobs, for each thread, whatever the times measured say. */
+    static final int MOST_AHEAD_PER_THREAD = 16;
+    /** A moving average of a job's time on its thread, in nanoseconds; 0 before any job ran. Written by the threads. */
+    private final AtomicLong jobNanos = new AtomicLong();
+    /** A moving average of the time between the client's frames, in nanoseconds; 0 before two frames. Client thread. */
+    private long frameNanos;
+    private long lastFrame;
     private final Heap heap = new Heap();
     /** Tasks holding or having held a snapshot and not yet taken back, client thread. */
     private final List<BuildTask<?>> admitted = new ArrayList<>();
@@ -80,7 +88,6 @@ final class ClientBuildWork implements IClientBuildWork {
 
     ClientBuildWork(int size, LivePermits permits) {
         this.size = Math.max(1, size);
-        this.lookahead = this.size;
         this.permits = permits;
     }
 
@@ -149,7 +156,7 @@ final class ClientBuildWork implements IClientBuildWork {
                 admitted.remove(i);
             }
         }
-        int room = permits.permits() + lookahead - holding;
+        int room = permits.permits() + lookahead() - holding;
         while (room > 0 && heap.size() > 0) {
             BuildTask<?> task = heap.poll();
             if (!now.isLoaded(task.x, task.y, task.z)) {
@@ -161,6 +168,45 @@ final class ClientBuildWork implements IClientBuildWork {
             executor().execute(new Run(task));
             room--;
         }
+    }
+
+    /**
+     * Pumps once a frame, as {@link #pump}, first noting the time since the last frame. The pool takes
+     * snapshots only when it is pumped, so what it admits must keep the threads busy until the next
+     * frame. Client thread.
+     */
+    void frame(long now) {
+        if (lastFrame != 0) {
+            long since = now - lastFrame;
+            frameNanos = frameNanos == 0 ? since : frameNanos + (since - frameNanos) / 8;
+        }
+        lastFrame = now;
+        pump();
+    }
+
+    /** Notes how long a job ran on its thread. Any thread. */
+    void noteJob(long nanos) {
+        for (long was = jobNanos.get();; was = jobNanos.get()) {
+            long now = was == 0 ? nanos : was + (nanos - was) / 16;
+            if (jobNanos.compareAndSet(was, now)) {
+                return;
+            }
+        }
+    }
+
+    /**
+     * How many snapshots are taken beyond the running permits: as many jobs as the permits finish
+     * between two frames, by the measured times, at least one a thread and at most
+     * {@link #MOST_AHEAD_PER_THREAD} a thread. One a thread until both times are known.
+     */
+    int lookahead() {
+        long job = jobNanos.get();
+        long frame = frameNanos;
+        if (job <= 0 || frame <= 0) {
+            return size;
+        }
+        long finished = (long) permits.permits() * frame / job + 1;
+        return (int) Math.max(size, Math.min((long) size * MOST_AHEAD_PER_THREAD, finished));
     }
 
     private ThreadPoolExecutor executor() {
@@ -348,7 +394,9 @@ final class ClientBuildWork implements IClientBuildWork {
                     return;
                 }
                 ran = true;
+                long began = System.nanoTime();
                 task.runJob();
+                noteJob(System.nanoTime() - began);
             } catch (InterruptedException gone) {
                 task.end(DROPPED);
             } finally {

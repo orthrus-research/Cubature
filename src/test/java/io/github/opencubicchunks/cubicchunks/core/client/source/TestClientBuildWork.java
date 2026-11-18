@@ -418,6 +418,66 @@ public class TestClientBuildWork {
     }
 
     @Test
+    public void theLookaheadIsOneTaskAThreadUntilJobsAndFramesAreTimed() {
+        ClientBuildWork pool = pool(2, new LivePermits(2), new World());
+        assertEquals(2, pool.lookahead());
+        pool.noteJob(1_000_000);
+        assertEquals(2, pool.lookahead());
+    }
+
+    @Test
+    public void theLookaheadCoversWhatTheRunningJobsFinishBetweenTwoFrames() {
+        ClientBuildWork pool = pool(2, new LivePermits(2), new World());
+        pool.noteJob(1_000_000);
+        pool.frame(1_000_000_000L);
+        pool.frame(1_008_000_000L);
+        // Two permits, 8 ms between frames and 1 ms a job: sixteen jobs end before the next frame, and one more.
+        assertEquals(17, pool.lookahead());
+        pool.noteJob(1_000_000);
+        assertEquals(17, pool.lookahead());
+    }
+
+    @Test
+    public void theLookaheadIsAtMostSixteenTasksAThread() {
+        ClientBuildWork pool = pool(2, new LivePermits(2), new World());
+        pool.noteJob(1_000);
+        pool.frame(1_000_000_000L);
+        pool.frame(1_033_000_000L);
+        assertEquals(2 * ClientBuildWork.MOST_AHEAD_PER_THREAD, pool.lookahead());
+    }
+
+    @Test
+    public void snapshotsAreTakenAheadOfTheThreadsForAFramesWork() throws Exception {
+        World world = new World();
+        for (int x = 0; x < 64; x++) {
+            world.load(x, 0, 0);
+        }
+        ClientBuildWork pool = pool(2, new LivePermits(2), world);
+        pool.noteJob(1_000_000);
+        pool.frame(1_000_000_000L);
+        pool.frame(1_004_000_000L);
+        // Two permits and a lookahead of 2 * 4 / 1 + 1 = 9.
+        assertEquals(9, pool.lookahead());
+        CountDownLatch gate = new CountDownLatch(1);
+        CountDownLatch started = new CountDownLatch(2);
+        for (int x = 0; x < 64; x++) {
+            pool.submit(x, x, 0, 0, false, 0, gated(gate, started));
+        }
+        started.await();
+        pool.pump();
+        assertEquals(11, world.snapshots.get());
+        assertEquals(53, pool.queued());
+        gate.countDown();
+        int most = 2 + 2 * ClientBuildWork.MOST_AHEAD_PER_THREAD;
+        for (int back = 1; back <= 64; back++) {
+            pollOne(pool);
+            int held = world.snapshots.get() - world.released.get();
+            assertTrue("held " + held + " after " + back + " back", held <= most);
+        }
+        assertEquals(64, world.snapshots.get());
+    }
+
+    @Test
     public void thePreviewPoolAndTheBuildPoolShareOneBudget() throws Exception {
         LivePermits shared = new LivePermits(1);
         World world = new World().load(0, 0, 0);
