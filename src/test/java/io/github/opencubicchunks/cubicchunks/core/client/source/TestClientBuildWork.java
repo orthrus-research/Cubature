@@ -501,6 +501,25 @@ public class TestClientBuildWork {
     }
 
     @Test
+    public void thePoolCountsTheSnapshotsItTakes() throws Exception {
+        World world = new World();
+        for (int x = 0; x < 6; x++) {
+            world.load(x, 0, 0);
+        }
+        ClientBuildWork pool = pool(2, new LivePermits(2), world);
+        assertEquals(0, pool.snapshotsTaken());
+        for (int x = 0; x < 6; x++) {
+            pool.submit(x, x, 0, 0, false, 0, X);
+        }
+        for (int back = 0; back < 6; back++) {
+            pollOne(pool);
+        }
+        assertEquals(6, pool.snapshotsTaken());
+        assertEquals(world.snapshots.get(), pool.snapshotsTaken());
+        assertTrue(pool.snapshotNanos() >= 0);
+    }
+
+    @Test
     public void thePreviewPoolAndTheBuildPoolShareOneBudget() throws Exception {
         LivePermits shared = new LivePermits(1);
         World world = new World().load(0, 0, 0);

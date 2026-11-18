@@ -304,6 +304,20 @@ public interface ICubeSource {
     }
 
     /**
+     * How many cube copies snapshots have made since the client started. A cube is copied when a
+     * snapshot needs it and its version has moved since its last copy; every other snapshot of it
+     * shares that copy. Client thread.
+     */
+    default long cubeCopies() {
+        return 0;
+    }
+
+    /** The client thread's time making those copies since the client started, in nanoseconds. Client thread. */
+    default long cubeCopyNanos() {
+        return 0;
+    }
+
+    /**
      * What a cube holds, without a snapshot: {@link #NOT_LOADED}, {@link #EMPTY} or
      * {@link #HAS_BLOCKS}. {@link #EMPTY} is given only for a loaded cube whose every block is air.
      * {@link #HAS_BLOCKS} is given for any other loaded cube. It reads the count of blocks the cube

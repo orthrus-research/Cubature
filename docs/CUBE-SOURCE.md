@@ -104,8 +104,10 @@ full snapshot.
 **Cost.** A cube is copied once per version, and that copy serves every snapshot that
 includes the cube until its version moves. A cube sits in up to 27 neighborhoods, so it is
 copied once where a per-snapshot copy would copy it 27 times. Cube storage is unchanged.
-The copy itself is not measured yet; the Celeritas integration copies blocks and block
-entities per section, and that is the cost to beat.
+`cubeCopies()` and `cubeCopyNanos()` count the copies made and the client thread's time making
+them, and the client log gives both for each world as it goes (`Client cube source: ... cube
+copies made`). The Celeritas integration copies blocks and block entities per section, and that
+is the cost to beat.
 
 **Release.** A renderer releases a snapshot when its build finishes or is cancelled.
 Holding one must not keep a cube loaded.
@@ -274,7 +276,8 @@ included); `STALE_ON_CENTER` is the first two. Each pump of a tick, a frame or a
 compares the admitted tasks with the cubes as they stand: a stale running job sees
 `cancelled()` and should return, and a stale task never comes back from `poll`. A `submit`
 only admits, so a renderer that hands in thousands of tasks in a frame does not check every
-held task each time. The renderer, which hears the change as an event
+held task each time. `snapshotsTaken()` and `snapshotNanos()` count the pool's snapshots and
+the client thread's time taking them, copies included; the stop line gives both for the world. The renderer, which hears the change as an event
 (section 3), hands in a new task. A renderer that keeps light apart from geometry hands in
 its geometry task with `STALE_ON_BLOCKS` only. `cancel()` ends a task at any stage; a
 cancelled task never comes back either. When the world changes every task is `DROPPED`,

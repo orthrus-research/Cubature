@@ -98,6 +98,19 @@ public interface IClientBuildWork {
      */
     int admitted();
 
+    /** How many snapshots this pool has taken since the client started. Client thread. */
+    default long snapshotsTaken() {
+        return 0;
+    }
+
+    /**
+     * The client thread's time taking this pool's snapshots since the client started, in nanoseconds,
+     * the cube copies they made included. Client thread.
+     */
+    default long snapshotNanos() {
+        return 0;
+    }
+
     /** Tasks whose job ended and that {@link #poll} has not yet handed back; they hold no snapshot. */
     default int finished() {
         return 0;

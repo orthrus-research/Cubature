@@ -505,4 +505,6 @@ jobs as the running permits finish between two frames, measured from a moving av
 time and of the time between frames, at least one and at most 16 a thread; before, it took one a
 thread, so its threads stood idle between frames. A submission to the pool now only admits
 waiting tasks; the staleness check of the tasks already held is left to the pumps of each tick,
-frame and poll, and the pool counts the snapshots it holds as it takes and releases them.
+frame and poll, and the pool counts the snapshots it holds as it takes and releases them. The
+cube source counts the cube copies its snapshots make and the pool the snapshots it takes, each
+with the client thread's time, readable through the API and logged as the world goes.

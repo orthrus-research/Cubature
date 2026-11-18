@@ -80,6 +80,11 @@ final class ClientBuildWork implements IClientBuildWork {
     private final ConcurrentLinkedQueue<BuildTask<?>> ended = new ConcurrentLinkedQueue<>();
     /** Snapshots held now: taken when a task is admitted, let go when it is released. Any thread. */
     private final AtomicInteger holding = new AtomicInteger();
+    /** Snapshots taken and the client thread's time taking them: since the pool was made, and in this world. */
+    private long snapshotsTaken;
+    private long snapshotNanos;
+    private long worldSnapshots;
+    private long worldSnapshotNanos;
     private final List<Thread> started = new ArrayList<>();
     @Nullable private Cubes cubes;
     @Nullable private ThreadPoolExecutor threads;
@@ -126,11 +131,16 @@ final class ClientBuildWork implements IClientBuildWork {
             lastStop = new int[] {count, queuedDropped + admittedDropped, running};
             io.github.opencubicchunks.cubicchunks.core.CubicChunks.LOGGER.info(
                     "Client build pool stopped: {} threads told to stop, {} tasks dropped ({} waiting, {} admitted), "
-                            + "{} running interrupted ({})", count, queuedDropped + admittedDropped, queuedDropped,
-                    admittedDropped, running, now == null ? "world gone" : "world replaced");
+                            + "{} running interrupted ({}); {} snapshots taken in this world in {} ms, {} microseconds each",
+                    count, queuedDropped + admittedDropped, queuedDropped, admittedDropped, running,
+                    now == null ? "world gone" : "world replaced", worldSnapshots,
+                    String.format("%.1f", worldSnapshotNanos / 1e6),
+                    String.format("%.1f", worldSnapshots == 0 ? 0.0 : worldSnapshotNanos / 1e3 / worldSnapshots));
             PoolStopCheck.INSTANCE.stopped("Client build pool", this::liveThreads, System.nanoTime());
         }
         ended.clear();
+        worldSnapshots = 0;
+        worldSnapshotNanos = 0;
         cubes = now;
     }
 
@@ -252,6 +262,24 @@ final class ClientBuildWork implements IClientBuildWork {
     @Override
     public int admitted() {
         return holding.get();
+    }
+
+    @Override
+    public long snapshotsTaken() {
+        return snapshotsTaken;
+    }
+
+    @Override
+    public long snapshotNanos() {
+        return snapshotNanos;
+    }
+
+    /** Notes a snapshot the pool took and how long it took. Client thread. */
+    void noteSnapshot(long nanos) {
+        snapshotsTaken++;
+        snapshotNanos += nanos;
+        worldSnapshots++;
+        worldSnapshotNanos += nanos;
     }
 
     @Override
@@ -452,7 +480,9 @@ final class ClientBuildWork implements IClientBuildWork {
         }
 
         void admit(Cubes cubes) {
+            long began = System.nanoTime();
             snapshot.set(cubes.snapshot(x, y, z, centerOnly));
+            pool.noteSnapshot(System.nanoTime() - began);
             pool.holding.incrementAndGet();
             blockVersion = cubes.blockVersion(x, y, z);
             lightVersion = cubes.lightVersion(x, y, z);

@@ -303,6 +303,13 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
         if (world == null) {
             return;
         }
+        if (worldCubeCopies > 0) {
+            CubicChunks.LOGGER.info("Client cube source: {} cube copies made for snapshots in {} ms, {} microseconds each, "
+                    + "while the world was attached", worldCubeCopies, String.format("%.1f", worldCubeCopyNanos / 1e6),
+                    String.format("%.1f", worldCubeCopyNanos / 1e3 / worldCubeCopies));
+        }
+        worldCubeCopies = 0;
+        worldCubeCopyNanos = 0;
         io.github.opencubicchunks.cubicchunks.core.lighting.LightChecksum.dump("client", world.provider.getDimension(),
                 cubes.loadedCubes());
         world.removeEventListener(this);
@@ -500,6 +507,22 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
     }
 
     // ICubeSource.
+
+    /** Cube copies snapshots made, and the client thread's time making them: since the client started, and in this world. */
+    private long cubeCopies;
+    private long cubeCopyNanos;
+    private long worldCubeCopies;
+    private long worldCubeCopyNanos;
+
+    @Override
+    public long cubeCopies() {
+        return cubeCopies;
+    }
+
+    @Override
+    public long cubeCopyNanos() {
+        return cubeCopyNanos;
+    }
 
     @Override
     public void setListener(@Nullable ICubeSourceListener newListener) {
@@ -812,7 +835,17 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
     private CubeCopy copy(int x, int y, int z, boolean sky) {
         Cube cube = cubes.getLoadedCube(x, y, z);
         if (cube != null) {
-            return CubeCopy.of(cube, sky);
+            Object before = cube.sourceCopy;
+            long began = System.nanoTime();
+            CubeCopy copy = CubeCopy.of(cube, sky);
+            if (copy != before) {
+                long took = System.nanoTime() - began;
+                cubeCopies++;
+                cubeCopyNanos += took;
+                worldCubeCopies++;
+                worldCubeCopyNanos += took;
+            }
+            return copy;
         }
         Chunk column = cubes.getLoadedColumn(x, z);
         return column == null ? CubeCopy.NOTHING : CubeCopy.absent(column, y, sky);
