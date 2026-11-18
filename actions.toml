@@ -1,0 +1,39 @@
+# Cubature's checks, run the same way locally (`orthrus-tools actions run ci`) and in CI
+# (.github/workflows/cleanroom.yml calls the shared Cleanroom workflow, which runs `ci`).
+# Builds and focused tests only: nothing here starts the game.
+[settings]
+name = "cubature"
+workflow = "ci"
+identity_files = ["{env.JAVA_HOME}/release"]
+
+[workflows]
+ci = ["inputs", "cleanroom", "lab", "lab-tools"]
+
+[jobs.inputs]
+description = "Fetch compile-only build inputs (DH 3.3.3, Demonica 0.9.0; SHA-256 checked)"
+steps = [{ name = "fetch", run = ["{python}", "-B", "tools/fetch_build_inputs.py"] }]
+
+[jobs.cleanroom]
+description = "Build and run focused regressions on a Java 26 test toolchain"
+needs = ["inputs"]
+locks = ["gradle"]
+memory = 6
+steps = [
+  { name = "gradle", run = ["bash", "gradlew", "-PcubicTestJava=26", "build", "--console=plain"], cwd = "cleanroom" },
+]
+
+[jobs.lab]
+description = "Build the optional lab and run its focused checks"
+needs = ["cleanroom"]
+locks = ["gradle"]
+memory = 6
+steps = [
+  { name = "gradle", run = ["bash", "../cleanroom/gradlew", "build", "--console=plain"], cwd = "lab" },
+]
+
+[jobs.lab-tools]
+description = "Check native lab control code"
+inputs = ["tools/*.py"]
+steps = [
+  { name = "unittest", run = ["{python}", "-B", "-m", "unittest", "discover", "-s", "tools", "-p", "test_cubic_lab.py"] },
+]

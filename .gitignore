@@ -114,3 +114,6 @@ VERSION
 
 # Compile-only inputs fetched by tools/fetch_build_inputs.py
 cleanroom/build-inputs/
+
+# Run records written by orthrus-tools actions
+/.local/
