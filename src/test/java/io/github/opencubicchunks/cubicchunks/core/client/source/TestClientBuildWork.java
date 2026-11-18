@@ -520,6 +520,30 @@ public class TestClientBuildWork {
     }
 
     @Test
+    public void aPollLeavesHeldTasksToThePumpButNeverHandsBackAStaleOne() throws Exception {
+        World world = new World().load(0, 0, 0).load(1, 0, 0);
+        ClientBuildWork pool = pool(2, new LivePermits(2), world);
+        CountDownLatch gate = new CountDownLatch(1);
+        CountDownLatch started = new CountDownLatch(1);
+        IClientBuildWork.Task<Integer> held = pool.submit(0, 0, 0, 0, false, IClientBuildWork.STALE_ON_CENTER,
+                gated(gate, started));
+        IClientBuildWork.Task<Integer> done = pool.submit(1, 1, 0, 0, false, IClientBuildWork.STALE_ON_CENTER, X);
+        started.await();
+        waitFor(() -> done.state() == IClientBuildWork.DONE);
+        world.changeBlocks(0, 0, 0);
+        world.changeBlocks(1, 0, 0);
+        // The finished task is stale and is not handed back; the held one is left as it was.
+        assertNull(pool.poll());
+        assertEquals(IClientBuildWork.STALE, done.state());
+        assertEquals(IClientBuildWork.ADMITTED, held.state());
+        pool.pump();
+        assertEquals(IClientBuildWork.STALE, held.state());
+        gate.countDown();
+        waitFor(() -> pool.admitted() == 0);
+        assertNull(pool.poll());
+    }
+
+    @Test
     public void thePreviewPoolAndTheBuildPoolShareOneBudget() throws Exception {
         LivePermits shared = new LivePermits(1);
         World world = new World().load(0, 0, 0);

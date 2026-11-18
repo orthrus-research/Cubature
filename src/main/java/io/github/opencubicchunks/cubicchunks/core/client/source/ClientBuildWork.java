@@ -168,8 +168,8 @@ final class ClientBuildWork implements IClientBuildWork {
 
     /**
      * Admits waiting tasks while there is room, with no check of the tasks already held: what
-     * {@link #submit} does, where a burst of submissions would otherwise check every held task each
-     * time. Room is counted by the snapshots still held, not by state: a task that ended or was
+     * {@link #submit} and {@link #poll} do, where a burst of submissions, or a renderer taking many
+     * results in one frame, would otherwise check every held task each time. Room is counted by the snapshots still held, not by state: a task that ended or was
      * cancelled keeps its snapshot until its thread lets go of it, and it counts until then. Client
      * thread.
      */
@@ -326,11 +326,18 @@ final class ClientBuildWork implements IClientBuildWork {
         heap.rebuild();
     }
 
+    /**
+     * The next ended task, after admitting what has room. A renderer calls this once for each result it
+     * takes, so it checks for staleness only the task it hands back; the held tasks are checked by the
+     * pumps of each tick and frame.
+     */
     @Nullable
     @Override
     public Task<?> poll() {
-        pump();
         Cubes now = cubes;
+        if (now != null) {
+            admit(now);
+        }
         for (BuildTask<?> task = ended.poll(); task != null; task = ended.poll()) {
             admitted.remove(task);
             if (now == null || task.pool != this) {

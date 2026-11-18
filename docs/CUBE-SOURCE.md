@@ -272,11 +272,12 @@ from the cube as it is when it runs, not as it was when it was handed in.
 changes that make it stale after its snapshot was taken: `STALE_ON_BLOCKS` (the center's
 blocks or biomes, its block version), `STALE_ON_LIGHT` (the center's light version),
 `STALE_ON_NEIGHBORS` (the version of any of the 26 neighbors, their arrival and departure
-included); `STALE_ON_CENTER` is the first two. Each pump of a tick, a frame or a `poll`
-compares the admitted tasks with the cubes as they stand: a stale running job sees
-`cancelled()` and should return, and a stale task never comes back from `poll`. A `submit`
-only admits, so a renderer that hands in thousands of tasks in a frame does not check every
-held task each time. `snapshotsTaken()` and `snapshotNanos()` count the pool's snapshots and
+included); `STALE_ON_CENTER` is the first two. The pump of each tick and frame compares the
+admitted tasks with the cubes as they stand: a stale running job sees `cancelled()` and
+should return. `poll` checks the task it would hand back, so a stale task never comes back
+from it. A `submit` or a `poll` otherwise only admits, so a renderer that hands in thousands
+of tasks, or takes back hundreds of results, in a frame does not check every held task each
+time. `snapshotsTaken()` and `snapshotNanos()` count the pool's snapshots and
 the client thread's time taking them, copies included; the stop line gives both for the world. The renderer, which hears the change as an event
 (section 3), hands in a new task. A renderer that keeps light apart from geometry hands in
 its geometry task with `STALE_ON_BLOCKS` only. `cancel()` ends a task at any stage; a
