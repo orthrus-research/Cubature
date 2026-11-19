@@ -502,3 +502,14 @@ client (`zgc-fixed`, with `zgc-fixed-nmt` for native memory tracking), in place 
 profile (`g1-ship8`, still a variant). With a renderer meshing on the client build pool at a view
 distance of 20, the client's longest collection pause went from 179 ms to 0.07 ms and the server's
 from 140 ms to 0.03 ms, with the same meshing speed and client CPU and no allocation stalls.
+
+On November 19, 2026, first light finds a cube's block light sources by reading its storage once,
+block by block, and asks a state for its light without the world when the state's block takes its
+light from the state: the block's world-aware method is Forge's own, which asks the state, and the
+state's is the game's, which asks the block. Before, it asked every block of the cube with the
+world and its position. A block that overrides the world-aware method is still asked with the
+world, and a cube without storage whose air gives no light is not scanned. The blocks found are
+the same: with `-Dcubature.checkFirstLightSources=true` the scan also asks every block with the
+world and logs each block where the two answers disagree, and over 86,016 cubes of a generating
+cave tour none did. On that tour first light's server-thread cost fell from 69.0 to 45.3
+microseconds a cube.

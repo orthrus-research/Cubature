@@ -1,5 +1,5 @@
 /*
- *  This file is part of Cubic Chunks Mod, licensed under the MIT License (MIT).
+ *  This file is part of Cubature, licensed under the MIT License (MIT).
  *
  *  Copyright (c) 2015-2021 OpenCubicChunks
  *  Copyright (c) 2015-2021 contributors
@@ -35,10 +35,16 @@ import io.github.opencubicchunks.cubicchunks.core.asm.mixin.ICubicWorldInternal;
 import io.github.opencubicchunks.cubicchunks.core.world.IColumnInternal;
 import io.github.opencubicchunks.cubicchunks.core.world.cube.Cube;
 import mcp.MethodsReturnNonnullByDefault;
+import net.minecraft.block.Block;
+import net.minecraft.block.state.BlockStateContainer;
+import net.minecraft.block.state.IBlockState;
+import net.minecraft.init.Blocks;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.BlockPos.MutableBlockPos;
 import net.minecraft.world.EnumSkyBlock;
 import net.minecraft.world.IBlockAccess;
+import net.minecraft.world.World;
+import net.minecraft.world.chunk.storage.ExtendedBlockStorage;
 import javax.annotation.ParametersAreNonnullByDefault;
 
 /**
@@ -67,17 +73,100 @@ public class FirstLightProcessor {
         diffuseSkylightFromBlocks(cube);
     }
 
-    private void diffuseSkylightFromBlocks(ICube cube) {
-        ILightingManager lm = ((ICubicWorldInternal) cube.getWorld()).getLightingManager();
-        Iterable<? extends BlockPos.MutableBlockPos> allBlocks = BlockPos.getAllInBoxMutable(
-                cube.getCoords().getMinBlockPos(),
-                cube.getCoords().getMaxBlockPos()
-        );
-        for (BlockPos.MutableBlockPos pos : allBlocks) {
-            if (cube.getBlockState(pos).getLightValue(cube.getWorld(), pos) > 0) {
-                lm.checkLightFor(EnumSkyBlock.BLOCK, pos);
+    /**
+     * Whether a block class answers its light from its state alone: it does not override the world-aware
+     * {@code getLightValue}, whose own body is {@code state.getLightValue()}.
+     */
+    private static final ClassValue<Boolean> BLOCK_LIGHT_FROM_STATE = new ClassValue<Boolean>() {
+        @Override protected Boolean computeValue(Class<?> type) {
+            return declaredBy(type, Block.class, IBlockState.class, IBlockAccess.class, BlockPos.class);
+        }
+    };
+
+    /** Whether a block state class hands the world-aware {@code getLightValue} to its block, as the game's own does. */
+    private static final ClassValue<Boolean> STATE_ASKS_BLOCK = new ClassValue<Boolean>() {
+        @Override protected Boolean computeValue(Class<?> type) {
+            return declaredBy(type, BlockStateContainer.StateImplementation.class, IBlockAccess.class, BlockPos.class);
+        }
+    };
+
+    /**
+     * {@code -Dcubature.checkFirstLightSources=true}: every block is also asked the world-aware question, and a
+     * block where the two answers part is counted and logged, with the cubes seen, every 4,096 cubes.
+     */
+    private static final boolean CHECK_SOURCES = Boolean.getBoolean("cubature.checkFirstLightSources");
+    private static long checkedCubes;
+    private static long checkedParted;
+
+    private static boolean declaredBy(Class<?> type, Class<?> owner, Class<?>... parameters) {
+        try {
+            return type.getMethod("getLightValue", parameters).getDeclaringClass() == owner;
+        } catch (NoSuchMethodException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Whether a state gives the light it gives wherever it stands, so the world need not be asked: the state hands
+     * the question to its block, and the block answers from the state.
+     */
+    static boolean lightFromState(IBlockState state) {
+        return STATE_ASKS_BLOCK.get(state.getClass()) && BLOCK_LIGHT_FROM_STATE.get(state.getBlock().getClass());
+    }
+
+    /**
+     * Checks block light at every block of the cube that gives light, in the order the cube's box is walked by
+     * {@link BlockPos#getAllInBoxMutable} (x fastest, then y, then z), so the checks are queued as before. The
+     * storage is read directly; a state that gives its light from itself alone is asked once for each run of it, and
+     * any other is asked with the world and its position at every block, as the game asks. A cube without storage is
+     * air throughout and is asked as air.
+     */
+    private static void checkBlockLightSources(ICube cube, ILightingManager lm) {
+        World world = cube.getWorld();
+        ExtendedBlockStorage storage = cube.getStorage();
+        int minX = cubeToMinBlock(cube.getX());
+        int minY = cubeToMinBlock(cube.getY());
+        int minZ = cubeToMinBlock(cube.getZ());
+        MutableBlockPos pos = new MutableBlockPos();
+        IBlockState air = Blocks.AIR.getDefaultState();
+        if (!CHECK_SOURCES && storage == null && lightFromState(air) && air.getLightValue() == 0) {
+            return;
+        }
+        IBlockState last = null;
+        boolean lastFromState = false;
+        int lastLight = 0;
+        for (int z = 0; z < Cube.SIZE; z++) {
+            for (int y = 0; y < Cube.SIZE; y++) {
+                for (int x = 0; x < Cube.SIZE; x++) {
+                    IBlockState state = storage == null ? air : storage.get(x, y, z);
+                    pos.setPos(minX + x, minY + y, minZ + z);
+                    if (state != last) {
+                        last = state;
+                        lastFromState = lightFromState(state);
+                        lastLight = lastFromState ? state.getLightValue() : 0;
+                    }
+                    int light = lastFromState ? lastLight : state.getLightValue(world, pos);
+                    if (CHECK_SOURCES && (light > 0) != (state.getLightValue(world, pos) > 0)) {
+                        checkedParted++;
+                        io.github.opencubicchunks.cubicchunks.core.CubicChunks.LOGGER.error(
+                                "First light check: {} at {} gives {} from its state and {} from the world", state, pos,
+                                light, state.getLightValue(world, pos));
+                    }
+                    if (light > 0) {
+                        lm.checkLightFor(EnumSkyBlock.BLOCK, pos);
+                    }
+                }
             }
         }
+        if (CHECK_SOURCES && ++checkedCubes % 4096 == 0) {
+            io.github.opencubicchunks.cubicchunks.core.CubicChunks.LOGGER.info(
+                    "First light check: {} cubes, {} blocks where the state and the world parted", checkedCubes, checkedParted);
+        }
+    }
+
+    private void diffuseSkylightFromBlocks(ICube cube) {
+        ILightingManager lm = ((ICubicWorldInternal) cube.getWorld()).getLightingManager();
+        checkBlockLightSources(cube, lm);
         if (!cube.getWorld().provider.hasSkyLight()) {
             return;
         }
