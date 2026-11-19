@@ -1,5 +1,5 @@
 /*
- *  This file is part of Cubic Chunks Mod, licensed under the MIT License (MIT).
+ *  This file is part of Cubature, licensed under the MIT License (MIT).
  *
  *  Copyright (c) 2015-2021 OpenCubicChunks
  *  Copyright (c) 2015-2021 contributors
@@ -74,6 +74,7 @@ import net.minecraftforge.event.AttachCapabilitiesEvent;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Supplier;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -231,20 +232,10 @@ public class Cube implements ICube {
     public Cube(Chunk column, int cubeY, CubePrimer primer) {
         this(column, cubeY);
 
-        for (int y = Cube.SIZE - 1; y >= 0; y--) {
-            for (int z = 0; z < Cube.SIZE; z++) {
-                for (int x = 0; x < Cube.SIZE; x++) {
-                    IBlockState newstate = primer.getBlockState(x, y, z);
-
-                    if (newstate.getMaterial() != Material.AIR) {
-                        if (storage == NULL_STORAGE) {
-                            newStorage();
-                        }
-                        storage.set(x, y, z, newstate);
-                    }
-                }
-            }
-        }
+        copyBlocks(primer, () -> {
+            newStorage();
+            return storage;
+        });
         if (primer.hasBiomes()) {
             for (int biomeX = 0; biomeX < 4; biomeX++) {
                 for (int biomeY = 0; biomeY < 4; biomeY++) {
@@ -260,6 +251,57 @@ public class Cube implements ICube {
         isModified = true;
     }
 
+    /**
+     * {@code -Dcubature.checkCubeConstruction=true}: every block's material is also asked of the block itself, and a
+     * block where it parts from the material asked once for its run is counted and logged, with the cubes seen, every
+     * 4,096 cubes.
+     */
+    private static final boolean CHECK_CONSTRUCTION = Boolean.getBoolean("cubature.checkCubeConstruction");
+    private static long checkedCubes;
+    private static long checkedParted;
+
+    /**
+     * Copies a primer's blocks into a storage made by {@code newStorage} at the first block whose material is not air,
+     * top layer first and each layer by z then x, so each state enters the storage's palette where the game's per-block
+     * copy puts it. A block of air material is left as the storage's air. The material is asked once for each run of
+     * one state: a state's material is its block's answer for that state.
+     *
+     * @return the storage filled, or null if no block's material is anything but air
+     */
+    @SuppressWarnings("deprecation")
+    @Nullable
+    static ExtendedBlockStorage copyBlocks(CubePrimer primer, Supplier<ExtendedBlockStorage> newStorage) {
+        ExtendedBlockStorage filled = null;
+        IBlockState last = null;
+        boolean lastAir = true;
+        for (int y = Cube.SIZE - 1; y >= 0; y--) {
+            for (int z = 0; z < Cube.SIZE; z++) {
+                for (int x = 0; x < Cube.SIZE; x++) {
+                    IBlockState newstate = primer.getBlockState(x, y, z);
+                    if (newstate != last) {
+                        last = newstate;
+                        lastAir = newstate.getMaterial() == Material.AIR;
+                    }
+                    if (CHECK_CONSTRUCTION && lastAir != (newstate.getMaterial() == Material.AIR)) {
+                        checkedParted++;
+                        CubicChunks.LOGGER.error("Cube construction check: {} at {} {} {} is {} for its run and {} itself",
+                                newstate, x, y, z, lastAir ? "air" : "not air", lastAir ? "not air" : "air");
+                    }
+                    if (!lastAir) {
+                        if (filled == null) {
+                            filled = newStorage.get();
+                        }
+                        filled.set(x, y, z, newstate);
+                    }
+                }
+            }
+        }
+        if (CHECK_CONSTRUCTION && ++checkedCubes % 4096 == 0) {
+            CubicChunks.LOGGER.info("Cube construction check: {} cubes, {} blocks where the run and the block parted",
+                    checkedCubes, checkedParted);
+        }
+        return filled;
+    }
 
     /**
      * Constructor to be used from subclasses to provide all field values

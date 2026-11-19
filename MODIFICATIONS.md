@@ -513,3 +513,10 @@ the same: with `-Dcubature.checkFirstLightSources=true` the scan also asks every
 world and logs each block where the two answers disagree, and over 86,016 cubes of a generating
 cave tour none did. On that tour first light's server-thread cost fell from 69.0 to 45.3
 microseconds a cube.
+
+Also on November 19, 2026, a cube built from a generator's primer asks a block's material once for
+each run of one state, not at every one of its 4,096 blocks, to leave blocks of air material as the
+storage's air. Blocks are copied in the same order, so the storage, its palette and its bytes are
+the same. With `-Dcubature.checkCubeConstruction=true` every block is also asked, and a block that
+parts from its run is logged; over 114,688 cubes of a generating cave tour none did. On that tour
+construction's server-thread cost fell from 87.3 to 72.0 microseconds a cube.
