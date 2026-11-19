@@ -139,6 +139,13 @@ public class CubicChunksConfig {
             + "1 to 4.")
     public static int clientBuildThreads = -1;
 
+    @Config.RangeInt(min = 0, max = 72000)
+    @Config.Comment("Client: ticks a cube's copy for snapshots is kept after a snapshot last asked for it. A copy is "
+            + "shared by the snapshots of a neighborhood while the cube is unchanged, and takes about 20 KiB for a cube "
+            + "with blocks; after this many ticks unasked it is let go, and copied again when next needed. 0 keeps every "
+            + "copy until its cube changes or leaves.")
+    public static int clientKeptCopyTicks = 200;
+
     @Config.Comment("Server: when the light of a cube a player already has changes and no block changed with it, send "
             + "the cube's light again, at most once every 10 ticks a cube, so the client's light follows the server's. "
             + "Off, the client keeps the light it was first sent until a block of the cube changes.")

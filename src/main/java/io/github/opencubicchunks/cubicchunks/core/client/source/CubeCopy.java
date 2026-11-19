@@ -72,6 +72,8 @@ final class CubeCopy {
     /** The column's biomes, 16 by 16, used when the cube has none of its own. */
     @Nullable private final byte[] columnBiomes;
     final Map<BlockPos, TileEntity> blockEntities;
+    /** The client tick this copy was last handed to a snapshot, for {@link KeptCopies}. Client thread. */
+    long asked;
 
     private CubeCopy(long version, long blockVersion, long lightVersion, boolean loaded,
             @Nullable IBlockState[] blocks, boolean empty,

@@ -509,3 +509,7 @@ already held is left to the pumps of each tick and frame, and the pool counts th
 as it takes and releases them. The
 cube source counts the cube copies its snapshots make and the pool the snapshots it takes, each
 with the client thread's time, readable through the API and logged as the world goes.
+
+Also on November 18, 2026, the client lets go of a cube's copy for snapshots once no snapshot has
+asked for it in `clientKeptCopyTicks` ticks (default 200; 0 keeps every copy as before); before,
+a copy stayed until its cube changed or left, which held about 640 MiB at a view distance of 20.

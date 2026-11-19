@@ -305,11 +305,14 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
         }
         if (worldCubeCopies > 0) {
             CubicChunks.LOGGER.info("Client cube source: {} cube copies made for snapshots in {} ms, {} microseconds each, "
-                    + "while the world was attached", worldCubeCopies, String.format("%.1f", worldCubeCopyNanos / 1e6),
-                    String.format("%.1f", worldCubeCopyNanos / 1e3 / worldCubeCopies));
+                    + "while the world was attached; {} let go after {} ticks unasked, {} still kept",
+                    worldCubeCopies, String.format("%.1f", worldCubeCopyNanos / 1e6),
+                    String.format("%.1f", worldCubeCopyNanos / 1e3 / worldCubeCopies), kept.worldDropped(),
+                    CubicChunksConfig.clientKeptCopyTicks, kept.size());
         }
         worldCubeCopies = 0;
         worldCubeCopyNanos = 0;
+        kept.clear();
         io.github.opencubicchunks.cubicchunks.core.lighting.LightChecksum.dump("client", world.provider.getDimension(),
                 cubes.loadedCubes());
         world.removeEventListener(this);
@@ -357,6 +360,8 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
         if (world != null) {
             settled.tick(((io.github.opencubicchunks.cubicchunks.core.asm.mixin.ICubicWorldInternal) world)
                     .getLightingManager().hasQueuedLightWork());
+            // Copies no snapshot has asked for in a while are let go; the next snapshot that needs one copies again.
+            kept.tick(++copyTicks, CubicChunksConfig.clientKeptCopyTicks);
         }
         if (previewWork != null) {
             // The pool's tasks belong to the attached preview: a change withdraws them and stops its threads.
@@ -507,6 +512,21 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
     }
 
     // ICubeSource.
+
+    /** The cubes that keep a copy, and the ticks counted for them while a world is attached. */
+    private final KeptCopies<Cube> kept = new KeptCopies<>(new KeptCopies.Holders<Cube>() {
+        @Override
+        public long lastAsked(Cube cube) {
+            Object copy = cube.sourceCopy;
+            return copy instanceof CubeCopy ? ((CubeCopy) copy).asked : -1;
+        }
+
+        @Override
+        public void drop(Cube cube) {
+            cube.sourceCopy = null;
+        }
+    });
+    private long copyTicks;
 
     /** Cube copies snapshots made, and the client thread's time making them: since the client started, and in this world. */
     private long cubeCopies;
@@ -844,7 +864,11 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
                 cubeCopyNanos += took;
                 worldCubeCopies++;
                 worldCubeCopyNanos += took;
+                if (!(before instanceof CubeCopy)) {
+                    kept.kept(cube);
+                }
             }
+            copy.asked = copyTicks;
             return copy;
         }
         Chunk column = cubes.getLoadedColumn(x, z);

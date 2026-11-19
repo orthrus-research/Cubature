@@ -104,6 +104,11 @@ full snapshot.
 **Cost.** A cube is copied once per version, and that copy serves every snapshot that
 includes the cube until its version moves. A cube sits in up to 27 neighborhoods, so it is
 copied once where a per-snapshot copy would copy it 27 times. Cube storage is unchanged.
+A copy no snapshot has asked for in `clientKeptCopyTicks` ticks (default 200, 10 seconds) is
+let go, and the next snapshot that needs the cube copies it again; a snapshot already taken keeps
+its own. Each tick looks at at most 2,048 of the cubes that keep one. Measured with Quadrature's
+terrain at radius 20 on 2026-11-18, kept copies held about 640 MiB, 36 to 43% of the client's live
+heap, once a place was meshed, about three times the cubes' own storage.
 `cubeCopies()` and `cubeCopyNanos()` count the copies made and the client thread's time making
 them, and the client log gives both for each world as it goes (`Client cube source: ... cube
 copies made`). The Celeritas integration copies blocks and block entities per section, and that
