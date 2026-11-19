@@ -218,7 +218,7 @@ class LabControlTest(unittest.TestCase):
 
     def test_native_memory_profile_records_each_process_summary_after_a_scenario(self):
         self.assertEqual([v for v in profiles.JVM_VARIANTS if profiles.tracks_native_memory({'jvmProfile': profiles.jvm_profile(v)})],
-                         ['g1-ship8-nmt'])
+                         ['zgc-fixed-nmt', 'g1-ship8-nmt'])
         outputs = {'VM.native_memory': NMT_FIXTURE, 'System.map': SYSTEM_MAP_FIXTURE}
         for vmmap in (None, 'C:/tools/vmmap.exe'):
             with tempfile.TemporaryDirectory() as temporary:
@@ -246,18 +246,19 @@ class LabControlTest(unittest.TestCase):
                     self.assertEqual(private['Accounted'], private['VMMap private total'])
 
     def test_native_capture_requires_effective_heap_and_collector_on_both_sides(self):
-        # The default profile is the shipping G1 profile on the 8 GiB floor.
-        self.assertEqual(profiles.jvm_profile()['collector'], 'G1')
-        server = {'runtime': {'maxHeapBytes': 8 * 1024**3, 'garbageCollectors': ['G1 Young Generation', 'G1 Old Generation']}}
+        # The default profile is ZGC on a fixed 8 GiB heap.
+        self.assertEqual(profiles.jvm_profile()['collector'], 'ZGC')
+        self.assertEqual(profiles.jvm_profile()['arguments'], ['-Xms8192M', '-Xmx8G', '-XX:+UseZGC'])
+        server = {'runtime': {'maxHeapBytes': 8 * 1024**3, 'garbageCollectors': ['ZGC Minor Cycles', 'ZGC Major Cycles']}}
         client = json.loads(json.dumps(server))
         profiles.validate_jvm_capture(server, client)
         for record in [server, client]:
             record['runtime']['maxHeapBytes'] = 6 * 1024**3
             with self.assertRaisesRegex(RuntimeError, 'heap'): profiles.validate_jvm_capture(server, client)
             record['runtime']['maxHeapBytes'] = 8 * 1024**3
-            record['runtime']['garbageCollectors'] = ['ZGC Minor Cycles']
+            record['runtime']['garbageCollectors'] = ['G1 Young Generation']
             with self.assertRaisesRegex(RuntimeError, 'collector'): profiles.validate_jvm_capture(server, client)
-            record['runtime']['garbageCollectors'] = ['G1 Young Generation', 'G1 Old Generation']
+            record['runtime']['garbageCollectors'] = ['ZGC Minor Cycles', 'ZGC Major Cycles']
 
     def test_old_java_lab_is_not_java26_qualification(self):
         with self.assertRaisesRegex(RuntimeError, 'newly prepared'):

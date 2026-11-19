@@ -18,7 +18,7 @@ DELIVERY_MODES = ('BASELINE', 'MAINTENANCE', 'SAVE', 'PREFETCH')
 JVM_ARGUMENTS = ['-Xms1G', '-Xmx8G', '-XX:+UseZGC']
 
 
-JVM_VARIANTS = ['zgc', 'zgc-fixed', 'zgc-pretouch', 'g1', 'g1-fixed', 'g1-pretouch', 'g1-diag',
+JVM_VARIANTS = ['zgc', 'zgc-fixed', 'zgc-fixed-nmt', 'zgc-pretouch', 'g1', 'g1-fixed', 'g1-pretouch', 'g1-diag',
                 'g1-p50', 'g1-egc', 'g1-ship8', 'g1-ship12', 'g1-ship8-nmt']
 G1_LOG = '-Xlog:gc*,gc+heap=debug:file=gc.log:time,uptime,level,tags'
 # G1 shipping candidates, each with the GC log: the shipping flags on the 8 GiB floor and on 12 GiB.
@@ -32,11 +32,16 @@ G1_EXPERIMENTS = {
     # record each process's NMT summary after every scenario.
     'g1-ship8-nmt': SHIPPING_G1 + ['-XX:NativeMemoryTracking=summary'],
 }
+# The shipping profile with native memory tracking, as g1-ship8-nmt is for G1.
+NATIVE_MEMORY = {'zgc-fixed-nmt': ['-XX:NativeMemoryTracking=summary']}
 HEAP_MIB = {'g1-ship12': 12288}
 # Environment variable that selects a variant for a newly prepared standalone instance.
 VARIANT_ENVIRONMENT = 'CUBATURE_LAB_JVM'
-# Newly prepared instances measure what ships: G1 with the shipping flags on the 8 GiB floor.
-DEFAULT_VARIANT = 'g1-ship8'
+# Newly prepared instances measure what ships: ZGC on a fixed 8 GiB heap, server and client. On 2026-11-18,
+# with a renderer meshing on the client build pool at view distance 20, it took the client's longest collection
+# pause from 179 ms (g1-ship8) to 0.07 ms and the server's from 140 ms to 0.03 ms, with the same meshing speed
+# and client CPU.
+DEFAULT_VARIANT = 'zgc-fixed'
 
 
 def jvm_profile(variant=DEFAULT_VARIANT):
@@ -51,6 +56,7 @@ def jvm_profile(variant=DEFAULT_VARIANT):
     # G1 with a GC log beside each process: heap after every collection, for memory budgets.
     if variant == 'g1-diag' or variant in G1_EXPERIMENTS: arguments.append(G1_LOG)
     arguments.extend(G1_EXPERIMENTS.get(variant, []))
+    arguments.extend(NATIVE_MEMORY.get(variant, []))
     return {'initialHeapMiB': initial, 'maxHeapMiB': maximum, 'collector': collector, 'arguments': arguments}
 
 

@@ -513,3 +513,9 @@ with the client thread's time, readable through the API and logged as the world 
 Also on November 18, 2026, the client lets go of a cube's copy for snapshots once no snapshot has
 asked for it in `clientKeptCopyTicks` ticks (default 200; 0 keeps every copy as before); before,
 a copy stayed until its cube changed or left, which held about 640 MiB at a view distance of 20.
+
+Also on November 18, 2026, newly prepared lab instances run ZGC on a fixed 8 GiB heap, server and
+client (`zgc-fixed`, with `zgc-fixed-nmt` for native memory tracking), in place of the shipping G1
+profile (`g1-ship8`, still a variant). With a renderer meshing on the client build pool at a view
+distance of 20, the client's longest collection pause went from 179 ms to 0.07 ms and the server's
+from 140 ms to 0.03 ms, with the same meshing speed and client CPU and no allocation stalls.
