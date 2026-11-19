@@ -520,3 +520,11 @@ storage's air. Blocks are copied in the same order, so the storage, its palette 
 the same. With `-Dcubature.checkCubeConstruction=true` every block is also asked, and a block that
 parts from its run is logged; over 114,688 cubes of a generating cave tour none did. On that tour
 construction's server-thread cost fell from 87.3 to 72.0 microseconds a cube.
+
+Also on November 19, 2026, first light skips its scan for block light sources when no state in the
+cube's storage palette gives light from itself and air gives none: the game's linear and hash-map
+palettes hold every state their storage has stored, and a block the palette does not name reads as
+air. A registry palette, which holds every state there is, is never read, and its cube is scanned.
+On a generating cave tour 73,149 of 86,016 cubes were skipped so; with
+`-Dcubature.checkFirstLightSources=true` they are scanned anyway, and none held a block giving
+light. On that tour first light's server-thread cost fell from 45.3 to 24.7 microseconds a cube.

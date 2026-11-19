@@ -32,6 +32,7 @@ import io.github.opencubicchunks.cubicchunks.api.util.MathUtil;
 import io.github.opencubicchunks.cubicchunks.api.world.IColumn;
 import io.github.opencubicchunks.cubicchunks.api.world.ICube;
 import io.github.opencubicchunks.cubicchunks.core.asm.mixin.ICubicWorldInternal;
+import io.github.opencubicchunks.cubicchunks.core.asm.mixin.core.common.IBlockStateContainer;
 import io.github.opencubicchunks.cubicchunks.core.world.IColumnInternal;
 import io.github.opencubicchunks.cubicchunks.core.world.cube.Cube;
 import mcp.MethodsReturnNonnullByDefault;
@@ -44,6 +45,9 @@ import net.minecraft.util.math.BlockPos.MutableBlockPos;
 import net.minecraft.world.EnumSkyBlock;
 import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
+import net.minecraft.world.chunk.BlockStatePaletteHashMap;
+import net.minecraft.world.chunk.BlockStatePaletteLinear;
+import net.minecraft.world.chunk.IBlockStatePalette;
 import net.minecraft.world.chunk.storage.ExtendedBlockStorage;
 import javax.annotation.ParametersAreNonnullByDefault;
 
@@ -92,11 +96,15 @@ public class FirstLightProcessor {
 
     /**
      * {@code -Dcubature.checkFirstLightSources=true}: every block is also asked the world-aware question, and a
-     * block where the two answers part is counted and logged, with the cubes seen, every 4,096 cubes.
+     * block where the two answers part is counted and logged; a cube its palette would have skipped is scanned too,
+     * and a block giving light in it is counted and logged. The counts are logged with the cubes seen every 4,096
+     * cubes.
      */
     private static final boolean CHECK_SOURCES = Boolean.getBoolean("cubature.checkFirstLightSources");
     private static long checkedCubes;
     private static long checkedParted;
+    private static long checkedDark;
+    private static long checkedDarkLit;
 
     private static boolean declaredBy(Class<?> type, Class<?> owner, Class<?>... parameters) {
         try {
@@ -114,12 +122,40 @@ public class FirstLightProcessor {
         return STATE_ASKS_BLOCK.get(state.getClass()) && BLOCK_LIGHT_FROM_STATE.get(state.getBlock().getClass());
     }
 
+    /** Whether a state gives no light wherever it stands. */
+    private static boolean darkFromState(IBlockState state) {
+        return lightFromState(state) && state.getLightValue() == 0;
+    }
+
+    /**
+     * Whether no state in a storage's palette gives light, read from the game's linear and hash-map palettes, which
+     * number their states from 0 with nothing missing and hold every state the storage has stored. Any other palette
+     * (the registry palette holds every state there is) is not read, and false is returned.
+     */
+    static boolean paletteGivesNoLight(IBlockStatePalette palette) {
+        if (!(palette instanceof BlockStatePaletteLinear) && !(palette instanceof BlockStatePaletteHashMap)) {
+            return false;
+        }
+        for (int id = 0; id < Cube.SIZE * Cube.SIZE * Cube.SIZE; id++) {
+            IBlockState state = palette.getBlockState(id);
+            if (state == null) {
+                return true;
+            }
+            if (!darkFromState(state)) {
+                return false;
+            }
+        }
+        return false;
+    }
+
     /**
      * Checks block light at every block of the cube that gives light, in the order the cube's box is walked by
      * {@link BlockPos#getAllInBoxMutable} (x fastest, then y, then z), so the checks are queued as before. The
      * storage is read directly; a state that gives its light from itself alone is asked once for each run of it, and
      * any other is asked with the world and its position at every block, as the game asks. A cube without storage is
-     * air throughout and is asked as air.
+     * air throughout and is asked as air. A cube none of whose states gives light is not scanned: its storage's
+     * palette holds every state it has, and a block the palette does not name reads as air, so air must give none
+     * either.
      */
     private static void checkBlockLightSources(ICube cube, ILightingManager lm) {
         World world = cube.getWorld();
@@ -129,8 +165,13 @@ public class FirstLightProcessor {
         int minZ = cubeToMinBlock(cube.getZ());
         MutableBlockPos pos = new MutableBlockPos();
         IBlockState air = Blocks.AIR.getDefaultState();
-        if (!CHECK_SOURCES && storage == null && lightFromState(air) && air.getLightValue() == 0) {
+        boolean dark = darkFromState(air)
+                && (storage == null || paletteGivesNoLight(((IBlockStateContainer) storage.getData()).getPalette()));
+        if (dark && !CHECK_SOURCES) {
             return;
+        }
+        if (dark) {
+            checkedDark++;
         }
         IBlockState last = null;
         boolean lastFromState = false;
@@ -152,6 +193,12 @@ public class FirstLightProcessor {
                                 "First light check: {} at {} gives {} from its state and {} from the world", state, pos,
                                 light, state.getLightValue(world, pos));
                     }
+                    if (CHECK_SOURCES && dark && state.getLightValue(world, pos) > 0) {
+                        checkedDarkLit++;
+                        io.github.opencubicchunks.cubicchunks.core.CubicChunks.LOGGER.error(
+                                "First light check: {} at {} gives {} in a cube its palette called dark", state, pos,
+                                state.getLightValue(world, pos));
+                    }
                     if (light > 0) {
                         lm.checkLightFor(EnumSkyBlock.BLOCK, pos);
                     }
@@ -160,7 +207,9 @@ public class FirstLightProcessor {
         }
         if (CHECK_SOURCES && ++checkedCubes % 4096 == 0) {
             io.github.opencubicchunks.cubicchunks.core.CubicChunks.LOGGER.info(
-                    "First light check: {} cubes, {} blocks where the state and the world parted", checkedCubes, checkedParted);
+                    "First light check: {} cubes, {} blocks where the state and the world parted, {} cubes dark by their "
+                            + "palette, {} blocks giving light in them", checkedCubes, checkedParted, checkedDark,
+                    checkedDarkLit);
         }
     }
 
