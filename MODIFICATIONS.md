@@ -551,3 +551,10 @@ block at a time into a copy of the map taken before, and the two maps' saved byt
 cave tour none parted. On that tour, on fresh instances with the same client, surface tracking's
 server-thread cost was 41.8 microseconds a cube against 50.3 before it; the other install phases
 were the same within a few percent.
+
+Also on November 19, 2026, each column counts how many of its loaded cubes hold an entity: a cube's
+entity container tells its column as it goes from holding none to holding one and back, and a cube
+joining or leaving the column brings or takes its share. The entity pass then answers a render chunk
+in a column whose count is nothing with the empty list at once, without looking its cube up. With
+`-Dcubature.checkEntityCubes=true` the cube is looked up anyway at such columns and any cube found
+holding entities is logged.

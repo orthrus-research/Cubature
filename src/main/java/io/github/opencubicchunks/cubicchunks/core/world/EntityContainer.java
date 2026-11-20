@@ -1,5 +1,5 @@
 /*
- *  This file is part of Cubic Chunks Mod, licensed under the MIT License (MIT).
+ *  This file is part of Cubature, licensed under the MIT License (MIT).
  *
  *  Copyright (c) 2015-2021 OpenCubicChunks
  *  Copyright (c) 2015-2021 contributors
@@ -38,8 +38,10 @@ import net.minecraftforge.common.util.Constants;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.function.Consumer;
+import java.util.function.IntConsumer;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import javax.annotation.ParametersAreNonnullByDefault;
 
 //TODO: Have xcube review this class... I dont trust it
@@ -63,13 +65,31 @@ public class EntityContainer {
     //========Methods for Chunk/Cube=========
     //=======================================
 
+    /**
+     * Told +1 when the container goes from holding no entity to holding one and -1 when it goes back, for the column
+     * that counts its cubes holding entities; null while the cube is in no column.
+     */
+    @Nullable private IntConsumer occupancy;
+
+    public void setOccupancy(@Nullable IntConsumer occupancy) {
+        this.occupancy = occupancy;
+    }
+
     public void addEntity(Entity entity) {
+        boolean wasEmpty = this.entities.isEmpty();
         this.entities.add(entity);
         this.hasActiveEntities = true;
+        if (wasEmpty && occupancy != null && !this.entities.isEmpty()) {
+            occupancy.accept(1);
+        }
     }
 
     public boolean remove(Entity entity) {
-        return this.entities.remove(entity);
+        boolean removed = this.entities.remove(entity);
+        if (removed && occupancy != null && this.entities.isEmpty()) {
+            occupancy.accept(-1);
+        }
+        return removed;
     }
 
     public ClassInheritanceMultiMap<Entity> getEntitySet() {

@@ -1,5 +1,5 @@
 /*
- *  This file is part of Cubic Chunks Mod, licensed under the MIT License (MIT).
+ *  This file is part of Cubature, licensed under the MIT License (MIT).
  *
  *  Copyright (c) 2015-2021 OpenCubicChunks
  *  Copyright (c) 2015-2021 contributors
@@ -37,6 +37,11 @@ public interface IColumnInternal extends IColumn {
     void removeFromStagingHeightmap(ICube cube);
 
     void addToStagingHeightmap(ICube cube);
+
+    /** How many of the column's loaded cubes hold an entity, or -1 where it is not counted. */
+    default int entityCubes() {
+        return -1;
+    }
 
     /**
      * Returns Y coordinate of the top non-transparent block

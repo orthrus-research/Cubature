@@ -1,5 +1,5 @@
 /*
- *  This file is part of Cubic Chunks Mod, licensed under the MIT License (MIT).
+ *  This file is part of Cubature, licensed under the MIT License (MIT).
  *
  *  Copyright (c) 2015-2021 OpenCubicChunks
  *  Copyright (c) 2015-2021 contributors
@@ -27,7 +27,10 @@ package io.github.opencubicchunks.cubicchunks.core.asm.mixin.core.client;
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import io.github.opencubicchunks.cubicchunks.core.CubicChunks;
 import io.github.opencubicchunks.cubicchunks.core.world.EntityContainer;
+import io.github.opencubicchunks.cubicchunks.core.world.IColumnInternal;
+import io.github.opencubicchunks.cubicchunks.core.world.cube.Cube;
 import io.github.opencubicchunks.cubicchunks.core.world.cube.BlankCube;
 import io.github.opencubicchunks.cubicchunks.api.world.ICube;
 import io.github.opencubicchunks.cubicchunks.api.util.Coords;
@@ -45,6 +48,7 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.chunk.Chunk;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Coerce;
 import org.spongepowered.asm.mixin.injection.Group;
@@ -132,13 +136,41 @@ public class MixinRenderGlobal {
             return original.call(chunk); //TODO: is this right?
         }
 
+        // A column none of whose cubes holds an entity has nothing to draw: no cube is looked up.
+        int entityCubes = ((IColumnInternal) chunk).entityCubes();
+        if (++cubicChunks$entityLists % 1_000_000 == 0) {
+            CubicChunks.LOGGER.info("Entity pass: {} render chunks asked for their entities, {} answered without a cube lookup",
+                    cubicChunks$entityLists, cubicChunks$entityListsSkipped);
+        }
+        if (entityCubes == 0) {
+            cubicChunks$entityListsSkipped++;
+            if (!CHECK_ENTITY_CUBES) {
+                return EntityContainer.EMPTY_ARR;
+            }
+        }
         ICube cube = ((IColumn) chunk).getCube(Coords.blockToCube(position.getY()));
         if (cube instanceof BlankCube) {
+            return EntityContainer.EMPTY_ARR;
+        }
+        if (entityCubes == 0) {
+            if (!cube.getEntitySet().isEmpty() && cubicChunks$entityCubesParted++ < 20) {
+                CubicChunks.LOGGER.error("Entity cubes check: cube {} holds {} entities in a column counted as holding none",
+                        ((Cube) cube).getCoords(), cube.getEntitySet().size());
+            }
             return EntityContainer.EMPTY_ARR;
         }
 
         return new ClassInheritanceMultiMap[]{cube.getEntitySet()};
     }
+
+    /**
+     * {@code -Dcubature.checkEntityCubes=true}: a column counted as holding no entity has its cube looked up anyway, and a
+     * cube found holding entities is logged (the first 20).
+     */
+    @Unique private static final boolean CHECK_ENTITY_CUBES = Boolean.getBoolean("cubature.checkEntityCubes");
+    @Unique private static int cubicChunks$entityCubesParted;
+    @Unique private static long cubicChunks$entityLists;
+    @Unique private static long cubicChunks$entityListsSkipped;
 
     @ModifyExpressionValue(
             method = "renderWorldBorder",
