@@ -34,6 +34,14 @@ it was built from, so builds from several worktrees do not replace one another. 
 `python -B -m unittest discover -s tools -p "test_*.py"`). Changes that affect scheduling, storage, lighting or delivery also need a native
 check in the lab ([lab/README.md](lab/README.md)) or, within Riven's workspace, `riven.ps1 full`.
 
+Before a push, `python tools/ci.py [commit]` checks the commit (HEAD by default) in a worktree of
+its own, so nothing uncommitted takes part: the compile-only inputs, the build with its focused
+regressions on Java 26, the lab's build and checks, and every tool test in a virtual environment
+made from `tools/requirements.txt`. Gradle runs on the JDK 25 in `JAVA_HOME` (or `--java25`), and
+`--java26` names the JDK for the regressions when Gradle does not find one. A pass is recorded under
+the commit's tree in the main checkout's `.local/ci/passes.json`; the pre-push hook that
+`python tools/push_gate.py install` writes refuses a pushed tip whose tree has no pass.
+
 ## Commits and documentation
 
 - One reviewed change per commit. The message says what was run and what it showed.
