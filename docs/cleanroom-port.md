@@ -104,7 +104,7 @@ long-running load/unload and concurrent native I/O stress, complete addon
 compatibility, terrain/content/progression parity and native performance.
 Optional Celeritas and wildcard-selector remap warnings remain
 visible. The build compiles against the DH JAR and the Celeritas JAR inside
-Demonica, which `tools/fetch_build_inputs.py` fetches (a Riven checkout
-supplies them from `dev/pins`). The prior synchronous load-event recursion limitation remains.
+Demonica, which `tools/fetch_build_inputs.py` fetches as `cleanroom/build-inputs.json`
+pins them. The prior synchronous load-event recursion limitation remains.
 The port keeps native world mutation on its existing owner thread; it
 does not introduce concurrent chunk generation or virtual-thread I/O.

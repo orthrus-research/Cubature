@@ -20,6 +20,7 @@ Examples (from the Cubature checkout or anywhere):
   python tools/build_cubature.py --freeze candidate-01
 """
 
+from fetch_build_inputs import fetch_all
 from lab_files import sha
 from riven_workspace import riven_workspace
 import argparse
@@ -195,7 +196,8 @@ def main():
     local = workspace_settings(workspace)
     environment = os.environ.copy()
     environment["JAVA_HOME"] = str(Path(local["java25"]).parent.parent)
-    environment["RIVEN_WORKSPACE"] = str(workspace)  # cleanroom/build.gradle reads dev/pins there
+    # Cubature's own compile-only inputs (cleanroom/build-inputs.json), never another checkout's.
+    fetch_all()
     java26_home = Path(local["java26"]).parent.parent
     installations = f"-Porg.gradle.java.installations.paths={java26_home}"
     if args.no_daemon:

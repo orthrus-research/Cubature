@@ -177,8 +177,8 @@ use actual light and supersede seed previews. Riven owns water geometry; this
 optional CC adapter owns the encoding. DH owns generation and delivery queues.
 
 The source build compiles against the official DH JAR as a remapped compile-only
-input, fetched by `tools/fetch_build_inputs.py` or read from a Riven checkout's
-`dev/pins`. It is not bundled or made a runtime dependency.
+input, pinned in `cleanroom/build-inputs.json` and fetched by `tools/fetch_build_inputs.py`.
+It is not bundled or made a runtime dependency.
 
 ## Current scope
 

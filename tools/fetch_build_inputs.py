@@ -1,23 +1,22 @@
 #!/usr/bin/env python3
-"""Download the compile-only JARs the Cleanroom build reads, verified by SHA-256.
+"""Download the compile-only JARs the Cleanroom build and the lab read, verified by SHA-256.
 
-Inside Riven's workspace the build uses its dev/pins instead and this step is unnecessary.
-Neither JAR is bundled into Cubature; both remain their authors' unmodified releases.
+cleanroom/build-inputs.json pins each by name, URL and hash; both Gradle builds check the files
+against it and refuse to compile without them. Neither JAR is bundled into Cubature; both remain
+their authors' unmodified releases.
 """
 from lab_files import sha
 import argparse
+import json
 from pathlib import Path
 import urllib.request
 
 FORK = Path(__file__).resolve().parents[1]
-INPUTS = [
-    ('DistantHorizons-3.3.3-1.12.2-forge.jar',
-     'https://cdn.modrinth.com/data/uCdwusMi/versions/1PczaQGZ/DistantHorizons-3.3.3-1.12.2-forge.jar',
-     '48c3ace5c35c471893d3dc78de79e3dde229df0179a59352307a2e1c8f60e613'),
-    ('Demonica-0.9.0.jar',
-     'https://github.com/ndellagrotte/Demonica/releases/download/v0.9.0/Demonica-0.9.0.jar',
-     '241632b96fa241b670d7c5c29110d8e7c870bda9693d2967e680cf357e1a619d'),
-]
+PINS = FORK / 'cleanroom/build-inputs.json'
+
+
+def inputs():
+    return json.loads(PINS.read_text(encoding='utf-8'))['inputs']
 
 
 def fetch(name, url, expected, target):
@@ -38,13 +37,16 @@ def fetch(name, url, expected, target):
     print('fetched  ' + name)
 
 
+def fetch_all(target=FORK / 'cleanroom/build-inputs'):
+    target.mkdir(parents=True, exist_ok=True)
+    for pin in inputs():
+        fetch(pin['file'], pin['url'], pin['sha256'], target)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--target', type=Path, default=FORK / 'cleanroom/build-inputs')
-    args = parser.parse_args()
-    args.target.mkdir(parents=True, exist_ok=True)
-    for name, url, expected in INPUTS:
-        fetch(name, url, expected, args.target)
+    fetch_all(parser.parse_args().target)
 
 
 if __name__ == '__main__':

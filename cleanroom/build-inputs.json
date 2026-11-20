@@ -1,0 +1,15 @@
+{
+  "description": "Compile-only inputs of the Cleanroom build and the lab, never bundled: their authors' unmodified releases, fetched into cleanroom/build-inputs by tools/fetch_build_inputs.py and checked against these hashes by both builds.",
+  "inputs": [
+    {
+      "file": "DistantHorizons-3.3.3-1.12.2-forge.jar",
+      "url": "https://cdn.modrinth.com/data/uCdwusMi/versions/1PczaQGZ/DistantHorizons-3.3.3-1.12.2-forge.jar",
+      "sha256": "48c3ace5c35c471893d3dc78de79e3dde229df0179a59352307a2e1c8f60e613"
+    },
+    {
+      "file": "Demonica-0.9.0.jar",
+      "url": "https://github.com/ndellagrotte/Demonica/releases/download/v0.9.0/Demonica-0.9.0.jar",
+      "sha256": "241632b96fa241b670d7c5c29110d8e7c870bda9693d2967e680cf357e1a619d"
+    }
+  ]
+}

@@ -48,15 +48,31 @@ configurations {
     embeddedLibraries
     implementation.extendsFrom(embeddedLibraries)
 }
-// Distant Horizons and Demonica are compile-only inputs, never bundled. With a Riven workspace (RIVEN_WORKSPACE, else
-// the sibling ../Riven) they come from its dev/pins; elsewhere tools/fetch_build_inputs.py downloads and verifies them
-// into cleanroom/build-inputs.
-def rivenPins = new File(providers.environmentVariable('RIVEN_WORKSPACE')
-        .getOrElse(file('../../Riven').path), 'dev/pins')
-def buildInputs = file(providers.gradleProperty('cubicBuildInputs')
-        .getOrElse(rivenPins.isDirectory() ? rivenPins.path : 'build-inputs'))
+// Distant Horizons and Demonica are compile-only inputs, never bundled: the releases build-inputs.json pins, which
+// tools/fetch_build_inputs.py downloads into build-inputs (-PcubicBuildInputs names another folder). Each is checked
+// against its pinned hash before anything compiles against it.
+def buildInputPins = new groovy.json.JsonSlurper().parse(file('build-inputs.json')).inputs
+def buildInputs = file(providers.gradleProperty('cubicBuildInputs').getOrElse('build-inputs'))
+def verifyBuildInputs = tasks.register('verifyBuildInputs') {
+    def pins = buildInputPins.collectEntries { [(it.file): it.sha256] }
+    def folder = buildInputs
+    inputs.property('pins', pins)
+    doLast {
+        pins.each { name, expected ->
+            def jar = new File(folder, name)
+            if (!jar.isFile()) {
+                throw new GradleException("Missing build input ${jar}: run python tools/fetch_build_inputs.py")
+            }
+            def found = java.security.MessageDigest.getInstance('SHA-256').digest(jar.bytes).encodeHex().toString()
+            if (found != expected) {
+                throw new GradleException("${jar} has SHA-256 ${found}; build-inputs.json pins ${expected}")
+            }
+        }
+    }
+}
 // Celeritas ships inside Demonica's release jar; the cubic-section integration compiles against those exact classes.
 def extractCeleritas = tasks.register('extractCeleritas', Copy) {
+    dependsOn verifyBuildInputs
     from(zipTree(new File(buildInputs, 'Demonica-0.9.0.jar'))) { include 'zz-demonica-bundled-celeritas-*.jar' }
     into layout.buildDirectory.dir('celeritas')
 }
@@ -96,7 +112,7 @@ tasks.register('verifyEmbeddedLibraries') {
         assert digest == '9b4d0f3c6dcb26694f7d347e2ddd4166d76db98f2c9df0dd500add2fd8aa71cd': 'RegionLib artifact differs from the verified maintainer publication'
     }
 }
-tasks.named('compileJava') { dependsOn tasks.named('verifyEmbeddedLibraries') }
+tasks.named('compileJava') { dependsOn tasks.named('verifyEmbeddedLibraries'), verifyBuildInputs }
 processResources {
     inputs.property('version', project.version)
     inputs.property('modDisplayName', modDisplayName)

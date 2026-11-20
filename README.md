@@ -73,8 +73,8 @@ the column on the server thread if it must.
 ## Building from source
 
 The supported build is the CleanroomGradle project in `cleanroom/`, which needs JDK 25. It compiles against the official Distant Horizons 3.3.3 and Demonica 0.9.0 JARs,
-which are never bundled. Inside Riven's workspace it reads them from Riven's `dev/pins`; in a
-standalone clone, fetch them first (each is checked against its SHA-256):
+which are never bundled. `cleanroom/build-inputs.json` pins each by URL and SHA-256; fetch them first
+(the build checks each against its hash and stops if one is missing or differs):
 
 ```sh
 python tools/fetch_build_inputs.py
