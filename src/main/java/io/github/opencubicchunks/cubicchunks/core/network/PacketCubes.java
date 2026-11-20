@@ -1,5 +1,5 @@
 /*
- *  This file is part of Cubic Chunks Mod, licensed under the MIT License (MIT).
+ *  This file is part of Cubature, licensed under the MIT License (MIT).
  *
  *  Copyright (c) 2015-2021 OpenCubicChunks
  *  Copyright (c) 2015-2021 contributors
@@ -286,7 +286,6 @@ public class PacketCubes implements IMessage {
             }
 
             cubes.stream().filter(Objects::nonNull).forEach(cube -> {
-                io.github.opencubicchunks.cubicchunks.core.compat.celeritas.CeleritasCompat.cubeLoaded(cube);
                 io.github.opencubicchunks.cubicchunks.core.client.source.ClientCubeSource.INSTANCE.cubeLoaded(cube);
                 cube.markForRenderUpdate();
             });

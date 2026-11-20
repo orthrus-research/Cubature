@@ -1,5 +1,5 @@
 /*
- *  This file is part of Cubic Chunks Mod, licensed under the MIT License (MIT).
+ *  This file is part of Cubature, licensed under the MIT License (MIT).
  *
  *  Copyright (c) 2015-2021 OpenCubicChunks
  *  Copyright (c) 2015-2021 contributors
@@ -32,7 +32,6 @@ import io.github.opencubicchunks.cubicchunks.api.util.XYZMap;
 import io.github.opencubicchunks.cubicchunks.api.world.IColumn;
 import io.github.opencubicchunks.cubicchunks.api.world.ICube;
 import io.github.opencubicchunks.cubicchunks.core.asm.mixin.ICubicWorldInternal;
-import io.github.opencubicchunks.cubicchunks.core.compat.celeritas.CeleritasCompat;
 import io.github.opencubicchunks.cubicchunks.core.world.cube.BlankCube;
 import io.github.opencubicchunks.cubicchunks.core.world.cube.Cube;
 import mcp.MethodsReturnNonnullByDefault;
@@ -95,7 +94,6 @@ public class CubeProviderClient extends ChunkProviderClient implements ICubeProv
         net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new net.minecraftforge.event.world.ChunkEvent.Load(column));
 
         column.markLoaded(true);
-        CeleritasCompat.columnLoaded((World) this.world, cubeX, cubeZ);
         return column;
     }
 
@@ -154,7 +152,6 @@ public class CubeProviderClient extends ChunkProviderClient implements ICubeProv
         cube.onUnload();
         cubeMap.remove(pos.getX(), pos.getY(), pos.getZ());
         cube.getColumn().removeCube(pos.getY());
-        CeleritasCompat.cubeUnloaded(cube);
         io.github.opencubicchunks.cubicchunks.core.client.source.ClientCubeSource.INSTANCE.cubeUnloaded(cube);
     }
 

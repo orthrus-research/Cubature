@@ -1,5 +1,5 @@
 /*
- *  This file is part of Cubic Chunks Mod, licensed under the MIT License (MIT).
+ *  This file is part of Cubature, licensed under the MIT License (MIT).
  *
  *  Copyright (c) 2015-2021 OpenCubicChunks
  *  Copyright (c) 2015-2021 contributors
@@ -91,11 +91,6 @@ public class CubicChunksConfig {
             + "preview provider (or a client whose server has none) received columns are still fed.")
     public static DistantHorizonsNativeFeed distantHorizonsNativeFeed = DistantHorizonsNativeFeed.ALL;
 
-    @Config.Comment("Under Demonica, rewrite Complementary r5.9.3's cave fog (lib/atmospherics/fog/caveFactor.glsl) as it "
-            + "loads, so it follows the camera's depth below its column's surface instead of its depth below Y61.9 and "
-            + "caves above sea level darken like those below. Off by default: Complementary's license grants no change "
-            + "to its code; enable it only with its authors' permission. Takes effect when the shader pack reloads.")
-    public static boolean complementaryCaveFog = false;
 
     @Config.RangeInt(min = -1, max = 32)
     @Config.RequiresWorldRestart

@@ -488,12 +488,5 @@ class LabControlTest(unittest.TestCase):
         self.assertEqual(lab_instance.expected_mod_hashes(manifest, 'server'), {'core.jar': 'a'})
         self.assertEqual(lab_instance.expected_mod_hashes(manifest, 'client'), {'core.jar': 'a', 'renderer.jar': 'b'})
         self.assertEqual(lab_instance.expected_mod_hashes({'modHashes': {'core.jar': 'a'}}, 'client'), {'core.jar': 'a'})
-    def test_combined_renderer_profile_includes_demonica_exact_pin(self):
-        baseline = lab_instance.read_client_profile('baseline')
-        combined = lab_instance.read_client_profile('celeritas-demonica')
-        self.assertEqual(baseline['mods'], [])
-        self.assertEqual([mod['slug'] for mod in combined['mods']], ['celeritas', 'demonica'])
-        self.assertTrue(all(mod['side'] == 'client' for mod in combined['mods']))
-        self.assertEqual(combined['mods'][0]['sha256'], '5bf123a6da6190f6e061cd3fd069a2bddcbf6ebf57894381b6c888c06a94f982')
 
 if __name__ == '__main__': unittest.main()

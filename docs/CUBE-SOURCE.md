@@ -11,9 +11,7 @@ from cubes instead of from the game's 16-section columns. Cubature owns this con
 renderer reads only the interfaces described here, never Cubature's internal classes, and
 Cubature calls a renderer only through the listener it is given.
 
-Today a renderer reaches cubes through hooks written for it specifically (the Celeritas
-integration in `core/compat/celeritas`). This contract states the same needs once, for any
-renderer.
+This contract states what a renderer needs from cubes once, for any renderer.
 
 ## Parties
 
@@ -111,8 +109,7 @@ terrain at radius 20 on 2026-11-18, kept copies held about 640 MiB, 36 to 43% of
 heap, once a place was meshed, about three times the cubes' own storage.
 `cubeCopies()` and `cubeCopyNanos()` count the copies made and the client thread's time making
 them, and the client log gives both for each world as it goes (`Client cube source: ... cube
-copies made`). The Celeritas integration copies blocks and block entities per section, and that
-is the cost to beat.
+copies made`).
 
 **Release.** A renderer releases a snapshot when its build finishes or is cancelled.
 Holding one must not keep a cube loaded.
@@ -665,23 +662,10 @@ are set, and Cubature recounts it when a cube arrives from the server, so a cube
 edits reads `EMPTY` again and a cube with any block, a plant included, reads `HAS_BLOCKS`.
 It costs one cube look-up. The default answers `NOT_LOADED`.
 
-## 9. How the Celeritas integration maps onto this
+## 9. What changes in Cubature
 
-| Today (`CeleritasCompat` and the `selectable.celeritas` Mixins) | In this contract |
-|---|---|
-| `section`: a loaded cube's block storage | Snapshot, block states and light |
-| `EmptyCubeSection`: a stand-in for a storage-less cube, built from column tops | Snapshot, implicit sky light |
-| `tileEntities`: the block entity map per section | Snapshot, block entities |
-| `minSection`, `maxSection` | World, height range |
-| `loadedCubeYs` | Queries, loaded set |
-| `columnLoaded`, `cubeLoaded`, `cubeUnloaded` | Events |
-| `applyCubeChanges`: deferring changes until the renderer applies its own events | Events arrive on the client thread at a defined point |
-| The entity gatherer | Not in this contract: entities are drawn by the game |
-
-## 10. What changes in Cubature
-
-Adding the source is additive. The vanilla, Celeritas, Demonica and Distant Horizons
-integrations are unaffected by it.
+Adding the source is additive. The vanilla and Distant Horizons integrations are unaffected
+by it.
 
 ## Verification
 

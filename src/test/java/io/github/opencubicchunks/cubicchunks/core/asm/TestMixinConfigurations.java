@@ -21,7 +21,6 @@ import static org.junit.Assert.assertTrue;
 public class TestMixinConfigurations {
     private static final String[] CONFIGURATIONS = {
         "cubicchunks.mixins.core.json", "cubicchunks.mixins.fixes.json", "cubicchunks.mixins.selectable.json",
-        "cubicchunks.mixins.selectable.celeritas.json", "cubicchunks.mixins.selectable.demonica.json",
         "cubicchunks.mixins.selectable.vanillaterrain.json", "cubicchunks.mixins.noncritical.json"};
 
     private static List<String> mixins(String configuration) throws Exception {
@@ -49,15 +48,6 @@ public class TestMixinConfigurations {
                 assertTrue(name + " is registered twice", seen.add(name));
                 assertNotNull(name + " has no class", getClass().getResource("/" + name.replace('.', '/') + ".class"));
             }
-        }
-    }
-
-    @Test public void vanillaTerrainMixinsAreTheOnlyOnesCeleritasReplaces() throws Exception {
-        for (String name : mixins("cubicchunks.mixins.selectable.vanillaterrain.json")) {
-            assertTrue(name, name.contains(".selectable.client.vertviewdist.MixinRenderGlobal"));
-        }
-        for (String name : mixins("cubicchunks.mixins.selectable.celeritas.json")) {
-            assertTrue(name, name.contains(".selectable.client.celeritas."));
         }
     }
 }

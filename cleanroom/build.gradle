@@ -48,8 +48,8 @@ configurations {
     embeddedLibraries
     implementation.extendsFrom(embeddedLibraries)
 }
-// Distant Horizons and Demonica are compile-only inputs, never bundled: the releases build-inputs.json pins, which
-// tools/fetch_build_inputs.py downloads into build-inputs (-PcubicBuildInputs names another folder). Each is checked
+// Distant Horizons is a compile-only input, never bundled: the release build-inputs.json pins, which
+// tools/fetch_build_inputs.py downloads into build-inputs (-PcubicBuildInputs names another folder). It is checked
 // against its pinned hash before anything compiles against it.
 def buildInputPins = new groovy.json.JsonSlurper().parse(file('build-inputs.json')).inputs
 def buildInputs = file(providers.gradleProperty('cubicBuildInputs').getOrElse('build-inputs'))
@@ -70,17 +70,10 @@ def verifyBuildInputs = tasks.register('verifyBuildInputs') {
         }
     }
 }
-// Celeritas ships inside Demonica's release jar; the cubic-section integration compiles against those exact classes.
-def extractCeleritas = tasks.register('extractCeleritas', Copy) {
-    dependsOn verifyBuildInputs
-    from(zipTree(new File(buildInputs, 'Demonica-0.9.0.jar'))) { include 'zz-demonica-bundled-celeritas-*.jar' }
-    into layout.buildDirectory.dir('celeritas')
-}
 dependencies {
     implementation cleanroom.userdev(cleanroom_version)
     // DH stays upstream on disk; Cubature supplies optional runtime transformations.
     compileOnly deobf(files(new File(buildInputs, 'DistantHorizons-3.3.3-1.12.2-forge.jar')))
-    compileOnly fileTree(layout.buildDirectory.dir('celeritas')) { include '*.jar' }.builtBy(extractCeleritas)
     buildSupportCompileOnly 'com.google.code.findbugs:jsr305:3.0.2'
     compileOnly 'com.google.code.findbugs:jsr305:3.0.2'
     compileOnly sourceSets.buildSupport.output
@@ -208,7 +201,7 @@ tasks.register('verifyReobfJar') {
             }
             def json = new groovy.json.JsonSlurper()
             def configs = entries.findAll { it.name.startsWith('cubicchunks.mixins.') && it.name.endsWith('.json') && !it.name.contains('refmap') }
-            assert configs.size() == 7: 'Expected the four Mixin configurations and the three renderer-specific ones'
+            assert configs.size() == 5: 'Expected the five Mixin configurations CubicChunksMixinConnector registers'
             configs.each { entry ->
                 def config = json.parse(archive.getInputStream(entry))
                 assert names.contains(config.refmap): "Missing refmap ${config.refmap}"

@@ -24,7 +24,7 @@ jobs:
         with:
           python-version: '3.14'
       - uses: gradle/actions/setup-gradle@v4
-      - name: Fetch compile-only build inputs (DH 3.3.3, Demonica 0.9.0; SHA-256 checked)
+      - name: Fetch compile-only build inputs (DH 3.3.3; SHA-256 checked)
         run: python -B tools/fetch_build_inputs.py
       - name: Build and run focused regressions
         working-directory: cleanroom

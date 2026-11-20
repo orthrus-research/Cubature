@@ -228,33 +228,16 @@ patches, must retain its applicable terms and undergo a combination-license
 review. Runtime patching is not an exemption. Do not apply this fork's MIT
 default or Riven's NRR license indiscriminately to DH-derived code.
 
-## Celeritas
+## Celeritas and Demonica
 
-On October 25, 2026, optional support was added for Celeritas as bundled by Demonica 0.9.0
-(Celeritas d94ec1e5). Celeritas replaces `RenderGlobal`'s terrain path, so the vanilla
-vertical-render-distance mixins stand aside when it is present. In cubic worlds the
-`client.celeritas` mixins instead give its section manager the world's full height, and they
-clone section blocks and tile entities from cubes. A cube without storage is all air with implicit,
-height-based sky light; Celeritas read it as its own empty section, which has full sky light at
-any depth, so cave walls beside such a cube were lit as daylight. Since October 27, 2026 it reads a
-section holding the cube's implicit sky light instead, unless every block of it is open to the sky.
-Its entity gatherer reads the world's entity list, because a cubic column's own entity lists stay empty, and its renderer's build height starts at
-the world's floor, so entity culling covers entities below Y 0. The client cube cache reports each column to
-Celeritas's chunk tracker, and a ready column has render sections only for loaded cubes: each cube
-adds its section once its blocks arrive and removes it after it unloads, applied where Celeritas
-applies its own column events, since a section change during its asynchronous graph search throws. These files contain no
-Celeritas code; they are MIT like the rest of the fork. The build compiles against the Celeritas
-JAR inside the Demonica pin and bundles none of it. When Demonica's Iris pipeline is present,
-`client.demonica.MixinDemonicaWorldInfo` replaces the `bedrockLevel` shader uniform. Demonica
-reports 0, the vanilla floor; in a cubic world the uniform now carries the world's minimum height,
-so packs stop fading sky and fog below Y-6. Since October 28, 2026 the same mixin adds a uniform,
-`cubicSurfaceDepth`: how far the camera's eye is below the top of its column's highest
-light-blocking block, from the height map the server sends, 0 at or above it. With the client
-option `complementaryCaveFog` (off by default), `client.demonica.MixinDemonicaIncludeGraph`
-rewrites one line of Complementary r5.9.3's `caveFactor.glsl` as Demonica reads it, so its cave
-fog follows that depth instead of the depth below Y61.9, and caves above sea level darken like
-those below. Other text is left unchanged. Complementary's license grants no change to its code,
-so the option stays off unless its authors permit it.
+From October 25 to November 19, 2026, Cubature carried optional client support for Celeritas as
+bundled by Demonica 0.9.0 (its section manager given the world's height and fed sections from
+cubes) and for Demonica's Iris pipeline (the `bedrockLevel` and `cubicSurfaceDepth` shader
+uniforms and the opt-in `complementaryCaveFog` rewrite). On November 19, 2026 it was removed with
+the `selectable.celeritas` and `selectable.demonica` Mixin configurations, `core/compat/celeritas`,
+`core/compat/demonica`, the client option `complementaryCaveFog` and the build's Demonica input:
+Demonica is no longer a target. The vanilla terrain-path mixins now always apply, and a client
+with Celeritas or Demonica installed is not supported.
 
 ## Biomes by height
 

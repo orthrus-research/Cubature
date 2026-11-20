@@ -35,8 +35,6 @@ The fork began at upstream commit `53847757c7998f3541fccc8c9b5d23dd23e4077d`.
   within a per-tick budget.
 - Optional Distant Horizons integration through Mixins. The Distant Horizons JAR stays the
   unmodified upstream release, and none of its code is bundled.
-- Shader support: packs under Demonica receive the camera's depth below the surface, and an opt-in
-  option (off by default) adapts Complementary's cave fog at load time without changing its files.
 
 ## For players and pack makers
 
@@ -72,9 +70,9 @@ the column on the server thread if it must.
 
 ## Building from source
 
-The supported build is the CleanroomGradle project in `cleanroom/`, which needs JDK 25. It compiles against the official Distant Horizons 3.3.3 and Demonica 0.9.0 JARs,
-which are never bundled. `cleanroom/build-inputs.json` pins each by URL and SHA-256; fetch them first
-(the build checks each against its hash and stops if one is missing or differs):
+The supported build is the CleanroomGradle project in `cleanroom/`, which needs JDK 25. It compiles against the official Distant Horizons 3.3.3 JAR,
+which is never bundled. `cleanroom/build-inputs.json` pins it by URL and SHA-256; fetch it first
+(the build checks it against its hash and stops if it is missing or differs):
 
 ```sh
 python tools/fetch_build_inputs.py

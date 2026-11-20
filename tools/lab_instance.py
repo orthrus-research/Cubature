@@ -209,19 +209,6 @@ def prepare_client(server, target, base_zip, root, java, release):
     return result
 
 
-def read_client_profile(name):
-    path = FORK / 'lab/profiles/client-renderers.json'
-    data = json.loads(path.read_text(encoding='utf-8'))
-    if name not in data['profiles']: raise RuntimeError('Unknown client profile: ' + name)
-    selected = data['profiles'][name]
-    mods = [dict(data['mods'][slug], slug=slug, side='client') for slug in selected]
-    for mod in mods:
-        if any(dependency not in selected for dependency in mod.get('requires', [])):
-            raise RuntimeError('Client profile is missing a dependency for ' + mod['slug'])
-    return {'name': name, 'definitionSha256': sha(path), 'mods': mods,
-            'ownership': 'External unmodified runtime compatibility inputs; no source or responsibilities embedded into CubicChunks'}
-
-
 def expected_mod_hashes(manifest, side):
     return manifest.get('clientModHashes', manifest['modHashes']) if side == 'client' else manifest['modHashes']
 
