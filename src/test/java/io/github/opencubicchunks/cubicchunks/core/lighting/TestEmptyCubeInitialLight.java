@@ -105,7 +105,7 @@ public class TestEmptyCubeInitialLight {
         assertEquals(true, field(fixture.target, Cube.class, "isModified"));
         assertTrue(fixture.target.needsSaving());
         assertTrue(fixture.column.modified);
-        assertEquals(4096, fixture.column.modifiedCalls);
+        assertEquals("the column is marked modified once a cube", 1, fixture.column.modifiedCalls);
         assertEquals(1, fixture.column.stagingRemovals);
         assertFalse(fixture.column.staging.contains(fixture.target));
         assertNull(data.lastHeightMap);
@@ -150,8 +150,8 @@ public class TestEmptyCubeInitialLight {
             assertEquals(full.column.heights.getLowestTopBlockY(), fast.column.heights.getLowestTopBlockY());
             assertEquals(full.listener.updates, fast.listener.updates);
             assertEquals(full.world.lightNotifications, fast.world.lightNotifications);
-            assertEquals(4096, full.column.modifiedCalls);
-            assertEquals(eligible ? 1 : 4096, fast.column.modifiedCalls);
+            assertEquals(1, full.column.modifiedCalls);
+            assertEquals(1, fast.column.modifiedCalls);
         }
     }
 
@@ -184,7 +184,7 @@ public class TestEmptyCubeInitialLight {
         stored.target.setStorage(new ExtendedBlockStorage(64, true));
         assertFalse(stored.whollyAbove());
         stored.target.trackSurface();
-        assertEquals(4096, stored.column.modifiedCalls);
+        assertEquals(1, stored.column.modifiedCalls);
         assertFalse(Cube.isStorageLessAboveSurface(new Cube(stored.column, 4) { }));
         Fixture noSky = new Fixture(false);
         assertFalse(noSky.whollyAbove());

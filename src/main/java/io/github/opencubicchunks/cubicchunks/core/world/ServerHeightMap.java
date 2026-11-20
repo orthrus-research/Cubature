@@ -1,5 +1,5 @@
 /*
- *  This file is part of Cubic Chunks Mod, licensed under the MIT License (MIT).
+ *  This file is part of Cubature, licensed under the MIT License (MIT).
  *
  *  Copyright (c) 2015-2021 OpenCubicChunks
  *  Copyright (c) 2015-2021 contributors
@@ -122,6 +122,51 @@ public class ServerHeightMap implements IHeightMap {
         }
 
         this.heightMapLowest = Coords.NO_HEIGHT;
+    }
+
+    /**
+     * The same as {@link #onOpacityChange} for the 16 blocks of one cube's column, top down: {@code opaqueBits} has
+     * bit k set where the block at {@code bottomY + k} is opaque. Where the 16 calls would leave the column as one
+     * range with no segments, or change nothing, that is done at once: a column with no blocks yet given 16 opaque
+     * ones; 16 opaque ones inside its range, or ending where its range begins below; 16 open ones outside its range.
+     * Anything else is the 16 calls.
+     */
+    public void onOpacityRun(int localX, int bottomY, int localZ, int opaqueBits) {
+        int top = bottomY + Cube.SIZE - 1;
+        int i = getIndex(localX, localZ);
+        if (top <= CubicChunks.MAX_SUPPORTED_BLOCK_Y && bottomY >= CubicChunks.MIN_SUPPORTED_BLOCK_Y) {
+            int min = ymin[i];
+            int max = ymax.get(i);
+            boolean empty = min == Coords.NO_HEIGHT;
+            if (opaqueBits == 0 && (empty || top < min || bottomY > max)) {
+                // Open blocks outside the range: each call leaves the column as it is.
+                this.heightMapLowest = Coords.NO_HEIGHT;
+                return;
+            }
+            if (opaqueBits == 0xFFFF && segments[i] == null) {
+                if (empty) {
+                    // From the top down each opaque block lands one below the last: one range.
+                    ymin[i] = bottomY;
+                    ymax.set(i, top);
+                    this.heightMapLowest = Coords.NO_HEIGHT;
+                    return;
+                }
+                if (bottomY >= min && top <= max) {
+                    // Opaque blocks inside the range: each call leaves the column as it is.
+                    this.heightMapLowest = Coords.NO_HEIGHT;
+                    return;
+                }
+                if (top + 1 == min) {
+                    // From the top down each opaque block extends the range one below: no segment begins.
+                    ymin[i] = bottomY;
+                    this.heightMapLowest = Coords.NO_HEIGHT;
+                    return;
+                }
+            }
+        }
+        for (int k = Cube.SIZE - 1; k >= 0; k--) {
+            onOpacityChange(localX, bottomY + k, localZ, opaqueBits >> k & 1);
+        }
     }
 
     @Override
@@ -253,6 +298,13 @@ public class ServerHeightMap implements IHeightMap {
 
     private static int getIndex(int localX, int localZ) {
         return (localZ << 4) | localX;
+    }
+
+    /** A copy with the same heights and segments, for checks. */
+    public ServerHeightMap copy() {
+        ServerHeightMap copy = new ServerHeightMap(new int[Cube.SIZE * Cube.SIZE]);
+        copy.readData(getData());
+        return copy;
     }
 
     // Serialization / NBT ---------------------------------------------------------------------------------------------

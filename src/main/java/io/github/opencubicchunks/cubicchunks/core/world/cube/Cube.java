@@ -53,6 +53,7 @@ import io.github.opencubicchunks.cubicchunks.core.util.ticket.ITicket;
 import io.github.opencubicchunks.cubicchunks.core.util.ticket.TicketList;
 import io.github.opencubicchunks.cubicchunks.core.world.EntityContainer;
 import io.github.opencubicchunks.cubicchunks.core.world.IColumnInternal;
+import io.github.opencubicchunks.cubicchunks.core.world.ServerHeightMap;
 import io.github.opencubicchunks.cubicchunks.core.world.chunkloader.ICubicTicketInternal;
 import mcp.MethodsReturnNonnullByDefault;
 import net.minecraft.block.material.Material;
@@ -759,23 +760,76 @@ public class Cube implements ICube {
         else trackSurfaceFromBlocks();
     }
 
+    /**
+     * {@code -Dcubature.checkSurfaceRuns=true}: every cube's surface is also tracked a block at a time into a copy of
+     * the column's height map taken before, and the two maps are compared; partings are logged, with the cubes seen
+     * every 4,096 cubes.
+     */
+    private static final boolean CHECK_SURFACE_RUNS = Boolean.getBoolean("cubature.checkSurfaceRuns");
+    private static long surfaceChecked;
+    private static long surfaceParted;
+
     @SuppressWarnings("deprecation")
     private void trackSurfaceFromBlocks() {
         IHeightMap opindex = ((IColumn) column).getOpacityIndex();
         int miny = getCoords().getMinBlockY();
-
+        column.setModified(true); //TODO: maybe ServerHeightMap needs its own isModified?
+        if (!(opindex instanceof ServerHeightMap)) {
+            for (int x = 0; x < Cube.SIZE; x++) {
+                for (int z = 0; z < Cube.SIZE; z++) {
+                    for (int y = Cube.SIZE - 1; y >= 0; y--) {
+                        opindex.onOpacityChange(x, miny + y, z, this.getBlockState(x, y, z).getLightOpacity());
+                    }
+                }
+            }
+            finishTrackingSurface();
+            return;
+        }
+        ServerHeightMap heights = (ServerHeightMap) opindex;
+        ServerHeightMap before = CHECK_SURFACE_RUNS ? heights.copy() : null;
+        // A block column's 16 opacities as bits, asking a state its opacity once for each run of that state.
+        IBlockState last = null;
+        boolean lastOpaque = false;
         for (int x = 0; x < Cube.SIZE; x++) {
             for (int z = 0; z < Cube.SIZE; z++) {
-
+                int opaque = 0;
                 for (int y = Cube.SIZE - 1; y >= 0; y--) {
-                    IBlockState newstate = this.getBlockState(x, y, z);
+                    IBlockState state = this.getBlockState(x, y, z);
+                    if (state != last) {
+                        last = state;
+                        lastOpaque = state.getLightOpacity() != 0;
+                    }
+                    if (lastOpaque) {
+                        opaque |= 1 << y;
+                    }
+                }
+                heights.onOpacityRun(x, miny, z, opaque);
+            }
+        }
+        if (before != null) {
+            checkSurfaceRuns(before, heights, miny);
+        }
+        finishTrackingSurface();
+    }
 
-                    column.setModified(true); //TODO: maybe ServerHeightMap needs its own isModified?
-                    opindex.onOpacityChange(x, miny + y, z, newstate.getLightOpacity());
+    /** Tracks the cube's surface a block at a time into the copy taken before, and sets it beside the map by runs. */
+    @SuppressWarnings("deprecation")
+    private void checkSurfaceRuns(ServerHeightMap before, ServerHeightMap byRuns, int miny) {
+        for (int x = 0; x < Cube.SIZE; x++) {
+            for (int z = 0; z < Cube.SIZE; z++) {
+                for (int y = Cube.SIZE - 1; y >= 0; y--) {
+                    before.onOpacityChange(x, miny + y, z, this.getBlockState(x, y, z).getLightOpacity());
                 }
             }
         }
-        finishTrackingSurface();
+        if (!java.util.Arrays.equals(before.getData(), byRuns.getData())) {
+            surfaceParted++;
+            CubicChunks.LOGGER.error("Surface runs check: cube {} tracked by runs parted from the cube tracked a block at a time",
+                    getCoords());
+        }
+        if (++surfaceChecked % 4096 == 0) {
+            CubicChunks.LOGGER.info("Surface runs check: {} cubes, {} where the two parted", surfaceChecked, surfaceParted);
+        }
     }
 
     private void finishTrackingSurface() {

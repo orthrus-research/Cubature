@@ -539,3 +539,12 @@ With `-Dcubature.checkCubeConstruction=true` every cube is also copied a block a
 are compared. Over 110,592 cubes of a generating cave tour no copy parted. On that tour, on fresh
 instances with the same client, construction's server-thread cost was 39.3 microseconds a cube
 against 67.0 for the commit before; the other install phases were the same within a few percent.
+
+Also on November 19, 2026, a cube's surface is tracked a block column at a time: the 16 opacities of
+each column, a state's opacity asked once for each run of it, go to the server height map's new
+`onOpacityRun`, which leaves the map as the 16 calls of `onOpacityChange` top down would. Where those
+calls would leave the column one range with no segments, or unchanged, it does so at once: a column
+with no blocks yet given 16 opaque ones, 16 opaque ones inside its range or ending where it begins
+below, 16 open ones outside it; otherwise it makes the 16 calls. The column is marked modified once a
+cube instead of at each block. With `-Dcubature.checkSurfaceRuns=true` every cube is also tracked a
+block at a time into a copy of the map taken before, and the two maps' saved bytes are compared.
