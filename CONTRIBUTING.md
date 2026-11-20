@@ -1,10 +1,9 @@
 # Contributing to Cubature
 
 Pull requests are welcome. The organization's
-[contributing guide](https://github.com/orthrus-research/.github/blob/main/CONTRIBUTING.md),
-[code of conduct](https://github.com/orthrus-research/.github/blob/main/CODE_OF_CONDUCT.md) and
-[AI usage terms](https://github.com/orthrus-research/.github/blob/main/AI.md) apply. This page adds
-what is specific to Cubature. Report Cubature problems here, not to upstream CubicChunks.
+[contributing guide](https://github.com/orthrus-research/.github/blob/main/CONTRIBUTING.md) and
+[code of conduct](https://github.com/orthrus-research/.github/blob/main/CODE_OF_CONDUCT.md) apply.
+This page adds what is specific to Cubature. Report Cubature problems here, not to upstream CubicChunks.
 
 ## Compatibility is a contract
 
@@ -47,5 +46,4 @@ the commit's tree in the main checkout's `.local/ci/passes.json`; the pre-push h
 - One reviewed change per commit. The message says what was run and what it showed.
 - Describe a change in the document that owns its area (`docs/`), and add it to
   [MODIFICATIONS.md](MODIFICATIONS.md) when it changes behavior.
-- Run output and evidence stay out of the repository. Editor and assistant configuration stays
-  local (see `.gitignore`).
+- Run output, evidence and editor configuration stay out of the repository (see `.gitignore`).

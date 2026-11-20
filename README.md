@@ -104,10 +104,6 @@ Questions and discussion: [Discord](https://discord.gg/qCVqhXtSzR). Bugs and req
 Cubature: this repository's issues, not upstream's. Security and private matters:
 admin@orthrus.cc. Pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
 
-Orthrus Research develops with AI assistance (Claude Code and Codex). Every change meets the same
-verification gates whatever its origin. See
-[AI usage](https://github.com/orthrus-research/.github/blob/main/AI.md).
-
 ## License
 
 Cubature keeps CubicChunks' terms: MIT, with the Forge-derived asynchronous I/O package under
