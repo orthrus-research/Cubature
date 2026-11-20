@@ -15,6 +15,7 @@
         "common.forge.MixinForgeChunkManager",
         "common.forge.MixinTicket",
         "common.IBlockStateContainer",
+        "common.IExtendedBlockStorage",
         "common.IForgeChunkManager",
         "common.IGameRegistry",
         "common.IIntegratedServer",

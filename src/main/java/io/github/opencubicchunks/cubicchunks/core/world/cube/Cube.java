@@ -43,6 +43,8 @@ import io.github.opencubicchunks.cubicchunks.api.worldgen.ICubeClassification;
 import io.github.opencubicchunks.cubicchunks.api.worldgen.ICubeGenerator;
 import io.github.opencubicchunks.cubicchunks.core.CubicChunks;
 import io.github.opencubicchunks.cubicchunks.core.asm.mixin.ICubicWorldInternal;
+import io.github.opencubicchunks.cubicchunks.core.asm.mixin.core.common.IBlockStateContainer;
+import io.github.opencubicchunks.cubicchunks.core.asm.mixin.core.common.IExtendedBlockStorage;
 import io.github.opencubicchunks.cubicchunks.core.lighting.LightingManager;
 import io.github.opencubicchunks.cubicchunks.core.server.CubeWatcher;
 import io.github.opencubicchunks.cubicchunks.core.server.SpawnCubes;
@@ -58,6 +60,7 @@ import net.minecraft.block.state.IBlockState;
 import net.minecraft.entity.Entity;
 import net.minecraft.init.Blocks;
 import net.minecraft.tileentity.TileEntity;
+import net.minecraft.util.BitArray;
 import net.minecraft.util.ClassInheritanceMultiMap;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.BlockPos;
@@ -252,13 +255,52 @@ public class Cube implements ICube {
     }
 
     /**
-     * {@code -Dcubature.checkCubeConstruction=true}: every block's material is also asked of the block itself, and a
-     * block where it parts from the material asked once for its run is counted and logged, with the cubes seen, every
-     * 4,096 cubes.
+     * {@code -Dcubature.checkCubeConstruction=true}: every block's material is also asked of the block itself, a block
+     * where it parts from the material asked once for its run is counted and logged, and every cube is also copied a
+     * block at a time, the game's way, and set beside the copy by runs: blocks, both counts and the bits. Partings
+     * are counted and logged, with the cubes seen, every 4,096 cubes.
      */
     private static final boolean CHECK_CONSTRUCTION = Boolean.getBoolean("cubature.checkCubeConstruction");
     private static long checkedCubes;
     private static long checkedParted;
+
+    /**
+     * What a cube built a run of blocks at a time reaches inside its storage: the container's bits, and the storage's
+     * counts of blocks and of randomly ticking blocks. Where the game runs, the core Mixins' accessors give them.
+     */
+    interface StorageAccess {
+        BitArray bits(ExtendedBlockStorage storage);
+
+        void addCounts(ExtendedBlockStorage storage, int blocks, int ticking);
+    }
+
+    /**
+     * The accessors' way in, where the core Mixins are applied, as they always are where the game runs; null outside
+     * the game (in unit tests of other parts), where a cube's blocks are then set one by one.
+     */
+    @Nullable
+    private static final StorageAccess ACCESSORS = IExtendedBlockStorage.class.isAssignableFrom(ExtendedBlockStorage.class)
+            ? new StorageAccess() {
+                @Override public BitArray bits(ExtendedBlockStorage storage) {
+                    return ((IBlockStateContainer) storage.getData()).getStorage();
+                }
+
+                @Override public void addCounts(ExtendedBlockStorage storage, int blocks, int ticking) {
+                    IExtendedBlockStorage counts = (IExtendedBlockStorage) storage;
+                    counts.setBlockRefCount(counts.getBlockRefCount() + blocks);
+                    counts.setTickRefCount(counts.getTickRefCount() + ticking);
+                }
+            }
+            : null;
+
+    @Nullable
+    static ExtendedBlockStorage copyBlocks(CubePrimer primer, Supplier<ExtendedBlockStorage> newStorage) {
+        ExtendedBlockStorage filled = copyBlocks(primer, newStorage, ACCESSORS);
+        if (CHECK_CONSTRUCTION) {
+            checkConstruction(primer, filled);
+        }
+        return filled;
+    }
 
     /**
      * Copies a primer's blocks into a storage made by {@code newStorage} at the first block whose material is not air,
@@ -266,14 +308,29 @@ public class Cube implements ICube {
      * copy puts it. A block of air material is left as the storage's air. The material is asked once for each run of
      * one state: a state's material is its block's answer for that state.
      *
+     * <p>The first block of each run goes through the storage's own {@code set}, so a state enters the palette, and the
+     * palette grows and its bits are written anew, exactly where the per-block copy does it. The rest of the run is
+     * written as that state's number straight into the bits, which no resize can change until the next run begins, and
+     * counted once at the end: the storage starts as air, so no block is ever counted down, and whether a block ticks
+     * randomly is its block's answer. The blocks, the palette, its order, the bits and both counts are the per-block
+     * copy's, so a cube saves and sends the same bytes.
+     *
+     * @param access the storage's bits and counts, or null to set every block through the storage's {@code set}
      * @return the storage filled, or null if no block's material is anything but air
      */
     @SuppressWarnings("deprecation")
     @Nullable
-    static ExtendedBlockStorage copyBlocks(CubePrimer primer, Supplier<ExtendedBlockStorage> newStorage) {
+    static ExtendedBlockStorage copyBlocks(CubePrimer primer, Supplier<ExtendedBlockStorage> newStorage,
+            @Nullable StorageAccess access) {
         ExtendedBlockStorage filled = null;
         IBlockState last = null;
         boolean lastAir = true;
+        // The run's state number in the bits, or -1 before its first block is set; its bits; whether it ticks.
+        int runNumber = -1;
+        BitArray bits = null;
+        boolean runTicks = false;
+        int moreBlocks = 0;
+        int moreTicking = 0;
         for (int y = Cube.SIZE - 1; y >= 0; y--) {
             for (int z = 0; z < Cube.SIZE; z++) {
                 for (int x = 0; x < Cube.SIZE; x++) {
@@ -281,26 +338,95 @@ public class Cube implements ICube {
                     if (newstate != last) {
                         last = newstate;
                         lastAir = newstate.getMaterial() == Material.AIR;
+                        runNumber = -1;
                     }
                     if (CHECK_CONSTRUCTION && lastAir != (newstate.getMaterial() == Material.AIR)) {
                         checkedParted++;
                         CubicChunks.LOGGER.error("Cube construction check: {} at {} {} {} is {} for its run and {} itself",
                                 newstate, x, y, z, lastAir ? "air" : "not air", lastAir ? "not air" : "air");
                     }
-                    if (!lastAir) {
-                        if (filled == null) {
-                            filled = newStorage.get();
-                        }
+                    if (lastAir) {
+                        continue;
+                    }
+                    if (filled == null) {
+                        filled = newStorage.get();
+                    }
+                    int index = y << 8 | z << 4 | x;
+                    if (access == null) {
                         filled.set(x, y, z, newstate);
+                    } else if (runNumber < 0) {
+                        filled.set(x, y, z, newstate);
+                        bits = access.bits(filled);
+                        runNumber = bits.getAt(index);
+                        runTicks = newstate.getBlock().getTickRandomly();
+                    } else {
+                        bits.setAt(index, runNumber);
+                        moreBlocks++;
+                        if (runTicks) {
+                            moreTicking++;
+                        }
                     }
                 }
             }
         }
-        if (CHECK_CONSTRUCTION && ++checkedCubes % 4096 == 0) {
-            CubicChunks.LOGGER.info("Cube construction check: {} cubes, {} blocks where the run and the block parted",
-                    checkedCubes, checkedParted);
+        if (filled != null && moreBlocks > 0) {
+            access.addCounts(filled, moreBlocks, moreTicking);
         }
         return filled;
+    }
+
+    /** The copy as the game makes it, a block at a time, for the construction check. */
+    @SuppressWarnings("deprecation")
+    @Nullable
+    static ExtendedBlockStorage copyBlocksOneByOne(CubePrimer primer) {
+        ExtendedBlockStorage storage = null;
+        for (int y = Cube.SIZE - 1; y >= 0; y--) {
+            for (int z = 0; z < Cube.SIZE; z++) {
+                for (int x = 0; x < Cube.SIZE; x++) {
+                    IBlockState state = primer.getBlockState(x, y, z);
+                    if (state.getMaterial() != Material.AIR) {
+                        if (storage == null) {
+                            storage = new ExtendedBlockStorage(0, true);
+                        }
+                        storage.set(x, y, z, state);
+                    }
+                }
+            }
+        }
+        return storage;
+    }
+
+    /** Sets the copy by runs beside the copy a block at a time: blocks, counts and bits. */
+    private static void checkConstruction(CubePrimer primer, @Nullable ExtendedBlockStorage filled) {
+        ExtendedBlockStorage expected = copyBlocksOneByOne(primer);
+        String parted = null;
+        if ((expected == null) != (filled == null)) {
+            parted = expected == null ? "a storage where none was due" : "no storage where one was due";
+        } else if (expected != null) {
+            IExtendedBlockStorage want = (IExtendedBlockStorage) expected;
+            IExtendedBlockStorage got = (IExtendedBlockStorage) filled;
+            if (want.getBlockRefCount() != got.getBlockRefCount() || want.getTickRefCount() != got.getTickRefCount()) {
+                parted = "counts " + got.getBlockRefCount() + "/" + got.getTickRefCount() + " against "
+                        + want.getBlockRefCount() + "/" + want.getTickRefCount();
+            } else if (!java.util.Arrays.equals(ACCESSORS.bits(expected).getBackingLongArray(),
+                    ACCESSORS.bits(filled).getBackingLongArray())) {
+                parted = "bits";
+            } else {
+                for (int i = 0; i < 4096 && parted == null; i++) {
+                    if (expected.get(i & 15, i >> 8, i >> 4 & 15) != filled.get(i & 15, i >> 8, i >> 4 & 15)) {
+                        parted = "block " + (i & 15) + " " + (i >> 8) + " " + (i >> 4 & 15);
+                    }
+                }
+            }
+        }
+        if (parted != null) {
+            checkedParted++;
+            CubicChunks.LOGGER.error("Cube construction check: the copy by runs parted from the copy a block at a time: {}", parted);
+        }
+        if (++checkedCubes % 4096 == 0) {
+            CubicChunks.LOGGER.info("Cube construction check: {} cubes, {} where the copies or a run and its blocks parted",
+                    checkedCubes, checkedParted);
+        }
     }
 
     /**

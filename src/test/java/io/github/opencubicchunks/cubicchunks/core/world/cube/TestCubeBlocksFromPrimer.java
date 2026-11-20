@@ -37,10 +37,13 @@ import net.minecraft.block.state.IBlockState;
 import net.minecraft.init.Blocks;
 import net.minecraft.init.Bootstrap;
 import net.minecraft.network.PacketBuffer;
+import net.minecraft.util.BitArray;
+import net.minecraft.world.chunk.BlockStateContainer;
 import net.minecraft.world.chunk.storage.ExtendedBlockStorage;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -81,9 +84,51 @@ public class TestCubeBlocksFromPrimer {
         return out;
     }
 
+    // Outside the game the core Mixins' accessors are not applied: the same parts, reached by their development names.
+    private static final Cube.StorageAccess REFLECTION = new Cube.StorageAccess() {
+        @Override public BitArray bits(ExtendedBlockStorage storage) {
+            return (BitArray) read(BlockStateContainer.class, "storage", storage.getData());
+        }
+
+        @Override public void addCounts(ExtendedBlockStorage storage, int blocks, int ticking) {
+            write(ExtendedBlockStorage.class, "blockRefCount", storage, count(storage, "blockRefCount") + blocks);
+            write(ExtendedBlockStorage.class, "tickRefCount", storage, count(storage, "tickRefCount") + ticking);
+        }
+    };
+
+    private static Field field(Class<?> owner, String name) {
+        try {
+            Field field = owner.getDeclaredField(name);
+            field.setAccessible(true);
+            return field;
+        } catch (NoSuchFieldException e) {
+            throw new AssertionError(e);
+        }
+    }
+
+    private static Object read(Class<?> owner, String name, Object of) {
+        try {
+            return field(owner, name).get(of);
+        } catch (IllegalAccessException e) {
+            throw new AssertionError(e);
+        }
+    }
+
+    private static void write(Class<?> owner, String name, Object of, int value) {
+        try {
+            field(owner, name).setInt(of, value);
+        } catch (IllegalAccessException e) {
+            throw new AssertionError(e);
+        }
+    }
+
+    private static int count(ExtendedBlockStorage storage, String name) {
+        return (Integer) read(ExtendedBlockStorage.class, name, storage);
+    }
+
     private static void assertCopiesAlike(CubePrimer primer) {
         ExtendedBlockStorage expected = perBlock(primer);
-        ExtendedBlockStorage actual = Cube.copyBlocks(primer, () -> new ExtendedBlockStorage(0, true));
+        ExtendedBlockStorage actual = Cube.copyBlocks(primer, () -> new ExtendedBlockStorage(0, true), REFLECTION);
         if (expected == null) {
             assertNull(actual);
             return;
@@ -96,9 +141,26 @@ public class TestCubeBlocksFromPrimer {
                 }
             }
         }
-        assertEquals(expected.isEmpty(), actual.isEmpty());
-        assertEquals(expected.needsRandomTick(), actual.needsRandomTick());
+        assertEquals("blocks counted", count(expected, "blockRefCount"), count(actual, "blockRefCount"));
+        assertEquals("randomly ticking blocks counted", count(expected, "tickRefCount"), count(actual, "tickRefCount"));
         assertArrayEquals("the palette and its numbering", bytes(expected), bytes(actual));
+    }
+
+    // Grass, leaves and farmland tick randomly; runs of them wrap from one row to the next and from layer to layer.
+    @Test public void randomlyTickingRunsAcrossRowsCopyAlike() {
+        CubePrimer primer = new CubePrimer();
+        IBlockState[] layer = {Blocks.GRASS.getDefaultState(), Blocks.LEAVES.getDefaultState(), Blocks.DIRT.getDefaultState(),
+                Blocks.FARMLAND.getDefaultState(), Blocks.STONE.getDefaultState(), Blocks.AIR.getDefaultState()};
+        int i = 0;
+        for (int y = Cube.SIZE - 1; y >= 0; y--) {
+            for (int z = 0; z < Cube.SIZE; z++) {
+                for (int x = 0; x < Cube.SIZE; x++) {
+                    // Runs 37 blocks long: none starts at a row's or a layer's start.
+                    primer.setBlockState(x, y, z, layer[i++ / 37 % layer.length]);
+                }
+            }
+        }
+        assertCopiesAlike(primer);
     }
 
     @Test public void anAirPrimerGivesNoStorage() {

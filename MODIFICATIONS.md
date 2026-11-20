@@ -528,3 +528,12 @@ air. A registry palette, which holds every state there is, is never read, and it
 On a generating cave tour 73,149 of 86,016 cubes were skipped so; with
 `-Dcubature.checkFirstLightSources=true` they are scanned anyway, and none held a block giving
 light. On that tour first light's server-thread cost fell from 45.3 to 24.7 microseconds a cube.
+
+Also on November 19, 2026, a cube built from a generator's primer writes each run of one state a run
+at a time. The run's first block goes through the storage's own `set`, so a state enters the palette,
+and the palette grows, where the per-block copy does it; the rest of the run is written as that
+state's number straight into the container's bits, and the storage's counts of blocks and of
+randomly ticking blocks are added once (accessor `IExtendedBlockStorage`). The blocks, the palette,
+the bits and both counts are the per-block copy's, as the primer copy's tests hold, counts included.
+With `-Dcubature.checkCubeConstruction=true` every cube is also copied a block at a time and the two
+are compared.
