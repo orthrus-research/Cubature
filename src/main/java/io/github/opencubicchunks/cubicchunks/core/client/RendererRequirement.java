@@ -36,8 +36,9 @@ import java.util.List;
  * renderer that takes it over draws the world, Quadrature (mod id {@code quadrature}). Without it the client stops
  * loading with a message saying so. Dedicated servers draw nothing and are not checked.
  * <p>
- * {@code -Dcubature.clientWithoutRenderer=true} skips the check, for runs that only time the server. Cubic terrain,
- * entities and block entities are then not drawn correctly, and the game's entity pass may fail in a cubic world.
+ * {@code -Dcubature.clientWithoutRenderer=true} skips the check, for runs that only time the server. The game's
+ * renderer then draws only heights 0 to 255 of a cubic world, with the entities and block entities there, as in a world
+ * that is not cubic ({@code MixinViewFrustum_VertViewDistance} keeps its grid that high).
  */
 public final class RendererRequirement extends CustomModLoadingErrorDisplayException {
 
@@ -50,7 +51,7 @@ public final class RendererRequirement extends CustomModLoadingErrorDisplayExcep
     static final String TITLE = "Cubature cannot start without Quadrature";
     static final String MESSAGE = "Cubature's client draws cubic worlds through Quadrature, which is not installed. "
             + "Install Quadrature, or start the game with -D" + SKIP_PROPERTY + "=true to go on without it: "
-            + "cubic terrain, entities and block entities are then not drawn correctly.";
+            + "only heights 0 to 255 of a cubic world are then drawn.";
 
     private RendererRequirement() {
         super(TITLE + ": " + MESSAGE, null);
@@ -62,8 +63,8 @@ public final class RendererRequirement extends CustomModLoadingErrorDisplayExcep
             return;
         }
         if (Boolean.getBoolean(SKIP_PROPERTY)) {
-            CubicChunks.LOGGER.warn("Quadrature is not installed and -D{}=true is set: cubic terrain, entities and block "
-                    + "entities are not drawn correctly.", SKIP_PROPERTY);
+            CubicChunks.LOGGER.warn("Quadrature is not installed and -D{}=true is set: only heights 0 to 255 of a cubic "
+                    + "world are drawn.", SKIP_PROPERTY);
             return;
         }
         throw new RendererRequirement();

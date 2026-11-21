@@ -669,7 +669,7 @@ client draws a cubic world through a renderer that takes over the game's chunk s
 (its terrain setup, chunk updates and entity pass) and reads this source: Quadrature, mod id
 `quadrature`. A client without it stops at loading with a message saying so.
 `-Dcubature.clientWithoutRenderer=true` skips the check, for runs that only time the server;
-cubic terrain, entities and block entities are then not drawn correctly. Dedicated servers
+the game's renderer then draws only heights 0 to 255 of a cubic world. Dedicated servers
 are not checked. The light packets (`PacketCubeLight`, `PacketCubeLightChanges`) raise their
 change through this source alone, not through the world's listeners. In worlds that are not
 cubic the game's renderer draws as before.

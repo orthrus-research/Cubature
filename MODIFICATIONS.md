@@ -247,8 +247,10 @@ and the client's requests for render updates when a cube's light arrives. A clie
 world through a renderer that takes over the game's chunk system there (its terrain setup, chunk
 updates and entity pass) and reads the cube source: Quadrature, mod id `quadrature`. A client
 without it stops at loading with a message saying so; `-Dcubature.clientWithoutRenderer=true`
-skips the check, for runs that only time the server, and cubic terrain, entities and block entities
-are then not drawn correctly. Dedicated servers are not checked. In worlds that are not cubic the
+skips the check, for runs that only time the server, and the game's renderer then draws only heights
+0 to 255 of a cubic world, with the entities and block entities there: in a cubic world the render
+grid keeps the game's own 16 render chunks, since the entity pass reads a column's 16 entity lists by
+render chunk. Dedicated servers are not checked. In worlds that are not cubic the
 game's renderer draws as before: the entity pass indexes a column's entity lists from the world's
 minimum height, the render grid and its updates follow the world's height, and the world border is
 drawn around the viewer's height.

@@ -121,8 +121,8 @@ public class CubicChunks {
     public void preInit(FMLPreInitializationEvent e) {
         LOGGER = e.getModLog();
         // The client draws cubic worlds only through a renderer that takes over the game's chunk system: without
-        // Quadrature, loading stops here unless -Dcubature.clientWithoutRenderer=true, under which cubic terrain,
-        // entities and block entities are not drawn correctly.
+        // Quadrature, loading stops here unless -Dcubature.clientWithoutRenderer=true, under which the game's renderer
+        // draws only heights 0 to 255 of a cubic world.
         SideUtils.runForClient(() -> RendererRequirement::check);
 
         FMLCommonHandler.instance().registerCrashCallable(new ICrashCallable() {

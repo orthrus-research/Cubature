@@ -29,7 +29,6 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import io.github.opencubicchunks.cubicchunks.api.util.Coords;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
-import io.github.opencubicchunks.cubicchunks.core.CubicChunksConfig;
 import mcp.MethodsReturnNonnullByDefault;
 import net.minecraft.client.renderer.RenderGlobal;
 import net.minecraft.client.renderer.ViewFrustum;
@@ -61,7 +60,10 @@ public class MixinViewFrustum_VertViewDistance {
     @Inject(method = "setCountChunksXYZ", at = @At(value = "HEAD"))
     private void onSetCountChunks(int renderDistance, CallbackInfo cbi) {
         if (((ICubicWorld) world).isCubicWorld()) {
-            this.renderDistance = CubicChunksConfig.verticalCubeLoadDistance * 2 + 1;
+            // The renderer that takes over a cubic world's chunk system sizes this grid itself. A client without one keeps
+            // the game's own height, 16 render chunks from 0 to 255: the game's entity pass reads a column's 16 entity
+            // lists by render chunk, and a taller grid would read past them.
+            this.renderDistance = 16;
         } else {
             ICubicWorld world = (ICubicWorld) this.world;
             // vanilla case: support extended height
