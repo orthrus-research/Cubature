@@ -20,7 +20,7 @@ def inputJar = new File(inputRepository, "local/cubicchunks/CubicChunks/${inputV
 if (!inputJar.exists()) { inputJar.parentFile.mkdirs(); java.nio.file.Files.copy(cubicJar.toPath(), inputJar.toPath()) }
 base { archivesName = 'cubicchunks-lab' }
 layout.buildDirectory = layout.projectDirectory.dir("build/${targetLoader}")
-java { toolchain { languageVersion = JavaLanguageVersion.of(25) }; withSourcesJar() }
+java { toolchain { languageVersion = JavaLanguageVersion.of(26) }; withSourcesJar() }
 repositories {
     maven { url = inputRepository; content { includeGroup 'local.cubicchunks' }; metadataSources { artifact() } }
     mavenCentral(); maven { url = 'https://curse.cleanroommc.com' }; maven { url = 'https://maven.cleanroommc.com' }

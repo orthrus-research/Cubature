@@ -8,16 +8,17 @@ group = 'cc.orthrus.cubature'
 def devBuild = providers.gradleProperty('cubicDevBuild').isPresent()
 version = devBuild ? "${cubic_version}-DEV" : cubic_version
 def modDisplayName = devBuild ? 'Cubature (DEV build)' : 'Cubature'
-// Cleanroom on Java 25 or 26 is the only target; the Java 8 Forge fallback was retired on 2026-10-30.
+// Cleanroom on Java 26 is the only target (one JDK across our projects since 2026-11-21); the Java 8 Forge
+// fallback was retired on 2026-10-30.
 def targetLoader = 'cleanroom'
-def testJavaVersion = providers.gradleProperty('cubicTestJava').map { it.toInteger() }.getOrElse(25)
-if (!(testJavaVersion in [25, 26])) {
-    throw new GradleException('Cleanroom tests support Java 25/26')
+def testJavaVersion = providers.gradleProperty('cubicTestJava').map { it.toInteger() }.getOrElse(26)
+if (!(testJavaVersion in [26])) {
+    throw new GradleException('Cleanroom tests run on Java 26')
 }
 base { archivesName = 'Cubature' }
 layout.buildDirectory = layout.projectDirectory.dir("build/${targetLoader}")
 java {
-    toolchain { languageVersion = JavaLanguageVersion.of(25) }
+    toolchain { languageVersion = JavaLanguageVersion.of(26) }
     withSourcesJar()
 }
 sourceSets {

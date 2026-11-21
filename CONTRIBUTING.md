@@ -19,7 +19,7 @@ This page adds what is specific to Cubature. Report Cubature problems here, not 
 
 ## Checks
 
-Build with the tests from `cleanroom/` (JDK 25; Cleanroom is the only target):
+Build with the tests from `cleanroom/` (JDK 26; Cleanroom is the only target):
 
 ```sh
 ./gradlew build
@@ -33,13 +33,13 @@ it was built from, so builds from several worktrees do not replace one another. 
 `python -B -m unittest discover -s tools -p "test_*.py"`). Changes that affect scheduling, storage, lighting or delivery also need a native
 check in the lab ([lab/README.md](lab/README.md)) or, within Riven's workspace, `riven.ps1 full`.
 
-Before a push, `python tools/ci.py [commit]` checks the commit (HEAD by default) in a worktree of
-its own, so nothing uncommitted takes part: the compile-only inputs, the build with its focused
-regressions on Java 26, the lab's build and checks, and every tool test in a virtual environment
-made from `tools/requirements.txt`. Gradle runs on the JDK 25 in `JAVA_HOME` (or `--java25`), and
-`--java26` names the JDK for the regressions when Gradle does not find one. A pass is recorded under
-the commit's tree in the main checkout's `.local/ci/passes.json`; the pre-push hook that
-`python tools/push_gate.py install` writes refuses a pushed tip whose tree has no pass.
+Before a push, the commit must pass the jobs in [actions.toml](actions.toml): the compile-only inputs,
+the build with its focused regressions on Java 26, the lab's build and checks, and every tool test in
+an environment made from `tools/requirements.txt`. Workbench runs them from a clean clone of the commit,
+so nothing uncommitted takes part: `wb run ci.run project=cubature` (HEAD by default; `commit=<sha>` for
+another). The pass is kept in Workbench's records, and the pre-push hook that
+`wb run ci.hook project=cubature` installs refuses a pushed tip whose tree has not passed. Without
+Workbench, `orthrus-tools actions run ci` runs the same jobs in a checkout.
 
 ## Commits and documentation
 

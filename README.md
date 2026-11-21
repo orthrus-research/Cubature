@@ -72,7 +72,7 @@ the column on the server thread if it must.
 
 ## Building from source
 
-The supported build is the CleanroomGradle project in `cleanroom/`, which needs JDK 25. It compiles against the official Distant Horizons 3.3.3 JAR,
+The supported build is the CleanroomGradle project in `cleanroom/`, which needs JDK 26. It compiles against the official Distant Horizons 3.3.3 JAR,
 which is never bundled. `cleanroom/build-inputs.json` pins it by URL and SHA-256; fetch it first
 (the build checks it against its hash and stops if it is missing or differs):
 
