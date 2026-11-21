@@ -1,5 +1,5 @@
 /*
- *  This file is part of Cubic Chunks Mod, licensed under the MIT License (MIT).
+ *  This file is part of Cubature, licensed under the MIT License (MIT).
  *
  *  Copyright (c) 2015-2021 OpenCubicChunks
  *  Copyright (c) 2015-2021 contributors
@@ -72,7 +72,11 @@ public class MixinViewFrustum_VertViewDistance {
     @ModifyArg(method = "updateChunkPositions", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/chunk/RenderChunk;setPosition"
             + "(III)V"), index = 1)
     private int modifyRenderChunkPosWhenUpdatingPositions(int y) {
-        // extended height support on vanilla worlds, no need to handle CC case - MixinViewFrustum_RenderHeightFix replaces this implementation
+        if (((ICubicWorld) world).isCubicWorld()) {
+            // The renderer that takes over a cubic world's chunk system places nothing through this grid.
+            return y;
+        }
+        // vanilla case: support extended height
         return y + ((ICubicWorld) world).getMinHeight();
     }
 

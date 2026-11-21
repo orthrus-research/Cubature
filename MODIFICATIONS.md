@@ -112,10 +112,6 @@ A cube generated this session is not saved while it holds no blocks, biomes, ent
 entities, capabilities or pending neighbour light checks and its generator reports it
 `regenerable` (the new optional `ICubeClassification.regenerable`, asked when saving is
 considered); reloading it generates it again. Once saved, it saves like any other cube.
-Chunk-mesh builders start their layer buffers at 512 KiB (solid), 128 KiB (cutout, cutout mipped)
-and 256 KiB (translucent) instead of vanilla's 8 MiB, 512 KiB and 1 MiB; buffers still grow on
-demand. Vanilla keeps about ten builders per processor, so this returns most of 0.8 GiB of direct
-memory on 8 processors and 1.8 GiB on 32.
 
 The lab fetcher publishes verified dependencies through short, unique temporary basenames beside
 their destinations, so cached and downloaded libraries fit legacy Windows path limits.
@@ -236,8 +232,26 @@ cubes) and for Demonica's Iris pipeline (the `bedrockLevel` and `cubicSurfaceDep
 uniforms and the opt-in `complementaryCaveFog` rewrite). On November 19, 2026 it was removed with
 the `selectable.celeritas` and `selectable.demonica` Mixin configurations, `core/compat/celeritas`,
 `core/compat/demonica`, the client option `complementaryCaveFog` and the build's Demonica input:
-Demonica is no longer a target. The vanilla terrain-path mixins now always apply, and a client
-with Celeritas or Demonica installed is not supported.
+Demonica is no longer a target, and a client with Celeritas or Demonica installed is not supported.
+
+## Chunk rendering in cubic worlds
+
+On November 21, 2026, Cubature's integration of the game's chunk renderer for cubic worlds was
+removed: the render-chunk grid placed by cube (`MixinViewFrustum_RenderHeightFix`), the visibility
+search without height limits and its reload on a changed vertical distance (the
+`selectable.vanillaterrain` Mixin configuration and `vertviewdist.MixinRenderGlobal`), the cube-backed
+render cache (`RenderCubeCache`, `MixinRenderChunk`), the render worker's build of a chunk whose cube
+had left (`MixinRenderWorker`), the smaller chunk-mesh buffers (`MixinRegionRenderCacheBuilder`), the
+entity pass's lookup of a render chunk's cube with each column's count of cubes holding entities,
+and the client's requests for render updates when a cube's light arrives. A client draws a cubic
+world through a renderer that takes over the game's chunk system there (its terrain setup, chunk
+updates and entity pass) and reads the cube source: Quadrature, mod id `quadrature`. A client
+without it stops at loading with a message saying so; `-Dcubature.clientWithoutRenderer=true`
+skips the check, for runs that only time the server, and cubic terrain, entities and block entities
+are then not drawn correctly. Dedicated servers are not checked. In worlds that are not cubic the
+game's renderer draws as before: the entity pass indexes a column's entity lists from the world's
+minimum height, the render grid and its updates follow the world's height, and the world border is
+drawn around the viewer's height.
 
 ## Biomes by height
 
@@ -352,12 +366,9 @@ so that a change of light alone can be told from a change of blocks. Each
 client cube carries the two halves beside its version. The bounds that cube
 change events carry are now a stated contract.
 
-Also on November 15, 2026, two client unload paths changed. A vanilla render
-chunk more than 24 blocks from the player whose own cube has left is now built
-(to nothing) instead of waiting for its neighbors, which had left the mesh of
-the departed cube drawn. A column unload on the client first unloads every cube
-the client still holds in it, as a cube unload would, instead of leaving those
-cubes in the client's cube map.
+Also on November 15, 2026, a column unload on the client first unloads every
+cube the client still holds in it, as a cube unload would, instead of leaving
+those cubes in the client's cube map.
 
 Also on November 15, 2026, the cube source gained `lightChecksum`, a diagnostic
 hash of a loaded cube's light (default -1), and Cubature gained two diagnostic
@@ -421,8 +432,7 @@ option `deliverOnlyChangedLight` (default off) sends only those blocks' light (a
 new client message, PacketCubeLightChanges, 3 bytes a block). The diagnostic
 light dumps gained periodic server dumps (`cubicchunks.lightChecksumEvery`),
 per-block light for listed cubes (`cubicchunks.lightDetail`) and each cube's
-pending boundary checks. A lab switch, `cubicchunks.noUnloadedMeshFix`, puts back
-the game's wait in the render worker, and `lab/tours` holds a one-off walking tour.
+pending boundary checks, and `lab/tours` holds a one-off walking tour.
 
 Also on November 16, 2026, the lab's view distances became a baseline instead of a fixed
 value: instances are prepared at 12, a run may raise the server's view distances (up to 32)
@@ -459,9 +469,7 @@ preview, separate from the sampling pool's threads and permits.
 Also on November 16, 2026, the governor of the client pools does nothing while
 no world is attached, and drops what the pools flagged meanwhile; and a second
 after each client pool's stop line the log counts the pool's threads still
-alive. The lab's cube source check counts a departed cube's mesh as still drawn
-only once the game has had its chance to rebuild the chunk, and the stale-mesh
-tour ends looking back over the edge the cubes left from.
+alive. The stale-mesh tour ends looking back over the edge the cubes left from.
 
 Also on November 16, 2026, a client pool whose threads are not all gone a second
 after its stop is counted again at 2, 5 and 10 seconds, so a thread that ends
@@ -551,12 +559,3 @@ block at a time into a copy of the map taken before, and the two maps' saved byt
 cave tour none parted. On that tour, on fresh instances with the same client, surface tracking's
 server-thread cost was 41.8 microseconds a cube against 50.3 before it; the other install phases
 were the same within a few percent.
-
-Also on November 19, 2026, each column counts how many of its loaded cubes hold an entity: a cube's
-entity container tells its column as it goes from holding none to holding one and back, and a cube
-joining or leaving the column brings or takes its share. The entity pass then answers a render chunk
-in a column whose count is nothing with the empty list at once, without looking its cube up. With
-`-Dcubature.checkEntityCubes=true` the cube is looked up anyway at such columns and any cube found
-holding entities is logged. On the forest tour with nine iron golems summoned into view, 178,691,157 of
-179,000,000 requests were answered without a lookup, and the check found no cube holding entities in a
-column counted as holding none.

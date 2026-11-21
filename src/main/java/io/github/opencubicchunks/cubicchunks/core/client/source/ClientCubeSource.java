@@ -1,5 +1,5 @@
 /*
- *  This file is part of Cubic Chunks Mod, licensed under the MIT License (MIT).
+ *  This file is part of Cubature, licensed under the MIT License (MIT).
  *
  *  Copyright (c) 2026 Orthrus Research
  *
@@ -162,34 +162,24 @@ public final class ClientCubeSource implements ICubeSource, IWorldEventListener 
 
     /**
      * The server replaced a cube's light (PacketCubeLight): the cube's light changed and nothing else,
-     * so only the vanilla renderer is told to rebuild, not every world listener.
+     * so only the cube source's listeners are told, not the world's listeners.
      */
     public void lightReplaced(Cube cube) {
         if (cube.getWorld() != world) {
             return;
         }
         changed(cube, ICubeSourceListener.LIGHT, 0, 0, 0, 15, 15, 15);
-        int x = cube.getX() << 4;
-        int y = cube.getY() << 4;
-        int z = cube.getZ() << 4;
-        // One block wider: neighbors' faces against this cube take light from it.
-        Minecraft.getMinecraft().renderGlobal.markBlockRangeForRenderUpdate(x - 1, y - 1, z - 1, x + 16, y + 16, z + 16);
     }
 
     /**
      * The server sent the light of some blocks of a cube (PacketCubeLightChanges); the bounds are local,
-     * 0 to 15, inclusive. Only the vanilla renderer is told to rebuild, not every world listener.
+     * 0 to 15, inclusive. Only the cube source's listeners are told, not the world's listeners.
      */
     public void lightChanged(Cube cube, int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {
         if (cube.getWorld() != world) {
             return;
         }
         changed(cube, ICubeSourceListener.LIGHT, minX, minY, minZ, maxX, maxY, maxZ);
-        int x = cube.getX() << 4;
-        int y = cube.getY() << 4;
-        int z = cube.getZ() << 4;
-        Minecraft.getMinecraft().renderGlobal.markBlockRangeForRenderUpdate(x + minX - 1, y + minY - 1, z + minZ - 1,
-                x + maxX + 1, y + maxY + 1, z + maxZ + 1);
     }
 
     /** The server corrected a column's height index, which the surface search starts from. */

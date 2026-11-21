@@ -5,6 +5,11 @@ dedicated server and client on Cubature, drives fixed workloads (generation, sav
 storage, full-view delivery) and records tick, frame and delivery timings, optionally with JFR.
 The lab is a development tool: it is never installed with Cubature or shipped in a pack.
 
+The full-view render-ready gate, the delivery trace's render events and the render diagnostics
+read the game's render chunks, which no longer run in cubic worlds under Quadrature, the renderer
+a Cubature client needs there. A client without Quadrature starts only with
+`-Dcubature.clientWithoutRenderer=true`, and then does not draw cubic worlds correctly.
+
 ## Building
 
 Build Cubature first (`../cleanroom`), then the lab against that artifact, from this directory:
@@ -112,37 +117,12 @@ question each and not part of any suite.
 `tours/stale-mesh-walk-2485331.json` walks the player 540 blocks east in steps of 9 blocks, 5
 seconds at each, then steps back west twice, facing west over the edge the cubes left from (the tour client captures a view only after the player has moved more than 8
 blocks and held still 100 ticks), so cubes leave at the trailing edge one column at a time
-instead of all at once as a long teleport makes them. It looks for the case in which the
-game's renderer kept drawing a cube that had left: a render chunk still in the client's grid
-whose cube the server unloaded, its outer neighbor already gone. Prepare the instance with
-`--seed 2485331 --no-distant-horizons --capture-ticks 100` and play the tour with
-`-Dcubicchunks.cubeSourceCheck=true`; 40 ticks after each removal the check looks at the cube's
-render chunk and counts the departed cubes still drawn. The game rebuilds a render chunk marked
-for an update only once it is in view, so a chunk still marked when checked has not had its
-chance yet: it is checked again every 40 ticks, counted as having waited on a rebuild, and
-counted as still drawn only once it is no longer marked and its mesh is not empty. The look
-back brings the departed edge into view, so its chunks are rebuilt or found stale. `-Dcubicchunks.noUnloadedMeshFix=true`
-puts back the game's wait, to compare.
+instead of all at once as a long teleport makes them. It asks for a client render distance of
+20 against the server's 12, so that the cubes 13 to 20 cubes away leave the server while still
+inside the client's render distance. Prepare the instance with
+`--seed 2485331 --no-distant-horizons --capture-ticks 100`.
 
 A tour file is a list of views, or an object with `views` and the view distances the tour
 asks for: `{"viewDistance": {"horizontal": 12, "vertical": 12, "clientRender": 20}, "views":
 [...]}`, any of the three left out staying at the baseline. Options given to `play` win over the
 tour's.
-
-Measured 2026-11-16, with the fix and without, at the baseline distances: 61 views, 36,875
-arrivals and 21,250 departures, every departed cube already outside the render grid, so
-neither run reached the case. At equal view distances it cannot arise: the grid spans the
-client's render distance around the player's chunk and the server's box its view distance
-around the player's cube. The tour therefore asks for a client render distance of 20 against
-the server's 12, so the cubes 13 to 20 cubes away leave the server while still in the grid.
-
-Measured 2026-11-16 at client render 20 against server 12, before the look back and before
-the check waited on rebuilds: 61 views each, 21,250 departures, all inside the grid, and 3,840
-still drawn with the fix and without, the same cubes. The walk faced east, away from the
-departed edge, so none of those chunks had been in view to be rebuilt.
-
-Measured again 2026-11-16 with the look back and the check waiting on rebuilds, same
-distances, 63 views each: 21,875 departures, 125 back, 16,250 outside the grid by the time
-they were checked, and 4,400 checked after the game had had its chance to rebuild them (all
-21,875 waited on a rebuild first, none still waiting at the end). Without the fix 1,916 of
-those 4,400 were still drawn; with it, none.

@@ -38,11 +38,6 @@ public interface IColumnInternal extends IColumn {
 
     void addToStagingHeightmap(ICube cube);
 
-    /** How many of the column's loaded cubes hold an entity, or -1 where it is not counted. */
-    default int entityCubes() {
-        return -1;
-    }
-
     /**
      * Returns Y coordinate of the top non-transparent block
      *

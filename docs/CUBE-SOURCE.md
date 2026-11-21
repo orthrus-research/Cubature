@@ -193,12 +193,10 @@ Events are delivered once per client tick, at its end.
    client tick in which the unload was applied, and by then the cube is gone: `isLoaded`
    is false and a snapshot reads it as absent. There is no retiring state between the two.
    A column that leaves takes every cube still held in it, each with its own
-   `cubeUnloaded`. The game's own renderer clears its mesh of the cube within its usual
-   rebuild latency, at any distance from the player. A renderer of its own needs no
-   retiring state either: it owns its meshes, drops the cube's on `cubeUnloaded`, and no
-   later event or read brings the cube back unless it arrives again (`cubeLoaded`). One
-   that wants to keep drawing a departing cube for a while, to fade it out, keeps that
-   mesh on its own side.
+   `cubeUnloaded`. A renderer needs no retiring state either: it owns its meshes, drops
+   the cube's on `cubeUnloaded`, and no later event or read brings the cube back unless it
+   arrives again (`cubeLoaded`). One that wants to keep drawing a departing cube for a
+   while, to fade it out, keeps that mesh on its own side.
 
 ## 4. Queries
 
@@ -664,8 +662,17 @@ It costs one cube look-up. The default answers `NOT_LOADED`.
 
 ## 9. What changes in Cubature
 
-Adding the source is additive. The vanilla and Distant Horizons integrations are unaffected
-by it.
+Adding the source is additive: the Distant Horizons integration is unaffected by it.
+
+Cubature has no integration of its own with the game's chunk renderer in cubic worlds. A
+client draws a cubic world through a renderer that takes over the game's chunk system there
+(its terrain setup, chunk updates and entity pass) and reads this source: Quadrature, mod id
+`quadrature`. A client without it stops at loading with a message saying so.
+`-Dcubature.clientWithoutRenderer=true` skips the check, for runs that only time the server;
+cubic terrain, entities and block entities are then not drawn correctly. Dedicated servers
+are not checked. The light packets (`PacketCubeLight`, `PacketCubeLightChanges`) raise their
+change through this source alone, not through the world's listeners. In worlds that are not
+cubic the game's renderer draws as before.
 
 ## Verification
 
@@ -683,9 +690,8 @@ cubes were loaded and 15 differing beside a cube that was not (guarantee 5 of se
 blocks by hand, so the small block-change packet route is exercised only by what the
 server does on its own.
 
-The same switch also follows each removal: five ticks after a cube leaves, the vanilla
-render chunk at its position, if the render grid still covers it, must hold no mesh, and
-every report counts the cubes the client still holds in a column it no longer has.
+Every report of the same switch also counts the cubes the client still holds in a column it
+no longer has.
 
 **Light checksums.** `-Dcubicchunks.lightChecksumDump=<directory>` has each side write a
 line per cube it holds (position, light checksum, block checksum, whether it has storage

@@ -1,5 +1,5 @@
 /*
- *  This file is part of Cubic Chunks Mod, licensed under the MIT License (MIT).
+ *  This file is part of Cubature, licensed under the MIT License (MIT).
  *
  *  Copyright (c) 2015-2021 OpenCubicChunks
  *  Copyright (c) 2015-2021 contributors
@@ -32,6 +32,7 @@ import io.github.opencubicchunks.cubicchunks.api.worldgen.VanillaCompatibilityGe
 import io.github.opencubicchunks.cubicchunks.core.asm.mixin.ICubicWorldSettings;
 import io.github.opencubicchunks.cubicchunks.core.asm.mixin.core.common.IIntegratedServer;
 import io.github.opencubicchunks.cubicchunks.core.client.ClientEventHandler;
+import io.github.opencubicchunks.cubicchunks.core.client.RendererRequirement;
 import io.github.opencubicchunks.cubicchunks.core.network.PacketDispatcher;
 import io.github.opencubicchunks.cubicchunks.core.server.TickDiagnostics;
 import io.github.opencubicchunks.cubicchunks.core.server.delivery.ServerDeliveryMode;
@@ -119,6 +120,10 @@ public class CubicChunks {
     @EventHandler
     public void preInit(FMLPreInitializationEvent e) {
         LOGGER = e.getModLog();
+        // The client draws cubic worlds only through a renderer that takes over the game's chunk system: without
+        // Quadrature, loading stops here unless -Dcubature.clientWithoutRenderer=true, under which cubic terrain,
+        // entities and block entities are not drawn correctly.
+        SideUtils.runForClient(() -> RendererRequirement::check);
 
         FMLCommonHandler.instance().registerCrashCallable(new ICrashCallable() {
             @Override public String getLabel() {

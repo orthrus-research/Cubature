@@ -41,7 +41,9 @@ The fork began at upstream commit `53847757c7998f3541fccc8c9b5d23dd23e4077d`.
 Cubature replaces CubicChunks: install one or the other, never both. It keeps the `cubicchunks`
 and `cubicchunkscore` mod IDs, the `io.github.opencubicchunks` packages, command and config
 identifiers, and the CubicChunks save format, so addons built for CubicChunks find what they
-expect. The tested runtime is official Cleanroom (the version Riven pins) on Java 26; Riven's
+expect. A client draws cubic worlds through Quadrature, which takes over the game's chunk system
+there; a client without it stops at loading. The tested runtime is official Cleanroom (the version
+Riven pins) on Java 26; Riven's
 [runtime profile](https://github.com/orthrus-research/Riven/blob/main/docs/RUNTIME.md) lists the
 exact files.
 

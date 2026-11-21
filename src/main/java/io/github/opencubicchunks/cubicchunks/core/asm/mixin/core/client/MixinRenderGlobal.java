@@ -27,150 +27,45 @@ package io.github.opencubicchunks.cubicchunks.core.asm.mixin.core.client;
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
-import io.github.opencubicchunks.cubicchunks.core.CubicChunks;
-import io.github.opencubicchunks.cubicchunks.core.world.EntityContainer;
-import io.github.opencubicchunks.cubicchunks.core.world.IColumnInternal;
-import io.github.opencubicchunks.cubicchunks.core.world.cube.Cube;
-import io.github.opencubicchunks.cubicchunks.core.world.cube.BlankCube;
-import io.github.opencubicchunks.cubicchunks.api.world.ICube;
-import io.github.opencubicchunks.cubicchunks.api.util.Coords;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
-import io.github.opencubicchunks.cubicchunks.api.world.IColumn;
 import mcp.MethodsReturnNonnullByDefault;
 import net.minecraft.client.multiplayer.WorldClient;
 import net.minecraft.client.renderer.RenderGlobal;
-import net.minecraft.client.renderer.ViewFrustum;
-import net.minecraft.client.renderer.chunk.RenderChunk;
-import net.minecraft.client.renderer.culling.ICamera;
 import net.minecraft.entity.Entity;
-import net.minecraft.util.ClassInheritanceMultiMap;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.chunk.Chunk;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
-import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Coerce;
-import org.spongepowered.asm.mixin.injection.Group;
-import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Slice;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import org.spongepowered.asm.mixin.injection.callback.LocalCapture;
 
-import java.util.Iterator;
-import java.util.List;
-
-import javax.annotation.Nullable;
 import javax.annotation.ParametersAreNonnullByDefault;
 
 /**
- * Fixes renderEntities crashing when rendering cubes
- * that are not at existing array index in chunk.getEntityLists(),
+ * Height limits in the game's renderer: the entity pass indexes a column's entity lists from the world's minimum
+ * height, and the world border is drawn around the viewer's height rather than over 0 to 256.
  * <p>
- * Allows to render cubes outside of 0..256 height range.
+ * In a cubic world the game's chunk system, its entity pass included, is taken over by the renderer that draws the
+ * world, so the entity pass here is left as the game has it.
  */
 @MethodsReturnNonnullByDefault
 @ParametersAreNonnullByDefault
 @Mixin(RenderGlobal.class)
 public class MixinRenderGlobal {
 
-    @Nullable private BlockPos position;
-
-
-
     @Shadow private WorldClient world;
 
     /*
-     * This allows to get the Y position of rendered entity by injecting itself directly before call to
-     * chunk.getEntityLists
+     * The entity pass picks a column's entity list by renderChunk.getPosition().getY() / 16. In a world that is not
+     * cubic, minHeight is zero unless the height is extended; it is subtracted so that the index starts at the bottom.
      */
-    @Group(name = "renderEntitiesFix", min = 3, max = 3)
-    @Inject(method = "renderEntities",
-            at = @At(value = "INVOKE",
-                    target = "Lnet/minecraft/client/multiplayer/WorldClient;getChunk(Lnet/minecraft/util/math/BlockPos;)Lnet/minecraft/world/chunk/Chunk;"),
-            locals = LocalCapture.CAPTURE_FAILSOFT)
-    private void onGetPosition(Entity renderViewEntity, ICamera camera, float partialTicks,
-            CallbackInfo ci, int pass, double d0, double d1, double d2,
-            Entity entity, double d3, double d4, double d5,
-            List<Entity> list, List<Entity> list1, List<Entity> list2,
-            BlockPos.PooledMutableBlockPos pos, Iterator<?> var21,
-            /*RenderGlobal.ContainerLocalRenderInformation*/ @Coerce Object info) {
-        RenderChunk renderChunk = ((IContainerLocalRenderInformation) info).getRenderChunk();
-        ICubicWorld world = (ICubicWorld) renderChunk.getWorld();
-        if (world.isCubicWorld()) {
-            this.position = renderChunk.getPosition();
-        } else {
-            this.position = null;
-        }
-    }
-
-    /*
-     * After chunk.getEntityLists() renderGlobal needs to get correct element of the array.
-     * The array element number is calculated using renderChunk.getPosition().getY() / 16.
-     * getY() is redirected to this method to always return 0.
-     * <p>
-     * Then chunk.getEntityLists is redirected to a method that returns a 1-element array.
-     */
-    @Group(name = "renderEntitiesFix")
-    @WrapOperation(method = "renderEntities", at = @At(value = "INVOKE", target = "Lnet/minecraft/util/math/BlockPos;getY()I"), require = 1)
+    @WrapOperation(method = "renderEntities", at = @At(value = "INVOKE", target = "Lnet/minecraft/util/math/BlockPos;getY()I"),
+            require = 1, allow = 1)
     private int getRenderChunkYPos(BlockPos pos, Operation<Integer> original) {
-        //position is null when it's not cubic chunks renderer
-        if (this.position != null) {
-            return 0;//must be 0 (or anything between 0 and 15)
+        if (((ICubicWorld) world).isCubicWorld()) {
+            return original.call(pos);
         }
-        // vanilla case: minHeight is zero normally, subtracting minHeight for extended height support
         return original.call(pos) - ((ICubicWorld) world).getMinHeight();
     }
-
-    /*
-     * Return a 1-element array for Cubic Chunks world,
-     * or original chunk.getEntityLists if not cubic chunks world.
-     */
-    @SuppressWarnings("unchecked")
-    @Group(name = "renderEntitiesFix")
-    @WrapOperation(method = "renderEntities",
-            at = @At(value = "INVOKE", target = "Lnet/minecraft/world/chunk/Chunk;getEntityLists()[Lnet/minecraft/util/ClassInheritanceMultiMap;"),
-            require = 1)
-    private ClassInheritanceMultiMap<Entity>[] getEntityList(Chunk chunk, Operation<ClassInheritanceMultiMap<Entity>[]> original) {
-        if (position == null) {
-            return original.call(chunk); //TODO: is this right?
-        }
-
-        // A column none of whose cubes holds an entity has nothing to draw: no cube is looked up.
-        int entityCubes = ((IColumnInternal) chunk).entityCubes();
-        if (++cubicChunks$entityLists % 1_000_000 == 0) {
-            CubicChunks.LOGGER.info("Entity pass: {} render chunks asked for their entities, {} answered without a cube lookup",
-                    cubicChunks$entityLists, cubicChunks$entityListsSkipped);
-        }
-        if (entityCubes == 0) {
-            cubicChunks$entityListsSkipped++;
-            if (!CHECK_ENTITY_CUBES) {
-                return EntityContainer.EMPTY_ARR;
-            }
-        }
-        ICube cube = ((IColumn) chunk).getCube(Coords.blockToCube(position.getY()));
-        if (cube instanceof BlankCube) {
-            return EntityContainer.EMPTY_ARR;
-        }
-        if (entityCubes == 0) {
-            if (!cube.getEntitySet().isEmpty() && cubicChunks$entityCubesParted++ < 20) {
-                CubicChunks.LOGGER.error("Entity cubes check: cube {} holds {} entities in a column counted as holding none",
-                        ((Cube) cube).getCoords(), cube.getEntitySet().size());
-            }
-            return EntityContainer.EMPTY_ARR;
-        }
-
-        return new ClassInheritanceMultiMap[]{cube.getEntitySet()};
-    }
-
-    /**
-     * {@code -Dcubature.checkEntityCubes=true}: a column counted as holding no entity has its cube looked up anyway, and a
-     * cube found holding entities is logged (the first 20).
-     */
-    @Unique private static final boolean CHECK_ENTITY_CUBES = Boolean.getBoolean("cubature.checkEntityCubes");
-    @Unique private static int cubicChunks$entityCubesParted;
-    @Unique private static long cubicChunks$entityLists;
-    @Unique private static long cubicChunks$entityListsSkipped;
 
     @ModifyExpressionValue(
             method = "renderWorldBorder",

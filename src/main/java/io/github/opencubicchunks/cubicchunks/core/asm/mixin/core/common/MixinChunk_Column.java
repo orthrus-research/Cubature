@@ -30,7 +30,6 @@ import io.github.opencubicchunks.cubicchunks.api.world.IHeightMap;
 import io.github.opencubicchunks.cubicchunks.core.asm.mixin.ICubicWorldInternal;
 import io.github.opencubicchunks.cubicchunks.core.world.IColumnInternal;
 import io.github.opencubicchunks.cubicchunks.core.world.StagingHeightMap;
-import io.github.opencubicchunks.cubicchunks.core.world.EntityContainer;
 import io.github.opencubicchunks.cubicchunks.core.world.column.CubeMap;
 import io.github.opencubicchunks.cubicchunks.core.world.cube.Cube;
 import mcp.MethodsReturnNonnullByDefault;
@@ -100,17 +99,8 @@ public abstract class MixinChunk_Column {
     }
 
 
-    /** How many of the column's cubes hold an entity: each cube's container tells the column as it fills and empties. */
-    @Unique private int cubicChunks$entityCubes;
-
     public void chunk$addCube(ICube cube) {
-        Cube added = (Cube) cube;
-        this.cubeMap.put(added);
-        EntityContainer entities = added.getEntityContainer();
-        entities.setOccupancy(this::cubicChunks$occupancyChanged);
-        if (entities.size() > 0) {
-            cubicChunks$entityCubes++;
-        }
+        this.cubeMap.put((Cube) cube);
     }
 
 
@@ -118,24 +108,7 @@ public abstract class MixinChunk_Column {
         if (cachedCube != null && cachedCube.getY() == cubeY) {
             cubicChunks$invalidateCachedCube();
         }
-        Cube removed = this.cubeMap.remove(cubeY);
-        if (removed != null) {
-            EntityContainer entities = removed.getEntityContainer();
-            entities.setOccupancy(null);
-            if (entities.size() > 0) {
-                cubicChunks$entityCubes--;
-            }
-        }
-        return removed;
-    }
-
-    @Unique
-    private void cubicChunks$occupancyChanged(int change) {
-        cubicChunks$entityCubes += change;
-    }
-
-    public int chunk_internal$entityCubes() {
-        return cubicChunks$entityCubes;
+        return this.cubeMap.remove(cubeY);
     }
 
     public void chunk_internal$removeFromStagingHeightmap(ICube cube) {

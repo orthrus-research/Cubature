@@ -16,7 +16,6 @@ public final class CubicChunksMixinConnector implements IMixinConnector {
     @Override
     public void connect() {
         ConditionalMixin.of("cubicchunks.mixins.core.json", "cubicchunks.mixins.fixes.json",
-                "cubicchunks.mixins.selectable.json", "cubicchunks.mixins.selectable.vanillaterrain.json",
-                "cubicchunks.mixins.noncritical.json").register();
+                "cubicchunks.mixins.selectable.json", "cubicchunks.mixins.noncritical.json").register();
     }
 }

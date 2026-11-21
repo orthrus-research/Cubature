@@ -1,5 +1,5 @@
 /*
- *  This file is part of Cubic Chunks Mod, licensed under the MIT License (MIT).
+ *  This file is part of Cubature, licensed under the MIT License (MIT).
  *
  *  Copyright (c) 2026 Orthrus Research
  *
@@ -46,11 +46,6 @@ public final class CubeSourceCheck implements ICubeSourceListener {
 
     private static final int DELAY_TICKS = 40;
     private static final int PER_TICK = 64;
-    /**
-     * Ticks after an unload by which its render chunk has been rebuilt: two seconds, well past the
-     * game's rebuild latency, so a mesh still drawn then is one that was never going to go.
-     */
-    private static final int MESH_DELAY_TICKS = 40;
     private static final int REPORT_TICKS = 200;
 
     private static final class Held {
@@ -63,30 +58,8 @@ public final class CubeSourceCheck implements ICubeSourceListener {
         }
     }
 
-    private static final class Departed {
-        final int x;
-        final int y;
-        final int z;
-        final long dueTick;
-        /** Seen before with its render chunk still waiting on a rebuild. */
-        final boolean awaiting;
-
-        Departed(int x, int y, int z, long dueTick) {
-            this(x, y, z, dueTick, false);
-        }
-
-        Departed(int x, int y, int z, long dueTick, boolean awaiting) {
-            this.x = x;
-            this.y = y;
-            this.z = z;
-            this.dueTick = dueTick;
-            this.awaiting = awaiting;
-        }
-    }
-
     private final ClientCubeSource source = ClientCubeSource.INSTANCE;
     private final ArrayDeque<Held> held = new ArrayDeque<>();
-    private final ArrayDeque<Departed> departed = new ArrayDeque<>();
     private long tick;
     private long loaded;
     private long unloaded;
@@ -100,14 +73,6 @@ public final class CubeSourceCheck implements ICubeSourceListener {
     private long absentNeighbor;
     private long goneBeforeDelivery;
     private long worlds;
-    private long departedChecked;
-    private long departedReturned;
-    private long departedOutsideGrid;
-    private long staleMeshes;
-    /** Departed cubes whose render chunk was still marked for a rebuild when checked, and checked again later. */
-    private long departedAwaitingRebuild;
-    /** Of those, checked again now: still in the queue. */
-    private long departedAwaitingNow;
     private long orphans;
     /** The tick the current held box was stated, and whether it has settled since. */
     private long boxTick = -1;
@@ -138,8 +103,6 @@ public final class CubeSourceCheck implements ICubeSourceListener {
     public void worldAttached(long worldIdentity) {
         worlds++;
         held.clear();
-        departed.clear();
-        departedAwaitingNow = 0;
         source.forEachLoaded(this::take);
         CubicChunks.LOGGER.info("Cube source check: world {} attached, {} cubes already loaded, heights {} to {}",
                 worldIdentity, held.size(), source.minCubeY(), source.maxCubeY());
@@ -148,8 +111,6 @@ public final class CubeSourceCheck implements ICubeSourceListener {
     @Override
     public void worldDetached(long worldIdentity) {
         held.clear();
-        departed.clear();
-        departedAwaitingNow = 0;
         report("world " + worldIdentity + " detached");
     }
 
@@ -196,53 +157,6 @@ public final class CubeSourceCheck implements ICubeSourceListener {
     @Override
     public void cubeUnloaded(int cubeX, int cubeY, int cubeZ) {
         unloaded++;
-        departed.add(new Departed(cubeX, cubeY, cubeZ, tick + MESH_DELAY_TICKS));
-    }
-
-    /**
-     * Whether the vanilla renderer still draws a mesh for a cube that left: its render chunk, if the
-     * grid still covers the cube, compiled something. Only the vanilla terrain path is read.
-     */
-    private void checkDeparted(Departed cube) {
-        if (cube.awaiting) {
-            departedAwaitingNow--;
-        }
-        if (source.isLoaded(cube.x, cube.y, cube.z)) {
-            departedReturned++;
-            return;
-        }
-        net.minecraft.client.renderer.RenderGlobal renderer = Minecraft.getMinecraft().renderGlobal;
-        net.minecraft.client.renderer.ViewFrustum frustum = renderer == null ? null
-                : ((io.github.opencubicchunks.cubicchunks.core.asm.mixin.core.client.IRenderGlobal) renderer)
-                        .getViewFrustum();
-        if (frustum == null) {
-            return;
-        }
-        BlockPos origin = new BlockPos(cube.x << 4, cube.y << 4, cube.z << 4);
-        net.minecraft.client.renderer.chunk.RenderChunk chunk =
-                ((io.github.opencubicchunks.cubicchunks.core.asm.mixin.core.client.IViewFrustum) frustum)
-                        .getRenderChunkAt(origin);
-        if (chunk == null || !chunk.getPosition().equals(origin)) {
-            departedOutsideGrid++;
-            return;
-        }
-        if (chunk.needsUpdate()) {
-            // The game has not yet tried to rebuild it: it does so once the chunk is in view. Only a
-            // mesh the game had its chance to clear and did not is counted, so this one waits.
-            if (!cube.awaiting) {
-                departedAwaitingRebuild++;
-            }
-            departedAwaitingNow++;
-            departed.add(new Departed(cube.x, cube.y, cube.z, tick + MESH_DELAY_TICKS, true));
-            return;
-        }
-        departedChecked++;
-        if (!chunk.getCompiledChunk().isEmpty()) {
-            if (staleMeshes++ < 10) {
-                CubicChunks.LOGGER.error("Cube source check: cube {} {} {} left {} ticks ago and its mesh is still drawn",
-                        cube.x, cube.y, cube.z, MESH_DELAY_TICKS);
-            }
-        }
     }
 
     /** Cubes the client still holds in a column it no longer has. */
@@ -444,9 +358,6 @@ public final class CubeSourceCheck implements ICubeSourceListener {
                 cube.sourceCopy = null;
             }
         }
-        for (int i = 0; i < PER_TICK && !departed.isEmpty() && departed.peek().dueTick <= tick; i++) {
-            checkDeparted(departed.poll());
-        }
         followSettled();
         followBuilds();
         if (tick % REPORT_TICKS == 0 && worlds > 0) {
@@ -458,13 +369,13 @@ public final class CubeSourceCheck implements ICubeSourceListener {
     private void report(String when) {
         CubicChunks.LOGGER.info("Cube source check, {}: events loaded {} unloaded {} changed {} (neighbor only {}); "
                         + "snapshots {}, differing from the game's render cache {}, differing only beside an absent cube {}, gone before delivery {}; rechecked {} unchanged cubes, {} changed with no "
-                        + "event; {} superseded, {} waiting; departed cubes {} back, {} outside the render grid, {} waited on a rebuild ({} still waiting), {} checked, {} still drawn; {} cubes held without their column; "
+                        + "event; {} superseded, {} waiting; {} cubes held without their column; "
                         + "held boxes {}, sent {} (mean {} ticks), settled {} (mean {}, longest {} ticks); "
                         + "builds submitted {}, replaced {}, done {} (mean {} ticks, longest {}), failed {}, done with a moved "
                         + "version {}, most queued {}, most holding a snapshot {}, most finished awaiting poll {}",
                 when, loaded, unloaded, changed, neighborOnly, snapshots,
                 accessMismatches, absentNeighbor, goneBeforeDelivery, verified, stale, superseded, held.size(),
-                departedReturned, departedOutsideGrid, departedAwaitingRebuild, departedAwaitingNow, departedChecked, staleMeshes, orphans, boxes, boxesSent,
+                orphans, boxes, boxesSent,
                 boxesSent == 0 ? 0 : sentTicks / boxesSent, boxesSettled,
                 boxesSettled == 0 ? 0 : settledTicks / boxesSettled, maxSettledTicks, buildsSubmitted, buildsReplaced,
                 buildsDone, buildsDone == 0 ? 0 : buildLatencyTicks / buildsDone, buildMaxLatencyTicks, buildsFailed,
