@@ -17,8 +17,9 @@ if (!(testJavaVersion in [26])) {
 }
 base { archivesName = 'Cubature' }
 layout.buildDirectory = layout.projectDirectory.dir("build/${targetLoader}")
+def targetJava = 26  // the release Cubature's classes are compiled for; verifyReobfJar checks it
 java {
-    toolchain { languageVersion = JavaLanguageVersion.of(26) }
+    toolchain { languageVersion = JavaLanguageVersion.of(targetJava) }
     withSourcesJar()
 }
 sourceSets {
@@ -191,7 +192,7 @@ tasks.register('verifyReobfJar') {
             def ownClasses = entries.findAll {
                 it.name.startsWith('io/github/opencubicchunks/') && it.name.endsWith('.class')
             }
-            def expectedMajor = 69
+            def expectedMajor = targetJava + 44
             ownClasses.each { entry ->
                 archive.getInputStream(entry).withCloseable { raw ->
                     def data = new DataInputStream(raw)
