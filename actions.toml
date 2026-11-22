@@ -1,14 +1,10 @@
-# Cubature's checks. Workbench runs them from a clean clone on Temurin 26 (`wb run ci.run project=cubature`), and
-# its pre-push hook refuses a commit whose tree has not passed them. Without Workbench, `orthrus-tools actions run ci`
-# runs the same jobs in a checkout. Builds and focused tests only: nothing here starts the game.
+# Cubature's checks. Workbench runs them from a clean clone on Temurin 26 (`wb run ci.run project=cubature`), with
+# {python} the environment made from tools/requirements.txt, and its pre-push hook refuses a commit whose tree has
+# not passed them. Builds and focused tests only: nothing here starts the game.
 [settings]
 name = "cubature"
 workflow = "ci"
 identity_files = ["{env.JAVA_HOME}/release"]
-
-[interpreters]
-# The tool tests' environment, made from tools/requirements.txt (Workbench builds and links it).
-tools_python = [".local/ci-venv/bin/python", ".local/ci-venv/Scripts/python.exe"]
 
 [workflows]
 ci = ["inputs", "cleanroom", "lab", "tools"]
@@ -36,10 +32,10 @@ steps = [
 ]
 
 [jobs.tools]
-description = "Every Python tool test, in an environment made from tools/requirements.txt"
+description = "Every Python tool test, under {python}: the environment made from tools/requirements.txt"
 inputs = ["tools/*.py", "tools/requirements.txt"]
 steps = [
-  { name = "unittest", run = ["{tools_python}", "-B", "-m", "unittest", "discover", "-s", "tools", "-p", "test_*.py"] },
+  { name = "unittest", run = ["{python}", "-B", "-m", "unittest", "discover", "-s", "tools", "-p", "test_*.py"] },
 ]
 
 [[quick.cubature]]
