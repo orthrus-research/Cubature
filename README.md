@@ -104,7 +104,8 @@ pass.
 
 Questions and discussion: [Discord](https://discord.gg/qCVqhXtSzR). Bugs and requests for
 Cubature: this repository's issues, not upstream's. Security and private matters:
-admin@orthrus.cc. Pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
+admin@orthrus.cc. Pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md). More about
+Cubature: [orthrus.cc/projects/cubature](https://orthrus.cc/projects/cubature).
 
 ## License
 
@@ -141,3 +142,7 @@ The upstream logo is not used for Cubature.
 on Cubic Chunks, and to [NotStirred](https://github.com/NotStirred),
 [CursedFlames](https://github.com/CursedFlames), thatsalamander and DaPorkchop_ for their work on
 it.</sub>
+
+<sub>Cubature is an [Orthrus Research](https://orthrus.cc) project ·
+[All projects](https://orthrus.cc/projects) · [Texts](https://orthrus.cc/texts) ·
+[Discord](https://discord.gg/qCVqhXtSzR)</sub>
