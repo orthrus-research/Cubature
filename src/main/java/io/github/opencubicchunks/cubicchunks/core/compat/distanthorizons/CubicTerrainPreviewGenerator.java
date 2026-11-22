@@ -17,8 +17,10 @@ import io.github.opencubicchunks.cubicchunks.core.server.delivery.PreviewPool;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.IdentityHashMap;
+import java.util.Set;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicLongArray;
@@ -153,8 +155,7 @@ final class CubicTerrainPreviewGenerator implements IDhApiWorldGenerator, Previe
         @Override public void addRun(int bottom,int top,IBlockState state) {
             if (!begun || state==null || bottom!=cursor || top<=bottom || top>maxY)
                 throw new IllegalArgumentException("Preview runs must cover the allocation contiguously");
-            if ((state.getMaterial().isLiquid() && !sourceWater(state)) || state.getLightValue()!=0)
-                throw new IllegalArgumentException("Preview lighting does not support fluid or emitting state "+state);
+            state=previewState(state);
             if (count==states.length) {
                 states=Arrays.copyOf(states,count*2);bottoms=Arrays.copyOf(bottoms,count*2);tops=Arrays.copyOf(tops,count*2);
             }
@@ -197,6 +198,21 @@ final class CubicTerrainPreviewGenerator implements IDhApiWorldGenerator, Previe
             points.add(DhApiTerrainDataPoint.create((byte)0,0,sky,bottom-minY,top-minY,wrapper,biome));
         }
     }
+    private static final Set<IBlockState> UNLIT=ConcurrentHashMap.newKeySet();
+
+    /**
+     * The state a preview run is drawn and lit as. Water at any level, flowing water included, is lit as source
+     * water: the surface-only profile cannot tell a river's slope from still water at a coarse cell. Another fluid
+     * or an emitting state is drawn without its own light, which this sky-only lighting cannot spread; it is named
+     * once, and costs that run its glow rather than costing DH the whole tile.
+     */
+    static IBlockState previewState(IBlockState state) {
+        if (state.getBlock()==Blocks.WATER || state.getBlock()==Blocks.FLOWING_WATER) return Blocks.WATER.getDefaultState();
+        if ((state.getMaterial().isLiquid() || state.getLightValue()!=0) && UNLIT.add(state))
+            CubicChunks.LOGGER.warn("CC/DH distant: preview lighting draws {} without its own light", state);
+        return state;
+    }
+
     private static boolean sourceWater(IBlockState state) {
         return state.getBlock()==Blocks.WATER&&state.getValue(BlockLiquid.LEVEL)==0&&state.getLightOpacity()==3;
     }

@@ -561,3 +561,11 @@ block at a time into a copy of the map taken before, and the two maps' saved byt
 cave tour none parted. On that tour, on fresh instances with the same client, surface tracking's
 server-thread cost was 41.8 microseconds a cube against 50.3 before it; the other install phases
 were the same within a few percent.
+
+On November 22, 2026, the Distant Horizons preview generator lights water at any level, flowing
+water included, as source water, and draws another fluid or a state that gives light without its own
+light, naming each such state once in the log. Before, one such state threw and DH lost the whole
+tile. The same day the Cleanroom build began sorting the Mixin compatibility table CleanMix writes
+from a hash map, whose order followed the build machine's file listing, so a commit's JAR is the same
+built on Windows or Linux; and the JAR began carrying `version.properties`, where FML looks for the
+mod's version before it warns and falls back to `mcmod.info`.

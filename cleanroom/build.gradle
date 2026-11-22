@@ -90,6 +90,17 @@ tasks.named('compileJava', JavaCompile) {
     outputs.file(mixinMappings)
     options.compilerArgs += ['-AmergeBehaviour=merge', "-AoutTsrgFile=${mixinMappings.get().asFile.absolutePath}"]
     doFirst { mixinMappings.get().asFile.parentFile.mkdirs() }
+    // CleanMix writes its compatibility table from a HashMap filled in the order javac meets the Mixins, and that
+    // order follows the file system's listing, so the same commit packed different bytes on Windows and Linux.
+    // Sorting the keys makes the table, and with it the JAR, the same wherever it is built.
+    def compatibility = destinationDirectory.file('cleanmix_version_compatibility.json')
+    doLast {
+        def table = compatibility.get().asFile
+        if (!table.isFile()) return
+        def entries = new TreeMap(new groovy.json.JsonSlurper().parse(table, 'UTF-8'))
+        def lines = entries.collect { k, v -> '  ' + groovy.json.JsonOutput.toJson(k) + ': ' + groovy.json.JsonOutput.toJson(v) }
+        table.setText('{\n' + lines.join(',\n') + '\n}', 'UTF-8')
+    }
 }
 tasks.named('reobfJar') {
     dependsOn tasks.compileJava
@@ -108,9 +119,20 @@ tasks.register('verifyEmbeddedLibraries') {
     }
 }
 tasks.named('compileJava') { dependsOn tasks.named('verifyEmbeddedLibraries'), verifyBuildInputs }
+// FML reads a mod's version from @Mod, then from version.properties, and warns before it falls back to mcmod.info.
+// The version is the build's, so it goes in version.properties rather than in a source constant.
+def versionProperties = tasks.register('versionProperties') {
+    def out = layout.buildDirectory.dir('generated/version')
+    inputs.property('version', project.version)
+    outputs.dir(out)
+    doLast {
+        out.get().file('version.properties').asFile.setText("cubicchunks.version=${project.version}\n", 'UTF-8')
+    }
+}
 processResources {
     inputs.property('version', project.version)
     inputs.property('modDisplayName', modDisplayName)
+    from(versionProperties)
     filesMatching('mcmod.info') {
         filter { it.replace('%%VERSION%%', project.version.toString()).replace('%%NAME%%', modDisplayName) }
     }
@@ -214,6 +236,13 @@ tasks.register('verifyReobfJar') {
                     }
                 }
             }
+            def versionEntry = archive.getEntry('version.properties')
+            assert versionEntry: 'Missing version.properties: FML would warn and fall back to mcmod.info'
+            def versions = new Properties()
+            archive.getInputStream(versionEntry).withCloseable { versions.load(it) }
+            assert versions.getProperty('cubicchunks.version') == project.version.toString(): 'version.properties names another version'
+            def compatibility = json.parse(archive.getInputStream(archive.getEntry('cleanmix_version_compatibility.json'))).keySet() as List
+            assert compatibility == compatibility.toSorted(): 'CleanMix compatibility table is not in key order, so the JAR depends on the build machine'
             def refmap = json.parse(archive.getInputStream(archive.getEntry('cubicchunks.mixins.refmap.json')))
             assert refmap.mappings && refmap.mappings.size() > 50: 'Empty or incomplete Mixin refmap'
             // A valid refmap does not prove that shadow and overwrite members in the packaged classes were renamed.
