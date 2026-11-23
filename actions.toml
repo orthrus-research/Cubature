@@ -19,7 +19,7 @@ needs = ["inputs"]
 locks = ["gradle"]
 memory = 6
 # What it builds: kept by Workbench with its SHA-256 once the job passes, so consumers take these bytes.
-artifacts = ["cleanroom/build/libs/*.jar"]
+artifacts = ["cleanroom/build/*/libs/*.jar"]   # build/<loader>/libs
 steps = [
   { name = "gradle", run = ["bash", "gradlew", "-PcubicTestJava=26", "build", "--no-daemon", "--console=plain"], cwd = "cleanroom" },
 ]
@@ -29,7 +29,7 @@ description = "Build the measurement lab against this build and run its checks"
 needs = ["cleanroom"]
 locks = ["gradle"]
 memory = 6
-artifacts = ["lab/build/libs/*.jar"]  # the lab observer the launcher loads
+artifacts = ["lab/build/*/libs/*.jar"]  # the lab observer the launcher loads
 steps = [
   { name = "gradle", run = ["bash", "../cleanroom/gradlew", "build", "--no-daemon", "--console=plain"], cwd = "lab" },
 ]
