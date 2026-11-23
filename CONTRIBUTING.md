@@ -33,13 +33,14 @@ it was built from, so builds from several worktrees do not replace one another. 
 `python -B -m unittest discover -s tools -p "test_*.py"`). Changes that affect scheduling, storage, lighting or delivery also need a native
 check in the lab ([lab/README.md](lab/README.md)) or, within Riven's workspace, `riven.ps1 full`.
 
-Before a push, the commit must pass the jobs in [actions.toml](actions.toml): the compile-only inputs,
-the build with its focused regressions on Java 26, the lab's build and checks, and every tool test in
-an environment made from `tools/requirements.txt`. Workbench runs them from a clean clone of the commit,
-so nothing uncommitted takes part: `wb run ci.run project=cubature` (HEAD by default; `commit=<sha>` for
-another). The pass is kept in Workbench's records, and the pre-push hook that
-`wb run ci.hook project=cubature` installs refuses a pushed tip whose tree has not passed. Without
-Workbench, `orthrus-tools actions run ci` runs the same jobs in a checkout.
+Before a push, the commit must pass the gate's checks in [project.toml](project.toml): the compile-only
+inputs, the build with its focused regressions on Java 26, the lab's build and checks, and every tool test
+in an environment made from `tools/requirements.txt`. Workbench runs them from a clean clone of the commit,
+so nothing uncommitted takes part: `wb check` in a worktree. The pass is kept in Workbench's records, and
+the pre-push hook refuses a pushed tip whose tree has not passed. `main` is Cubature's set-named branch: it
+moves only by landing (`wb land`), which records the commit and the SHA-256 of its JARs in the Set so every
+consumer takes the same bytes; a plain push to it is refused. Without Workbench,
+`orthrus-tools actions run gate` runs the same checks in a checkout.
 
 ## Commits and documentation
 

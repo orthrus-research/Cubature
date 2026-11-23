@@ -1,50 +1,51 @@
-# Cubature's checks. Workbench runs them from a clean clone on Temurin 26 (`wb run ci.run project=cubature`), with
-# {python} the environment made from tools/requirements.txt, and its pre-push hook refuses a commit whose tree has
-# not passed them. Builds and focused tests only: nothing here starts the game.
-[settings]
+# Cubature's checks and the files its builds make. Workbench runs the checks from a clean clone on Temurin 26, with
+# {python} the environment made from tools/requirements.txt; a push needs the gate's checks passed, and Cubature's
+# set-named branch moves only by landing (wb land). Builds and focused tests only: nothing here starts the game.
+schema = 1
+gate = ["inputs", "cleanroom", "lab", "tools"]
+
+[project]
 name = "cubature"
-workflow = "ci"
-identity_files = ["{env.JAVA_HOME}/release"]
+python = ["tools/requirements.txt"]
 
-[workflows]
-ci = ["inputs", "cleanroom", "lab", "tools"]
+# What its builds make, kept by Workbench with their SHA-256 once the check passes; consumers take these bytes.
+[artifacts.mod]
+check = "cleanroom"
+file = "cleanroom/build/*/libs/Cubature-*-cleanroom.jar"
 
-[jobs.inputs]
+[artifacts.sources]
+check = "cleanroom"
+file = "cleanroom/build/*/libs/Cubature-*-sources.jar"
+
+[artifacts.lab-observer]
+check = "lab"
+file = "lab/build/*/libs/cubicchunks-lab-*-cleanroom.jar"
+
+[checks.inputs]
 description = "Fetch the compile-only build inputs (Distant Horizons 3.3.3), checked by SHA-256"
 steps = [{ name = "fetch", run = ["{python}", "-B", "tools/fetch_build_inputs.py"] }]
 
-[jobs.cleanroom]
+[checks.cleanroom]
 description = "Build Cubature and run its focused regressions on Java 26"
 needs = ["inputs"]
 locks = ["gradle"]
 memory = 6
-# What it builds: kept by Workbench with its SHA-256 once the job passes, so consumers take these bytes.
-artifacts = ["cleanroom/build/*/libs/*.jar"]   # build/<loader>/libs
 steps = [
   { name = "gradle", run = ["bash", "gradlew", "-PcubicTestJava=26", "build", "--no-daemon", "--console=plain"], cwd = "cleanroom" },
 ]
 
-[jobs.lab]
+[checks.lab]
 description = "Build the measurement lab against this build and run its checks"
 needs = ["cleanroom"]
 locks = ["gradle"]
 memory = 6
-artifacts = ["lab/build/*/libs/*.jar"]  # the lab observer the launcher loads
 steps = [
   { name = "gradle", run = ["bash", "../cleanroom/gradlew", "build", "--no-daemon", "--console=plain"], cwd = "lab" },
 ]
 
-[jobs.tools]
+[checks.tools]
 description = "Every Python tool test, under {python}: the environment made from tools/requirements.txt"
 inputs = ["tools/*.py", "tools/requirements.txt"]
 steps = [
   { name = "unittest", run = ["{python}", "-B", "-m", "unittest", "discover", "-s", "tools", "-p", "test_*.py"] },
 ]
-
-[[quick.cubature]]
-paths = ["docs/**", "*.md", "license.txt", "HEADER.txt"]
-jobs = []
-
-[[quick.cubature]]
-paths = ["tools/**"]
-jobs = ["tools"]
