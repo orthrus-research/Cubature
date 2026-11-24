@@ -117,16 +117,34 @@ the observer does no file work inside a measured tick.
 
 ## One-off tours
 
-`tours/` holds tour definitions for `wb play riven --tour <file>`, kept for a single question
-each and not part of any suite.
+`tours/` holds tour definitions, kept for a single question each and not part of any suite. Play
+one on Cubature's own launch with `wb play cubature:lab --tour lab/tours/<file>`, or on Riven's
+with `wb play riven --tour <file>`.
+
+On `cubature:lab` the observer's tour client takes the views. The launch's tour rules
+(`[launch.lab.tour]` in `project.toml`) start the client with `-Dcubiclab.tour=true`; without
+it nothing of the tour client is registered. Workbench moves the player to each view with the
+server's `tp`, and the client takes a view once the player is more than 8 blocks from the last
+view it took, has held still 120 ticks (longer than the 5 seconds Workbench pauses on each step
+of a long climb or descent) and the view has settled: the cube source reports every cube of the
+server's held box arrived and 20 quiet ticks (`ICubeSource.settled`, see
+[CUBE-SOURCE.md](../docs/CUBE-SOURCE.md#6-settled)), and the game's renderer has had no chunk
+update left for 10 frames in a row. It saves the screenshot before the hand and the HUD are
+drawn and prints `CUBICLAB_TOUR_CAPTURED` with the file, whether the view settled, how long the
+player held still, the quiet ticks and the held box. A view that has not settled after 1200
+ticks of holding still is taken anyway with `settled=false`. `-Dcubiclab.tourStillTicks`,
+`tourQuietTicks`, `tourRenderFrames` and `tourLimitTicks` (each `client:` in `--jvm`) change
+the four. The launch has no Quadrature, so the game's renderer draws only heights 0 to 255.
 
 `tours/stale-mesh-walk-2485331.json` walks the player 540 blocks east in steps of 9 blocks, 5
-seconds at each, then steps back west twice, facing west over the edge the cubes left from (the tour client captures a view only after the player has moved more than 8
-blocks and held still 100 ticks), so cubes leave at the trailing edge one column at a time
-instead of all at once as a long teleport makes them. It asks for a client render distance of
-20 against the server's 12, so that the cubes 13 to 20 cubes away leave the server while still
-inside the client's render distance. Play it with `--param seed=2485331 --jvm
-client:-Driven.captureTicks=100` (Riven's launch carries no Distant Horizons).
+seconds at each, then steps back west twice, facing west over the edge the cubes left from (a
+tour client takes a view only after the player has moved more than 8 blocks), so cubes leave at
+the trailing edge one column at a time instead of all at once as a long teleport makes them. It
+asks for a client render distance of 20 against the server's 12, so that the cubes 13 to 20
+cubes away leave the server while still inside the client's render distance. Play it with
+`--param seed=2485331` and, for 5 seconds at each view, `--jvm client:-Dcubiclab.tourStillTicks=100`
+on `cubature:lab` or `--jvm client:-Driven.captureTicks=100` on Riven's launch (which carries no
+Distant Horizons).
 
 A tour file is a list of views, or an object with `views` and the view distances the tour
 asks for: `{"viewDistance": {"horizontal": 12, "vertical": 12, "clientRender": 20}, "views":
