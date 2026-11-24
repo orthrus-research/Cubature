@@ -55,14 +55,9 @@ dependencies {
     compileOnly deobf(files(new File(buildInputs, 'DistantHorizons-3.3.3-1.12.2-forge.jar')))
     testImplementation 'junit:junit:4.13.2'
 }
-// CleanMix emits shadow member mappings separately from the injection refmap; the reobf map needs both.
-def mixinMappings = layout.buildDirectory.file('generated/mixin/mcp2srg.tsrg')
-tasks.named('compileJava', JavaCompile) {
-    dependsOn verifyBuildInputs
-    outputs.file(mixinMappings)
-    options.compilerArgs += ['-AmergeBehaviour=merge', "-AoutTsrgFile=${mixinMappings.get().asFile.absolutePath}"]
-    doFirst { mixinMappings.get().asFile.parentFile.mkdirs() }
-}
+tasks.named('compileJava', JavaCompile) { dependsOn verifyBuildInputs }
+// CleanMix's shadow member mappings, merged by the convention's compile options; the reobf map needs both.
+def mixinMappings = set.mixinMappings()
 tasks.named('reobfJar') {
     dependsOn tasks.compileJava
     map.setFrom(mixinMappings)
