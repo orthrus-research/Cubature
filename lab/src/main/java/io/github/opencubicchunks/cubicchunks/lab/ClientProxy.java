@@ -24,7 +24,10 @@ public final class ClientProxy extends CommonProxy {
     private long lodTicks;
     private String last = "Ready: /cubiclab run vertical";
     private String lastScreen;
-    public void initialize() { overlays=new LabOverlayProbe();MinecraftForge.EVENT_BUS.register(this); }
+    public void initialize() {
+        overlays=new LabOverlayProbe();MinecraftForge.EVENT_BUS.register(this);
+        if (LabTourClient.ENABLED) MinecraftForge.EVENT_BUS.register(new LabTourClient());
+    }
     public void clientMessage(String message) {
         Minecraft.getMinecraft().addScheduledTask(() -> {
             JsonObject data = new JsonParser().parse(message).getAsJsonObject();
