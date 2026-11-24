@@ -1,13 +1,16 @@
-# Cleanroom and Java 25 development
+# Cleanroom and Java development
 
-This fork targets Minecraft 1.12.2 on Cleanroom 0.7.14-alpha / JDK 25, run on Java 25 or 26,
-with the upstream CubicChunks API and source tree, including the earlier asynchronous
-completion ownership fix. The Forge 14.23.5.2860 / Java 8 fallback was retired on
-October 30, 2026, so the source may use any Java 25 API.
+This fork targets Minecraft 1.12.2 on the Cleanroom and Java the set's platform names (Cleanroom
+0.7.14-alpha and Java 26 at the time of writing), with the upstream CubicChunks API and source tree,
+including the earlier asynchronous completion ownership fix. The Forge 14.23.5.2860 / Java 8
+fallback was retired on October 30, 2026.
 
 The `cleanroom/` project uses CleanroomGradle and is the only build; upstream's ForgeGradle project
 was removed on November 10, 2026, and the Unimined build that compiled against Cleanroom 0.6.13-alpha
-on November 11, 2026. Build with a JDK 25 launcher:
+on November 11, 2026. Since November 23, 2026 it and `lab/` build from the set: their settings apply
+`set.base`, which reads `set.json` and names the CleanroomGradle version, and their builds apply
+`set.cleanroom`, which sets the Cleanroom version, packs archives reproducibly and sorts CleanMix's
+compatibility table. Build on the JDK the set names, in a Workbench worktree or with `-Pset.dir`:
 
 ```sh
 cd cleanroom

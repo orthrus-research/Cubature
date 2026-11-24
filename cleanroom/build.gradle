@@ -1,23 +1,26 @@
 plugins {
     id 'java'
     id 'com.cleanroommc.cleanroomgradle'
+    id 'set.cleanroom'
 }
+
+// The platform (Java, Cleanroom, the JDK builds) comes from the set, which set.base reads and checks the JDK
+// against; set.cleanroom sets cleanroom_version from it and sorts CleanMix's compatibility table.
 
 group = 'cc.orthrus.cubature'
 // -PcubicDevBuild labels a development build: "-DEV" in the version and JAR name, "(DEV build)" in the mod list.
 def devBuild = providers.gradleProperty('cubicDevBuild').isPresent()
 version = devBuild ? "${cubic_version}-DEV" : cubic_version
 def modDisplayName = devBuild ? 'Cubature (DEV build)' : 'Cubature'
-// Cleanroom on Java 26 is the only target (one JDK across our projects since 2026-11-21); the Java 8 Forge
-// fallback was retired on 2026-10-30.
+// Cleanroom on the set's Java is the only target; the Java 8 Forge fallback was retired on 2026-10-30.
 def targetLoader = 'cleanroom'
-def testJavaVersion = providers.gradleProperty('cubicTestJava').map { it.toInteger() }.getOrElse(26)
-if (!(testJavaVersion in [26])) {
-    throw new GradleException('Cleanroom tests run on Java 26')
+def targetJava = set.platform().java as int  // the release Cubature's classes are compiled for; verifyReobfJar checks it
+def testJavaVersion = providers.gradleProperty('cubicTestJava').map { it.toInteger() }.getOrElse(targetJava)
+if (testJavaVersion != targetJava) {
+    throw new GradleException("Cleanroom tests run on Java ${targetJava}, the set's")
 }
 base { archivesName = 'Cubature' }
 layout.buildDirectory = layout.projectDirectory.dir("build/${targetLoader}")
-def targetJava = 26  // the release Cubature's classes are compiled for; verifyReobfJar checks it
 java {
     toolchain { languageVersion = JavaLanguageVersion.of(targetJava) }
     withSourcesJar()
@@ -90,17 +93,6 @@ tasks.named('compileJava', JavaCompile) {
     outputs.file(mixinMappings)
     options.compilerArgs += ['-AmergeBehaviour=merge', "-AoutTsrgFile=${mixinMappings.get().asFile.absolutePath}"]
     doFirst { mixinMappings.get().asFile.parentFile.mkdirs() }
-    // CleanMix writes its compatibility table from a HashMap filled in the order javac meets the Mixins, and that
-    // order follows the file system's listing, so the same commit packed different bytes on Windows and Linux.
-    // Sorting the keys makes the table, and with it the JAR, the same wherever it is built.
-    def compatibility = destinationDirectory.file('cleanmix_version_compatibility.json')
-    doLast {
-        def table = compatibility.get().asFile
-        if (!table.isFile()) return
-        def entries = new TreeMap(new groovy.json.JsonSlurper().parse(table, 'UTF-8'))
-        def lines = entries.collect { k, v -> '  ' + groovy.json.JsonOutput.toJson(k) + ': ' + groovy.json.JsonOutput.toJson(v) }
-        table.setText('{\n' + lines.join(',\n') + '\n}', 'UTF-8')
-    }
 }
 tasks.named('reobfJar') {
     dependsOn tasks.compileJava

@@ -1,10 +1,11 @@
 plugins {
     id 'java'
     id 'com.cleanroommc.cleanroomgradle'
+    id 'set.cleanroom'
 }
 group = 'io.github.opencubicchunks'
 version = '0.1.0'
-// Cleanroom on Java 25 or 26 is the only target; the Java 8 Forge fallback was retired on 2026-10-30.
+// Cleanroom on the set's Java is the only target; set.cleanroom sets cleanroom_version from the set's platform.
 def targetLoader = 'cleanroom'
 def cubicProperties = new Properties()
 file('../cleanroom/gradle.properties').withInputStream { cubicProperties.load(it) }
@@ -20,7 +21,8 @@ def inputJar = new File(inputRepository, "local/cubicchunks/CubicChunks/${inputV
 if (!inputJar.exists()) { inputJar.parentFile.mkdirs(); java.nio.file.Files.copy(cubicJar.toPath(), inputJar.toPath()) }
 base { archivesName = 'cubicchunks-lab' }
 layout.buildDirectory = layout.projectDirectory.dir("build/${targetLoader}")
-java { toolchain { languageVersion = JavaLanguageVersion.of(26) }; withSourcesJar() }
+def targetJava = set.platform().java as int
+java { toolchain { languageVersion = JavaLanguageVersion.of(targetJava) }; withSourcesJar() }
 repositories {
     maven { url = inputRepository; content { includeGroup 'local.cubicchunks' }; metadataSources { artifact() } }
     mavenCentral(); maven { url = 'https://curse.cleanroommc.com' }; maven { url = 'https://maven.cleanroommc.com' }
@@ -79,6 +81,6 @@ jar {
 tasks.named('test') {
     useJUnit()
     classpath += sourceSets.main.compileClasspath
-    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(26) }
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(targetJava) }
 }
 sourceSets.test.compileClasspath += sourceSets.main.compileClasspath

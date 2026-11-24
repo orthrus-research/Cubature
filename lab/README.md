@@ -12,7 +12,8 @@ a Cubature client needs there. A client without Quadrature starts only with
 
 ## Building
 
-Build Cubature first (`../cleanroom`), then the lab against that artifact, from this directory:
+Build Cubature first (`../cleanroom`), then the lab against that artifact, from this directory. Like
+`cleanroom/`, the lab reads the set for its platform (see the [README](../README.md#building-from-source)):
 
 ```sh
 ../cleanroom/gradlew build

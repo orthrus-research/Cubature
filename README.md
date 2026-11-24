@@ -72,9 +72,15 @@ the column on the server thread if it must.
 
 ## Building from source
 
-The supported build is the CleanroomGradle project in `cleanroom/`, which needs JDK 26. It compiles against the official Distant Horizons 3.3.3 JAR,
-which is never bundled. `cleanroom/build-inputs.json` pins it by URL and SHA-256; fetch it first
-(the build checks it against its hash and stops if it is missing or differs):
+The supported build is the CleanroomGradle project in `cleanroom/`. It reads the set:
+[orthrus-set](https://github.com/orthrus-research/orthrus-set)'s `set.json` names the platform (the JDK,
+Cleanroom, CleanroomGradle and Gradle); run Gradle on the JDK it names (Temurin 26.0.2.1+1). In a Workbench
+worktree the folder's `.set` says which revision and `./gradlew build` just works; in a plain clone, clone the Set
+and pass `-Pset.dir=<clone of the Set>`.
+
+The build compiles against the official Distant Horizons 3.3.3 JAR, which is never bundled and is Cubature's own
+input, not the set's. `cleanroom/build-inputs.json` pins it by URL and SHA-256; fetch it first (the build checks it
+against its hash and stops if it is missing or differs):
 
 ```sh
 python tools/fetch_build_inputs.py

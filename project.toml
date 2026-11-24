@@ -1,6 +1,7 @@
-# Cubature's checks and the files its builds make. Workbench runs the checks from a clean clone on Temurin 26, with
-# {python} the environment made from tools/requirements.txt; a push needs the gate's checks passed, and Cubature's
-# set-named branch moves only by landing (wb land). Builds and focused tests only: nothing here starts the game.
+# Cubature's checks and the files its builds make. Workbench runs the checks from a clean clone with the set's Gradle
+# and JDKs ({gradle}), with {python} the environment made from tools/requirements.txt; a push needs the gate's checks
+# passed, and Cubature's set-named branch moves only by landing (wb land). Builds and focused tests only: nothing here
+# starts the game.
 schema = 1
 gate = ["inputs", "cleanroom", "lab", "tools"]
 
@@ -26,12 +27,12 @@ description = "Fetch the compile-only build inputs (Distant Horizons 3.3.3), che
 steps = [{ name = "fetch", run = ["{python}", "-B", "tools/fetch_build_inputs.py"] }]
 
 [checks.cleanroom]
-description = "Build Cubature and run its focused regressions on Java 26"
+description = "Build Cubature and run its focused regressions on the set's Java"
 needs = ["inputs"]
 locks = ["gradle"]
 memory = 6
 steps = [
-  { name = "gradle", run = ["bash", "gradlew", "-PcubicTestJava=26", "build", "--no-daemon", "--console=plain"], cwd = "cleanroom" },
+  { name = "gradle", run = ["{gradle}", "build", "--no-daemon", "--console=plain"], cwd = "cleanroom" },
 ]
 
 [checks.lab]
@@ -40,7 +41,7 @@ needs = ["cleanroom"]
 locks = ["gradle"]
 memory = 6
 steps = [
-  { name = "gradle", run = ["bash", "../cleanroom/gradlew", "build", "--no-daemon", "--console=plain"], cwd = "lab" },
+  { name = "gradle", run = ["{gradle}", "build", "--no-daemon", "--console=plain"], cwd = "lab" },
 ]
 
 [checks.tools]
