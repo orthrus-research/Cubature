@@ -1,7 +1,7 @@
 # Cubature's checks and the files its builds make. Workbench runs the checks from a clean clone with the set's Gradle
 # and JDKs ({gradle}), with {python} the environment made from tools/requirements.txt; a push needs the gate's checks
-# passed, and Cubature's set-named branch moves only by landing (wb land). Builds and focused tests only: nothing here
-# starts the game.
+# passed, and Cubature's set-named branch moves only by landing (wb land). Builds and focused tests only: no check
+# starts the game. [launch.standalone] below is the world a launch of another project starts from.
 schema = 1
 gate = ["inputs", "cleanroom", "lab", "tools"]
 
@@ -46,7 +46,58 @@ steps = [
 
 [checks.tools]
 description = "Every Python tool test, under {python}: the environment made from tools/requirements.txt"
-inputs = ["tools/*.py", "tools/requirements.txt"]
+inputs = ["tools/*.py", "tools/requirements.txt", "project.toml", "launch/**",
+          "src/main/java/io/github/opencubicchunks/cubicchunks/core/client/RendererRequirement.java"]
 steps = [
   { name = "unittest", run = ["{python}", "-B", "-m", "unittest", "discover", "-s", "tools", "-p", "test_*.py"] },
 ]
+
+# Cubature's standalone world, the base a launch starts from with base = "cubature:standalone": a local creative
+# server on 127.0.0.1 and one offline client, as tools/cubic_standalone.py prepares them (the JVM profile and view
+# distance of tools/lab_profiles.py, the command lines of tools/lab_process.py). Workbench's lab reads it at the commit
+# the set names for Cubature, with the launch/standalone folder at that commit: its both/, server/ and client/ files
+# are laid into the instance's sides, with {port}, {seed}, {player} and {player_uuid} filled in. A launched product's
+# own changes are its configure script, never this table. tools/test_launch_standalone.py keeps it equal to the tools.
+[launch.standalone]
+summary = "Cubature's standalone world: a local creative server on 127.0.0.1 and one offline client"
+runtime = "cleanroom"
+player = "CubicLab"
+overlay = "standalone"
+memory = "8G"
+# The runtime's installer, run on the launch's JDK into the server folder.
+installer = ["{java}", "-jar", "{installer}", "server", "--dir", "{target}", "--version", "{version}", "--no-gui",
+             "--yes", "--no-provision-java", "--java", "{java}", "--memory", "{memory}"]
+# The installer's argument file is read after the command line, so the profile goes there too, under this line.
+jvm_args_file = "# Owned lab profile: same heap and collector on server and client.\n"
+# Written only when the machine's owner accepts the Minecraft EULA ([lab] eula).
+eula = "eula=true\n"
+# {jvm} is the launch's JVM arguments for the side, {profile} the JVM profile's, {tweakers} the runtime's tweakers.
+server = ["{java}", "{jvm}", "{profile}", "-Djava.io.tmpdir={game}/java-tmp", "-Dfile.encoding=UTF-8",
+          "-Djava.awt.headless=true", "@user_jvm_args.txt",
+          "@{game}/libraries/com/cleanroommc/cleanroom/{version}/{args_file}", "nogui"]
+client = ["{java}", "{jvm}", "{profile}", "-Djava.io.tmpdir={game}/java-tmp", "-Dfile.encoding=UTF-8",
+          "--enable-native-access=ALL-UNNAMED", "-Djava.library.path={game}/natives", "-cp", "{classpath}",
+          "{main_class}", "{tweakers}", "--username", "{player}", "--uuid", "{player_uuid}", "--accessToken", "0",
+          "--userType", "legacy", "--versionType", "custom", "--version", "Cleanroom-{version}", "--gameDir", "{game}",
+          "--assetsDir", "{assets}", "--assetIndex", "{asset_index}", "--width", "1280", "--height", "720",
+          "--server", "127.0.0.1", "--port", "{port}"]
+
+# The lab's zgc-fixed profile (lab_profiles.DEFAULT_VARIANT): ZGC on a fixed 8 GiB heap, the same on server and client.
+[launch.standalone.jvm_profile]
+name = "zgc-fixed"
+collector = "ZGC"
+initialHeapMiB = 8192
+maxHeapMiB = 8192
+arguments = ["-Xms8192M", "-Xmx8G", "-XX:+UseZGC"]
+
+# A session's view distances (lab.run view=...; the baseline of 12 is in the overlay's files): each key sets these
+# <side>/<file>:<key> lines.
+[launch.standalone.views]
+horizontal = ["server/server.properties:view-distance"]
+vertical = ["server/config/cubicchunks.cfg:I:verticalCubeLoadDistance",
+            "client/config/cubicchunks.cfg:I:verticalCubeLoadDistance"]
+client_render = ["client/options.txt:renderDistance"]
+
+# What Cubature adds to any launch it is a member of: the line that says why the game refused to start.
+[launch.member]
+failures = ["cannot start without .*"]

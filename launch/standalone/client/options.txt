@@ -1,0 +1,9 @@
+renderDistance:12
+maxFps:120
+enableVsync:false
+fancyGraphics:false
+renderClouds:false
+fullscreen:false
+pauseOnLostFocus:false
+showSubtitles:false
+tutorialStep:none
