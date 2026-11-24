@@ -1,5 +1,6 @@
-"""project.toml's [launch.standalone] and its launch/standalone folder say what the standalone tools prepare: the
-reviewed JVM profile, the baseline view distance, the player and the world's height range."""
+"""project.toml's [launch.standalone] and its launch/standalone folder say what the lab's tools expect of an instance:
+the reviewed JVM profile, the baseline view distance, the player and the world's height range; [launch.lab]'s drivers
+are commands of tools/cubic_lab.py."""
 from pathlib import Path
 import re
 import tomllib
@@ -51,6 +52,17 @@ class LaunchStandalone(unittest.TestCase):
         config = OVERLAY / 'both/config/cubicchunks.cfg'
         self.assertEqual((key(config, 'I:defaultMinHeight'), key(config, 'I:defaultMaxHeight')), ('-128', '384'))
         self.assertEqual(key(OVERLAY / 'server/server.properties', 'server-port'), '{port}')
+
+    def test_the_lab_launch_starts_from_the_standalone_world_and_its_drivers_are_cubic_lab_commands(self):
+        project = tomllib.loads((ROOT / 'project.toml').read_text(encoding='utf-8'))
+        launch = project['launch']['lab']
+        self.assertEqual(launch['base'], 'cubature:standalone')
+        self.assertEqual(set(launch['members']), {'cubature:mod@both', 'cubature:lab-observer@both'})
+        commands = re.search(r"add_argument\('command', choices=(\[[^]]*\])", (ROOT / 'tools/cubic_lab.py').read_text(
+            encoding='utf-8')).group(1)
+        for name, driver in launch['drivers'].items():
+            self.assertEqual(driver['command'][:2], ['{python}', '{root}/tools/cubic_lab.py'], name)
+            self.assertIn(repr(driver['command'][2]), commands, name)
 
     def test_the_refusal_line_is_cubatures(self):
         source = (ROOT / 'src/main/java/io/github/opencubicchunks/cubicchunks/core/client/RendererRequirement.java')

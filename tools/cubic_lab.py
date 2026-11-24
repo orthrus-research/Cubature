@@ -1,9 +1,15 @@
 #!/usr/bin/env python3
-"""Prepare and run isolated native Cleanroom clients/servers for the optional cube lab. Python 3.11+."""
+"""Run the optional cube lab's native scenarios and bulk jobs in a Workbench driver session. Python 3.11+.
+
+Workbench builds the instance, holds the GPU lease and runs the launch's driver (wb play cubature:lab --driver run,
+from [launch.lab] in project.toml); this runner owns the native server and client it starts from the instance's
+receipt (lab_session) and keeps every result in the session folder. run measures on a fresh copy of the instance. A
+caller that prepares its own instance, as Riven's drivers do, passes its preparation boundary to run and survey.
+
+Options a launch's fixed driver command cannot carry go in LAB_DRIVER_ARGS, split like a shell line."""
 from __future__ import annotations
 
 import argparse
-from contextlib import contextmanager
 from datetime import datetime, timezone
 import json
 import os
@@ -12,107 +18,24 @@ import queue
 import re
 import shutil
 import subprocess
+import sys
 import time
 import uuid
 from native_workload_guard import JavaWorkloadGuard
 from lab_files import sha, write_json
 from lab_input_snapshot import retain_prelaunch_inputs
-from lab_instance import FORK, export_client, load_lab, prime, record_inputs
+from lab_instance import record_inputs
 from lab_process import (PLAYER, argv, await_line, capture_process_endpoint, retain_process_lifecycles, send, spawn,
                          write_process_receipt)
-from lab_profiles import tracks_native_memory, validate_jvm_capture, validate_view_distance_capture
+from lab_profiles import (tracks_native_memory, validate_jvm_capture, validate_view_distance_capture,
+                          validate_view_distance_inputs)
 import lab_workload
-from riven_workspace import riven_workspace
 
 # Input hashes a pregeneration compares before and after its native work.
 PREGENERATION_INPUTS = ('mods', 'controllerSources', 'generationInputsSha256')
 
 
-TURN_LEASE_ENV = 'CUBIC_LAB_TURN_LEASE'
-
-
-def lease_occupied(path):
-    """Whether some handle holds the lease. On Windows this reads byte 0, which the holder's
-    lock makes unreadable to every other handle, and never takes the lock: taking it even
-    briefly can make a launch that starts at that moment fail. POSIX flock does not block
-    reads, so there a non-blocking flock probe is the only test."""
-    try:
-        stream = open(path, 'rb', buffering=0)
-    except OSError:
-        return False
-    with stream:
-        if os.name == 'nt':
-            try:
-                stream.read(1)
-                return False
-            except OSError:
-                return True
-        import fcntl
-        try:
-            fcntl.flock(stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except OSError:
-            return True
-        fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
-        return False
-
-
-def lease_owner(path):
-    """The JSON the holder (or, once released, the last holder) wrote from byte 1."""
-    try:
-        with open(path, 'rb', buffering=0) as stream:
-            stream.seek(1)
-            owner = json.loads(stream.read(65536).decode('utf-8'))
-    except (OSError, UnicodeError, ValueError):
-        return None
-    return owner if isinstance(owner, dict) else None
-
-
-def held_by_turn(path, token):
-    """True when a queued turn's holder owns the lease under this token (see gpu_queue.py in Riven)."""
-    if not token or not lease_occupied(path):
-        return False
-    owner = lease_owner(path)
-    return bool(owner) and owner.get('turnToken') == token
-
-
-@contextmanager
-def native_measurement_lease(root, name):
-    """One measured pair per workspace; the OS releases the lease if a controller exits.
-
-    Inside a queued turn, the turn holder keeps the lease from its first tour to its last and
-    passes its token in CUBIC_LAB_TURN_LEASE; a launcher under it joins that lease instead of
-    taking it again, so no other job can start between the turn's tours."""
-    path = root / '.local/cubic-lab/native-measurement.lock'
-    if held_by_turn(path, os.environ.get(TURN_LEASE_ENV)):
-        yield
-        return
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with os.fdopen(os.open(path, os.O_RDWR | os.O_CREAT, 0o600), 'r+b') as stream:
-        if path.stat().st_size == 0: stream.write(b' '); stream.flush()
-        stream.seek(0)
-        try:
-            if os.name == 'nt':
-                import msvcrt
-                msvcrt.locking(stream.fileno(), msvcrt.LK_NBLCK, 1)
-            else:
-                import fcntl
-                fcntl.flock(stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except OSError as error:
-            raise RuntimeError('Another native lab owns this workspace measurement lease; preserve that run') from error
-        owner = {'pid':os.getpid(),'name':name,'startedUtc':datetime.now(timezone.utc).isoformat()}
-        try:
-            stream.seek(1); stream.write(json.dumps(owner).encode())
-            stream.truncate(); stream.flush()
-            yield
-        finally:
-            # Stamped while still held, so queues can tell when the lease became free.
-            try:
-                stream.seek(1); stream.write(json.dumps(dict(owner, releasedUtc=datetime.now(timezone.utc).isoformat())).encode())
-                stream.truncate(); stream.flush()
-            except OSError: pass
-            stream.seek(0)
-            if os.name == 'nt': msvcrt.locking(stream.fileno(), msvcrt.LK_UNLCK, 1)
-            else: fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
+DRIVER_ARGS_ENV = 'LAB_DRIVER_ARGS'
 
 
 def native_memory_summaries(manifest, evidence, scenario, processes):
@@ -155,12 +78,13 @@ def selected_scenarios(args, manifest):
     return scenarios
 
 
-def run(args, *, load=None, prime_lab=None, select=None, record=None, retain=None, validate=None):
-    """Run the selected scenarios natively and retain their evidence. A caller that prepares its own
-    instances passes its preparation boundary: load returns (target, manifest), prime_lab primes the
-    instance, select names the scenarios, record hashes the inputs before launch, retain keeps their
-    proofs and validate checks each capture. Each defaults to this lab's own."""
-    load, prime_lab, select = load or load_lab, prime_lab or prime, select or selected_scenarios
+def run(args, *, load, prime_lab=None, select=None, record=None, retain=None, validate=None):
+    """Run the selected scenarios natively and retain their evidence. The caller passes its preparation
+    boundary: load returns (target, manifest), the session folder evidence goes under and the lab's
+    record of the instance (lab_session); prime_lab primes the instance, select names the scenarios,
+    record hashes the inputs before launch, retain keeps their proofs and validate checks each capture.
+    All but load default to this lab's own."""
+    prime_lab, select = prime_lab or (lambda unused: None), select or selected_scenarios
     record, retain = record or record_inputs, retain or retain_prelaunch_inputs
     validate = validate or lab_workload.validate_capture
     from lab_storage_evidence import lifecycle_names, retain_lifecycle
@@ -343,10 +267,10 @@ def retain_incomplete_scenarios(result, server_dir, client_dir, evidence):
     result['incompleteScenarios'] = incomplete
 
 
-def survey(args, *, load=None, prime_lab=None, record=None, retain=None):
-    """Resume an explicitly bounded native pregeneration job using the reviewed launcher. A caller that
-    prepares its own instances passes load, prime_lab, record and retain, as for run."""
-    load, prime_lab = load or load_lab, prime_lab or prime
+def survey(args, *, load, prime_lab=None, record=None, retain=None):
+    """Resume an explicitly bounded native pregeneration job on a session's instance. The caller passes
+    load, prime_lab, record and retain, as for run."""
+    prime_lab = prime_lab or (lambda unused: None)
     record, retain = record or record_inputs, retain or retain_prelaunch_inputs
     operation = getattr(args, 'native_operation', 'pregenerate')
     if operation != 'pregenerate': raise ValueError('Unsupported native bulk operation')
@@ -412,15 +336,46 @@ def survey(args, *, load=None, prime_lab=None, record=None, retain=None):
     return 0 if result['passed'] else 1
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=['prime', 'export', 'run', 'storage-crash', 'server', 'client'])
-    parser.add_argument('--crash-id', help='New bounded identity for an isolated native process-crash fixture.')
+def session_lab(args):
+    """A fresh copy of the session's instance and the lab's record of it, with the options' workload and lab
+    properties set up: what run and storage-crash work on."""
+    import lab_session
+    session = lab_session.Session.from_environment().copy()
+    manifest = session.manifest()
+    validate_view_distance_inputs(manifest)
+    properties = {}
+    if args.workload:
+        workload = lab_workload.validate(json.loads(args.workload.read_text(encoding='utf-8')))
+        if manifest.get('seed') != workload['seed']:
+            raise ValueError(f"The workload's seed {workload['seed']} is not the instance's {manifest.get('seed')}")
+        for side in ['server', 'client']:
+            identity = lab_workload.install(workload, manifest[side])
+        manifest['benchmarkWorkload'] = identity
+        properties.update({'cubiclab.workload': lab_workload.RELATIVE_PATH, 'cubiclab.tickTimer': 'complete-v1'})
+    if args.storage_diagnostics:
+        properties['cubiclab.storageDiagnostics'] = 'true'
+    for item in args.property or []:
+        name, separator, value = item.partition('=')
+        if not separator or not re.fullmatch(r'[A-Za-z0-9_.]+', name):
+            raise ValueError('--property takes name=value: ' + item)
+        properties[name] = value
+    manifest['labProperties'] = properties
+    manifest['modHashes'] = session.mod_hashes()
+    lab_session.write_record(session, 'lab.json', manifest)
+    return session, manifest
+
+
+def main(argv=None):
+    import shlex
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('command', choices=['run', 'storage-crash'])
+    parser.add_argument('--crash-id', help='storage-crash: a new bounded identity for the fixture (default: the session id)')
     parser.add_argument('--crash-boundary', choices=['payloadForce','headerForce','overflow-rename','after-barrier'])
-    parser.add_argument('--riven-workspace', type=Path, default=riven_workspace())
-    parser.add_argument('--name', required=True)
     parser.add_argument('--phase', choices=['write', 'read'], default='write')
     parser.add_argument('--scenarios', help='Comma-separated scenario override; prerequisites still apply')
+    parser.add_argument('--workload', type=Path, help='A workload file (lab_workload), installed on both sides')
+    parser.add_argument('--storage-diagnostics', action='store_true', help='Storage spans; storage-crash needs them')
+    parser.add_argument('--property', action='append', help='A lab JVM property name=value for both sides')
     parser.add_argument('--jfr', action='store_true')
     parser.add_argument('--server-jfr-settings', type=Path,
                         help='Opt-in server diagnostic JFC for run --jfr; retained and hashed.')
@@ -428,13 +383,8 @@ def main():
                         help='Opt-in client diagnostic JFC for run --jfr; retained and hashed.')
     parser.add_argument('--client-report-timeout',type=int,default=30,choices=range(30,181),metavar='30..180',help='Bounded client report deadline; timeout retains owned-client thread/JFR diagnostics. Does not relax frame, GUI or view-distance checks.')
     parser.add_argument('--scenario-start-timeout',type=int,default=10,choices=range(10,181),metavar='10..180',help='Bounded command acknowledgement wait; default 10 seconds. Retains request/wait receipts, including failure. Does not change the native job deadline; startup latency remains separate evidence.')
-    parser.add_argument('--survey-id',default='pregeneration',help='Stable journal name; unchanged bounds and settings permit restart and resume.')
-    parser.add_argument('--survey-origin-x',type=int,default=-625,help='Minimum chunk X, inclusive; default -10000 blocks.')
-    parser.add_argument('--survey-origin-z',type=int,default=-625,help='Minimum chunk Z, inclusive.')
-    parser.add_argument('--survey-width',type=int,default=1250,help='Chunk columns; 1250 gives 20000 blocks.')
-    parser.add_argument('--survey-height',type=int,default=1250)
-    parser.add_argument('--survey-max-columns',type=int,default=1562500,help='Stop cleanly after this many additional columns; resume the same journal later.')
-    args = parser.parse_args(); args.riven_workspace = args.riven_workspace.resolve()
+    argv = list(sys.argv[1:] if argv is None else argv) + shlex.split(os.environ.get(DRIVER_ARGS_ENV, ''))
+    args = parser.parse_args(argv)
     for field in ['server_jfr_settings', 'client_jfr_settings']:
         selected = getattr(args, field)
         if selected:
@@ -444,22 +394,17 @@ def main():
                 parser.error('--' + field.replace('_', '-') + ' requires run --jfr')
             if not selected.is_file() or any(c in str(selected) for c in ',\r\n'):
                 parser.error('JFC must be an existing file with no comma/newline in its path')
-    if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]{0,63}', args.name): parser.error('Invalid lab name')
     if args.scenarios and any(not lab_workload.scenario_valid(s) for s in args.scenarios.split(',')):
         parser.error('Unknown scenario in --scenarios')
-    if args.command == 'prime':
-        with native_measurement_lease(args.riven_workspace,args.name): prime(args)
-        return
-    if args.command == 'export': export_client(args); return
+    if args.command == 'storage-crash' and not args.storage_diagnostics:
+        parser.error('storage-crash needs --storage-diagnostics')
+    session, manifest = session_lab(args)
+    load = lambda unused: (session.folder, manifest)
     if args.command == 'storage-crash':
         from lab_storage_crash import run as storage_crash
-        with native_measurement_lease(args.riven_workspace,args.name):raise SystemExit(storage_crash(args))
-    if args.command == 'run':
-        with native_measurement_lease(args.riven_workspace,args.name):
-            raise SystemExit(run(args))
-    _, manifest = load_lab(args)
-    client = args.command == 'client'
-    raise SystemExit(subprocess.call(argv(manifest, client), cwd=manifest['client' if client else 'server']))
+        args.crash_id = args.crash_id or session.id
+        raise SystemExit(storage_crash(args, load=load))
+    raise SystemExit(run(args, load=load))
 
 
 if __name__ == '__main__': main()

@@ -31,14 +31,16 @@ def inspect_crash_files(fixture,boundary):
             'observed':'old' if actual==old else 'new' if actual==new else 'unrecognized','scope':'Independent bytes inspected after owned-process death and before a recovery JVM opens the files.'}
 
 
-def run(args):
+def run(args, *, load):
+    """The crash and the recovery on the instance ``load(args)`` gives (target, manifest), as cubic_lab.run's
+    callers pass it."""
     import lab_files
     import lab_input_snapshot
     import lab_instance
     import lab_process
     if not args.crash_id or not re.fullmatch('[a-z0-9-]{1,48}',args.crash_id) or not args.crash_boundary:
         raise ValueError('storage-crash requires --crash-id and --crash-boundary')
-    lab_instance.prime(args);target,manifest=lab_instance.load_lab(args)
+    target,manifest=load(args)
     if manifest.get('labProperties',{}).get('cubiclab.storageDiagnostics')!='true':raise ValueError('Prepare with --storage-diagnostics')
     server_dir=Path(manifest['server']);fixture=server_dir/'cubiclab-crashes'/args.crash_id
     if fixture.exists():raise ValueError('Crash fixture already exists; use a new identity')
@@ -51,7 +53,7 @@ def run(args):
             phase=evidence/mode;phase.mkdir();messages=queue.Queue();server=None
             row={'mode':mode,'passed':False};result['phases'].append(row)
             try:
-                _,manifest=lab_instance.load_lab(args)
+                _,manifest=load(args)
                 server=lab_process.spawn(lab_process.argv(manifest,False),server_dir,phase/'server.log',messages,lifecycle_role='server')
                 lab_process.write_process_receipt(phase,server);lab_process.await_line(messages,'Done (',[server],300)
                 lab_process.send(server,f'cubiclab storage-{mode} {args.crash_id} {args.crash_boundary} isolated-files')

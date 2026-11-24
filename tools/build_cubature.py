@@ -16,13 +16,12 @@ its own hash, since the same commit can then give different artifacts. A publish
 replaced by a different one. `--no-publish` leaves the folder alone.
 
 Examples (from the Cubature checkout or anywhere):
-  python tools/build_cubature.py
-  python tools/build_cubature.py --freeze candidate-01
+  python tools/build_cubature.py --workspace ../Riven
+  python tools/build_cubature.py --workspace ../Riven --freeze candidate-01
 """
 
 from fetch_build_inputs import fetch_all
 from lab_files import sha
-from riven_workspace import riven_workspace
 import argparse
 import json
 import os
@@ -181,7 +180,9 @@ def main():
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("--workspace", type=Path, default=riven_workspace(), help="Riven root")
+    parser.add_argument(
+        "--workspace", type=Path, required=True, help="the Riven root it records into"
+    )
     parser.add_argument("--skip-tests", action="store_true", help="assemble without tests")
     parser.add_argument("--no-lab", action="store_true", help="skip the lab observer")
     parser.add_argument("--freeze", metavar="LABEL", help="copy artifacts to .local/frozen/LABEL")

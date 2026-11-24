@@ -23,13 +23,21 @@ Build Cubature first (`../cleanroom`), then the lab against that artifact, from 
 
 ## Running
 
-`tools/cubic_standalone.py` prepares isolated client and server instances, and `tools/cubic_lab.py`
-runs scenarios and bulk pregeneration in them. Riven prepares instances with its
-`tools/runtime.py prepare` and drives captures through its `tools/riven_observe.py` (see Riven's
-[observability guide](https://github.com/orthrus-research/Riven/blob/main/docs/OBSERVABILITY.md)).
-Dependency downloads and cached copies use checksum-verified content and unique temporary files
-beside their destinations. Temporary basenames stay short even when a library's filename is long,
-so preparation also works within legacy Windows path limits.
+Workbench builds the instances: `project.toml`'s `[launch.lab]` is Cubature and this lab's observer
+on the standalone world (`[launch.standalone]`), and its drivers run `tools/cubic_lab.py` in a
+Workbench driver session, which holds the GPU lease for the whole run:
+
+```sh
+wb play cubature:lab --driver run
+```
+
+The driver starts the server and client from the instance's receipt (`tools/lab_session.py`) on a
+fresh copy of the instance, and keeps its record (`lab.json`), the copy and every result (`runs/`) in
+the session folder, which the report and profile tools take as their `--lab-directory`. Further
+options, such as a workload and its scenarios, go in `LAB_DRIVER_ARGS`
+(`--workload <file> --scenarios full-view,idle`). Riven's measurement and pregeneration drivers
+(`tools/measure_pipeline.py`, `tools/pregenerate_map.py`) use the same runner on Riven's launch (see
+Riven's [observability guide](https://github.com/orthrus-research/Riven/blob/main/docs/OBSERVABILITY.md)).
 
 The Python tools and their tests need the packages in `tools/requirements.txt`:
 
@@ -40,23 +48,20 @@ python -B -m unittest discover -s tools -p "test_*.py"
 
 ### View distance
 
-Every instance is prepared at the baseline view distance: 12 cubes for the server's horizontal
+Every instance is built at the baseline view distance: 12 cubes for the server's horizontal
 and vertical view distances and 12 chunks for the client's render distance, so runs compare. A
-run may raise any of the three above the baseline, freely, and nothing goes below it. Riven's
-`tools/runtime.py play` takes `--view-distance`, `--vertical-view-distance` and
-`--client-render-distance`, and a tour may ask for raised distances itself (below). Before the
-launch the instance is set to the run's distances, the baseline for a run that asks for nothing,
-and the instance's `standalone.json` records them in `viewDistance` with `viewDistanceLabel`:
-`baseline`, or what was raised, such as `raised: clientRender 20 (baseline 12)`. The checks
-before launch and in each capture compare the files and the measured distances with that
-record. The game clamps the server's distances above 32 and Cubature's render distance above 64,
+session may raise any of the three above the baseline, freely, and nothing goes below it:
+`wb play --view horizontal=16` (also `vertical` and `client_render`, the views of
+`[launch.standalone]`), and a tour may ask for raised distances itself. The lab's record of a
+session's instance (`lab.json`, from `tools/lab_session.py`) takes the distances its files hold
+into `viewDistance`, and each capture compares the measured distances with that record. The game clamps the server's distances above 32 and Cubature's render distance above 64,
 so those are the highest a run may ask for.
 
-Below the baseline only a named reduced profile is allowed, chosen when the instance is
-prepared (`--view-profile near-8`: all three distances 8) and fixed for its life. The manifest
-records it as `viewProfile`, with a label such as `reduced near-8: horizontal 8, vertical 8,
-clientRender 8 (baseline 12)`; its values are enforced exactly, a run may not raise or change
-them, and a play asked to is refused. An instance that names no profile is a baseline one.
+Below the baseline only a named reduced profile is allowed (`near-8`: all three distances 8),
+which instances prepared before Workbench's sessions recorded as `viewProfile`, with a label such
+as `reduced near-8: horizontal 8, vertical 8, clientRender 8 (baseline 12)`; its values are
+enforced exactly. A session's record names no profile, so it is a baseline one, and a session
+below the baseline is refused before its JVMs start.
 Runs of different profiles, or of a baseline and a raised run, are not compared:
 `lab_profiles.require_same_view_profile` refuses them, and the full-view comparison accepts
 only baseline runs.

@@ -1,8 +1,7 @@
-"""Native process control for the lab: launch commands for prepared instances, owned processes with
-their console lines and lifecycle receipts, and console commands."""
+"""Native process control for the lab: the command lines of a session's instance, owned processes with their console
+lines and lifecycle receipts, and console commands."""
 from contextlib import nullcontext
 from datetime import datetime, timezone
-import hashlib
 import os
 from pathlib import Path
 import queue
@@ -10,7 +9,6 @@ import re
 import subprocess
 import threading
 import time
-import uuid
 from lab_files import write_json
 from native_process_lifecycle import ProcessLifecycle
 
@@ -18,32 +16,23 @@ PLAYER = 'CubicLab'
 
 
 def argv(manifest, client, recording=None, jfr_settings=None):
-    directory = Path(manifest['client'] if client else manifest['server'])
-    temporary = directory / 'java-tmp'; temporary.mkdir(exist_ok=True)
-    result = [manifest['java'], *manifest.get('jvmProfile', {}).get('arguments', ['-Xms1G', '-Xmx6G']),
-              '-Djava.io.tmpdir=' + str(temporary), '-Dfile.encoding=UTF-8']
-    result += ['-D' + name + '=' + value for name, value in manifest.get('labProperties', {}).items()]
-    if manifest.get('networkReadTimeoutSeconds',30)!=30:result.append('-Dfml.readTimeout='+str(manifest['networkReadTimeoutSeconds']))
+    """The command line of the manifest's server or client: the receipt's (lab_session), with the lab's JVM properties,
+    the network timeout and a JFR recording spliced in where the receipt takes a session's JVM options."""
+    side = 'client' if client else 'server'
+    entry = manifest['commands'][side]
+    directory = Path(manifest[side])
+    (directory / 'java-tmp').mkdir(exist_ok=True)
+    extra = ['-D' + name + '=' + value for name, value in manifest.get('labProperties', {}).items()]
+    if manifest.get('networkReadTimeoutSeconds',30)!=30:extra.append('-Dfml.readTimeout='+str(manifest['networkReadTimeoutSeconds']))
     if recording:
         repository = directory / 'jfr-repository'; repository.mkdir(exist_ok=True)
-        result += ['-XX:FlightRecorderOptions=repository=' + str(repository),
-                   '-XX:StartFlightRecording=filename=' + str(recording) + ',settings=' + str(jfr_settings or 'profile')
-                   + ',dumponexit=true,maxsize=' + str(manifest.get('jfrMaxSizeMiB', 256)) + 'm']
-    if not client:
-        product_version = manifest.get('runtimeVersion', manifest['release']['tag_name'])
-        modern_args = directory / 'libraries/com/cleanroommc/cleanroom' / product_version / ('win_args.txt' if os.name == 'nt' else 'unix_args.txt')
-        if modern_args.exists():
-            return result + ['-Djava.awt.headless=true', '@user_jvm_args.txt', '@' + str(modern_args), 'nogui']
-        return result + ['-Djava.awt.headless=true', '-jar', 'cleanroom-' + manifest.get('runtimeVersion', manifest['release']['tag_name']) + '.jar', 'nogui']
-    runtime = manifest['clientRuntime']
-    classpath = os.pathsep.join([runtime['minecraft']] + [library['path'] for library in runtime['libraries']])
-    player_uuid = str(uuid.UUID(bytes=hashlib.md5(('OfflinePlayer:' + PLAYER).encode()).digest(), version=3))
-    return result + ['--enable-native-access=ALL-UNNAMED', '-Djava.library.path=' + runtime['natives'], '-cp', classpath,
-        runtime['mainClass'], '--tweakClass', 'net.minecraftforge.fml.common.launcher.FMLTweaker',
-        '--username', PLAYER, '--uuid', player_uuid, '--accessToken', '0', '--userType', 'legacy', '--versionType', 'custom',
-        '--version', 'Cleanroom-' + manifest['release']['tag_name'], '--gameDir', str(directory),
-        '--assetsDir', runtime['assets'], '--assetIndex', runtime['assetIndex'], '--width', '1280', '--height', '720',
-        '--server', '127.0.0.1', '--port', str(manifest['port'])]
+        extra += ['-XX:FlightRecorderOptions=repository=' + str(repository),
+                  '-XX:StartFlightRecording=filename=' + str(recording) + ',settings=' + str(jfr_settings or 'profile')
+                  + ',dumponexit=true,maxsize=' + str(manifest.get('jfrMaxSizeMiB', 256)) + 'm']
+    command = list(entry['command'])
+    at = int(entry['jvm_at'])
+    command[at:at] = extra
+    return command
 
 
 def spawn(command, directory, log, messages, lifecycle_role=None, workload_guard=None):

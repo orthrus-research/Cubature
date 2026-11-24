@@ -10,7 +10,6 @@ from unittest import mock
 import zipfile
 import cubic_lab as lab
 import lab_files
-import lab_instance
 import lab_process
 import lab_profiles as profiles
 
@@ -51,8 +50,9 @@ class LabControlTest(unittest.TestCase):
             root=Path(temporary);guard=mock.Mock()
             guard.report.return_value={'passed':False,'issues':[{'kind':'foreign-java'}]}
             guard.require_clean.side_effect=RuntimeError('foreign-java')
-            with mock.patch.object(lab,'load_lab',return_value=(root,{})), mock.patch.object(lab,'selected_scenarios',return_value=['route']), mock.patch.object(lab,'JavaWorkloadGuard',return_value=guard), mock.patch.object(lab,'prime') as prime, mock.patch.object(lab,'spawn') as spawn:
-                with self.assertRaisesRegex(RuntimeError,'foreign-java'):lab.run(argparse.Namespace(phase='write'))
+            prime=mock.Mock()
+            with mock.patch.object(lab,'selected_scenarios',return_value=['route']), mock.patch.object(lab,'JavaWorkloadGuard',return_value=guard), mock.patch.object(lab,'spawn') as spawn:
+                with self.assertRaisesRegex(RuntimeError,'foreign-java'):lab.run(argparse.Namespace(phase='write'),load=lambda a:(root,{}),prime_lab=prime)
             prime.assert_not_called();spawn.assert_not_called()
             receipt=list((root/'runs').glob('java-workload-preflight-*.json'))
             self.assertEqual(len(receipt),1);self.assertFalse(json.loads(receipt[0].read_text())['passed'])
@@ -73,14 +73,14 @@ class LabControlTest(unittest.TestCase):
             guard.report.side_effect=[{'passed':True},{'passed':False,'issues':[{'kind':'observer-close-failed'}]}]
             guard.close.side_effect=RuntimeError('observer close fixture')
             manifest={'server':str(server),'client':str(root/'client')}
-            patches=[mock.patch.object(lab,'load_lab',return_value=(root,manifest)),mock.patch.object(lab,'selected_scenarios',return_value=['route']),
-                mock.patch.object(lab,'JavaWorkloadGuard',return_value=guard),mock.patch.object(lab,'prime'),mock.patch.object(lab,'record_inputs',return_value={}),
+            patches=[mock.patch.object(lab,'selected_scenarios',return_value=['route']),
+                mock.patch.object(lab,'JavaWorkloadGuard',return_value=guard),mock.patch.object(lab,'record_inputs',return_value={}),
                 mock.patch.object(lab,'retain_prelaunch_inputs',return_value={}),mock.patch.object(lab,'argv',return_value=['java']),
                 mock.patch.object(lab,'spawn',return_value=process),mock.patch.object(lab,'await_line',side_effect=RuntimeError('foreign-java'))]
             from contextlib import ExitStack
             with ExitStack() as stack:
                 for patch in patches:stack.enter_context(patch)
-                with self.assertRaisesRegex(RuntimeError,'foreign-java'):lab.run(argparse.Namespace(phase='write',jfr=False))
+                with self.assertRaisesRegex(RuntimeError,'foreign-java'):lab.run(argparse.Namespace(phase='write',jfr=False),load=lambda a:(root,manifest))
             self.assertFalse(process.alive)
             saved=json.loads((root/'runs/write/result.json').read_text())
             self.assertFalse(saved['passed']);self.assertFalse(saved['hostWorkloadGuard']['passed'])
@@ -108,7 +108,7 @@ class LabControlTest(unittest.TestCase):
             lines=iter(['Done (','joined','screen=none','CUBICLAB_STARTED scenario=route runId='+run_id,
                         'CUBICLAB_SERVER_RESULT runId='+run_id+' PASS','CUBICLAB_CLIENT_RESULT runId='+run_id])
             unused=mock.Mock(side_effect=AssertionError('module default used'))
-            patches=[mock.patch.object(lab,name,unused) for name in ['load_lab','selected_scenarios','prime','record_inputs','retain_prelaunch_inputs']]
+            patches=[mock.patch.object(lab,name,unused) for name in ['selected_scenarios','record_inputs','retain_prelaunch_inputs']]
             patches+=[mock.patch.object(lab.lab_workload,'validate_capture',unused),mock.patch.object(lab,'JavaWorkloadGuard',return_value=guard),
                 mock.patch.object(lab,'argv',return_value=['java']),mock.patch.object(lab,'spawn',return_value=process),
                 mock.patch.object(lab,'await_line',side_effect=lambda *a,**k:next(lines)),mock.patch.object(lab,'validate_view_distance_capture'),
@@ -137,40 +137,6 @@ class LabControlTest(unittest.TestCase):
         source = (Path(__file__).resolve().parents[1] / 'src/main/java/io/github/opencubicchunks/cubicchunks/core/CubicChunksConfig.java').read_text(encoding='utf-8')
         constants = re.search(r'public enum DeliveryMode \{\s*([A-Z_,\s]+);', source)[1]
         self.assertEqual(tuple(name.strip() for name in constants.split(',')), profiles.DELIVERY_MODES)
-
-    def test_measurement_lease_rejects_overlap_and_releases_after_failure(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            root=Path(temporary)
-            with self.assertRaisesRegex(ValueError,'fixture'):
-                with lab.native_measurement_lease(root,'first'):
-                    with self.assertRaisesRegex(RuntimeError,'Another native lab'):
-                        with lab.native_measurement_lease(root,'overlap'): self.fail('overlapping lease')
-                    raise ValueError('fixture failure')
-            with lab.native_measurement_lease(root,'second'): pass
-            value=json.loads((root/'.local/cubic-lab/native-measurement.lock').read_bytes()[1:])
-            self.assertEqual(value['name'],'second')
-
-    def test_launcher_joins_a_turn_lease_only_with_its_token(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            root=Path(temporary); path=root/'.local/cubic-lab/native-measurement.lock'
-            with lab.native_measurement_lease(root,'turn'):
-                # A turn holder adds its token to the record it wrote.
-                with open(path,'r+b',buffering=0) as stream:
-                    stream.seek(1); stream.write(json.dumps({'name':'turn','turnToken':'t-1'}).encode()); stream.truncate()
-                self.assertTrue(lab.lease_occupied(path))
-                with mock.patch.dict('os.environ',{lab.TURN_LEASE_ENV:'t-1'}):
-                    with lab.native_measurement_lease(root,'tour'): pass
-                for env in ({lab.TURN_LEASE_ENV:'other'}, {}):
-                    with mock.patch.dict('os.environ',env,clear=False):
-                        if not env: __import__('os').environ.pop(lab.TURN_LEASE_ENV,None)
-                        with self.assertRaisesRegex(RuntimeError,'Another native lab'):
-                            with lab.native_measurement_lease(root,'outsider'): self.fail('joined without the token')
-                self.assertEqual(lab.lease_owner(path)['turnToken'],'t-1')
-            self.assertFalse(lab.lease_occupied(path))
-            with mock.patch.dict('os.environ',{lab.TURN_LEASE_ENV:'t-1'}):
-                # A stale token on a released lease takes it normally.
-                with lab.native_measurement_lease(root,'after'): pass
-            self.assertEqual(lab.lease_owner(path)['name'],'after')
 
     def test_reviewed_jvm_experiments_keep_equal_max_heap_and_verify_effective_collectors(self):
         for variant in profiles.JVM_VARIANTS:
@@ -259,21 +225,6 @@ class LabControlTest(unittest.TestCase):
             record['runtime']['garbageCollectors'] = ['G1 Young Generation']
             with self.assertRaisesRegex(RuntimeError, 'collector'): profiles.validate_jvm_capture(server, client)
             record['runtime']['garbageCollectors'] = ['ZGC Minor Cycles', 'ZGC Major Cycles']
-
-    def test_old_java_lab_is_not_java26_qualification(self):
-        with self.assertRaisesRegex(RuntimeError, 'newly prepared'):
-            lab_instance.validate_java26_inputs({'java': 'historical-java25.exe'})
-
-    def test_changed_java26_critical_input_is_rejected(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            files = [Path(temporary) / name for name in ('java.exe', 'release', 'modules', 'jvm.dll')]
-            for p in files: p.write_bytes(p.name.encode())
-            manifest = {'java': str(files[0]), 'javaRuntime': {'major': 26, 'criticalArtifacts': [
-                {'path': str(p.resolve()), 'sha256': lab_files.sha(p)} for p in files]}}
-            lab_instance.validate_java26_inputs(manifest)
-            files[3].write_bytes(b'changed JVM')
-            with self.assertRaisesRegex(RuntimeError, 'runtime changed'):
-                lab_instance.validate_java26_inputs(manifest)
 
     def test_preparation_sets_all_test_distances_and_preserves_world_height(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -428,65 +379,7 @@ class LabControlTest(unittest.TestCase):
             with self.assertRaises(RuntimeError): profiles.validate_view_distance_capture(manifest, server, client)
             record[field] = 12
 
-    def test_changed_prepared_runtime_is_rejected_before_launch(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary); directory = root / '.local/cubic-lab/check'
-            directory.mkdir(parents=True)
-            artifact = root / 'loader.jar'; artifact.write_bytes(b'reviewed loader bytes')
-            manifest = {'runtimeArtifacts': {'client': {'path': str(artifact), 'sha256': lab_files.sha(artifact)}}}
-            (directory / 'lab.json').write_text(json.dumps(manifest), encoding='utf-8')
-            args = argparse.Namespace(riven_workspace=root, name='check')
-            self.assertEqual(lab_instance.load_lab(args)[1], manifest)
-            artifact.write_bytes(b'changed loader bytes')
-            with self.assertRaises(RuntimeError): lab_instance.load_lab(args)
-
-    def test_same_tag_asset_replacement_requires_review_before_installation(self):
-        hashes = {'installer': 'a' * 64, 'universal': 'b' * 64, 'prism': 'c' * 64}
-        release = {'assets': [
-            {'name': 'cleanroom-0.7.0-alpha-installer.jar', 'digest': 'sha256:' + hashes['installer']},
-            {'name': 'cleanroom-0.7.0-alpha-universal.jar', 'digest': 'sha256:' + hashes['universal']},
-            {'name': 'cleanroom-0.7.0-alpha.zip', 'digest': 'sha256:' + hashes['prism']} ]}
-        self.assertEqual(set(lab_instance.runtime_assets(release, '0.7.0-alpha', hashes)), set(hashes))
-        release['assets'][0]['digest'] = 'sha256:' + 'd' * 64
-        with self.assertRaises(RuntimeError): lab_instance.runtime_assets(release, '0.7.0-alpha', hashes)
-        with self.assertRaises(RuntimeError): lab_instance.runtime_assets(release, '0.7.0', hashes)
-
     def test_color_coded_join_is_detected(self):
         messages = queue.Queue(); messages.put('\x1b[0;33;1mCubicLab\x1b[m\x1b[0;33;1m joined the game\x1b[m')
         self.assertIn('CubicLab joined the game', lab_process.await_line(messages, 'CubicLab joined the game', [], 1))
-    def test_artifact_and_native_entries_merge_without_losing_java_classes(self):
-        components = [{'libraries': [
-            {'name': 'org.lwjgl:lwjgl:3.4.3', 'downloads': {'artifact': {'sha1': 'abc'}}},
-            {'name': 'org.lwjgl:lwjgl:3.4.3', 'downloads': {'classifiers': {'natives-windows': {'sha1': 'def'}}},
-             'natives': {'windows': 'natives-windows'}}]}]
-        result = lab_instance.merged_libraries(components, 'windows', 'x86_64')
-        self.assertEqual(len(result), 1)
-        self.assertEqual(result[0]['downloads']['artifact']['sha1'], 'abc')
-        self.assertEqual(result[0]['downloads']['classifiers']['natives-windows']['sha1'], 'def')
-    def test_loader_library_overrides_base_version(self):
-        components = [{'libraries': [{'name': 'a:b:1', 'downloads': {'artifact': {'sha1': 'old'}}}]},
-                      {'libraries': [{'name': 'a:b:2', 'downloads': {'artifact': {'sha1': 'new'}}}]}]
-        self.assertEqual(lab_instance.merged_libraries(components, 'windows', 'x86_64')[0]['name'], 'a:b:2')
-    def test_windows_x64_excludes_other_native_architectures(self):
-        for suffix in ['natives-windows-arm64', 'natives-windows-x86']:
-            self.assertFalse(lab_instance.library_allowed({'name': 'org.lwjgl:lwjgl:3:' + suffix}, 'windows', 'x86_64'))
-        self.assertTrue(lab_instance.library_allowed({'name': 'org.lwjgl:lwjgl:3:natives-windows'}, 'windows', 'x86_64'))
-    def test_generated_library_must_match_retained_embedded_bytes(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary); mods = root / 'mods'; (mods / '1.12.2').mkdir(parents=True)
-            payload = b'the exact embedded library bytes'
-            with zipfile.ZipFile(mods / 'owner.jar', 'w') as archive:
-                archive.writestr('lib/runtime.jar', payload)
-            extracted = mods / '1.12.2/runtime.jar'; extracted.write_bytes(payload)
-            manifest = {'server': str(root), 'client': str(root)}
-            record = lab_instance.record_generated_libraries(manifest)['client']['1.12.2/runtime.jar']
-            self.assertEqual(record['owners'], [{'mod': 'owner.jar', 'embeddedEntry': 'lib/runtime.jar'}])
-            extracted.write_bytes(b'a changed library must fail qualification')
-            with self.assertRaises(RuntimeError): lab_instance.record_generated_libraries(manifest)
-    def test_client_addons_do_not_change_server_or_legacy_hash_contract(self):
-        manifest = {'modHashes': {'core.jar': 'a'}, 'clientModHashes': {'core.jar': 'a', 'renderer.jar': 'b'}}
-        self.assertEqual(lab_instance.expected_mod_hashes(manifest, 'server'), {'core.jar': 'a'})
-        self.assertEqual(lab_instance.expected_mod_hashes(manifest, 'client'), {'core.jar': 'a', 'renderer.jar': 'b'})
-        self.assertEqual(lab_instance.expected_mod_hashes({'modHashes': {'core.jar': 'a'}}, 'client'), {'core.jar': 'a'})
-
 if __name__ == '__main__': unittest.main()

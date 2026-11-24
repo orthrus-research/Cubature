@@ -1,7 +1,8 @@
 # Cubature's checks and the files its builds make. Workbench runs the checks from a clean clone with the set's Gradle
 # and JDKs ({gradle}), with {python} the environment made from tools/requirements.txt; a push needs the gate's checks
 # passed, and Cubature's set-named branch moves only by landing (wb land). Builds and focused tests only: no check
-# starts the game. [launch.standalone] below is the world a launch of another project starts from.
+# starts the game. [launch.standalone] below is the world a launch of another project starts from, and [launch.lab]
+# the lab's own measurement launch, whose drivers start the game in a Workbench session.
 schema = 1
 gate = ["inputs", "cleanroom", "lab", "tools"]
 
@@ -53,11 +54,11 @@ steps = [
 ]
 
 # Cubature's standalone world, the base a launch starts from with base = "cubature:standalone": a local creative
-# server on 127.0.0.1 and one offline client, as tools/cubic_standalone.py prepares them (the JVM profile and view
-# distance of tools/lab_profiles.py, the command lines of tools/lab_process.py). Workbench's lab reads it at the commit
-# the set names for Cubature, with the launch/standalone folder at that commit: its both/, server/ and client/ files
-# are laid into the instance's sides, with {port}, {seed}, {player} and {player_uuid} filled in. A launched product's
-# own changes are its configure script, never this table. tools/test_launch_standalone.py keeps it equal to the tools.
+# server on 127.0.0.1 and one offline client, with the JVM profile and view distance of tools/lab_profiles.py.
+# Workbench's lab reads it at the commit the set names for Cubature, with the launch/standalone folder at that commit:
+# its both/, server/ and client/ files are laid into the instance's sides, with {port}, {seed}, {player} and
+# {player_uuid} filled in. A launched product's own changes are its configure script, never this table.
+# tools/test_launch_standalone.py keeps it equal to the tools.
 [launch.standalone]
 summary = "Cubature's standalone world: a local creative server on 127.0.0.1 and one offline client"
 runtime = "cleanroom"
@@ -97,6 +98,30 @@ horizontal = ["server/server.properties:view-distance"]
 vertical = ["server/config/cubicchunks.cfg:I:verticalCubeLoadDistance",
             "client/config/cubicchunks.cfg:I:verticalCubeLoadDistance"]
 client_render = ["client/options.txt:renderDistance"]
+
+# Cubature's own measurement launch: Cubature and its lab observer on the standalone world, drawn by the game's own
+# renderer (no Quadrature, so the client is told to start without it). Its drivers run tools/cubic_lab.py in a
+# Workbench driver session: Workbench builds the instance and holds the GPU lease, the driver starts the server and
+# client from the instance's receipt and keeps their results in the session folder (wb play cubature:lab --driver run).
+# A driver's further options go in LAB_DRIVER_ARGS, for example "--workload <file> --scenarios full-view,idle".
+[launch.lab]
+members = ["cubature:mod@both", "cubature:lab-observer@both"]
+runtime = "cleanroom"
+base = "cubature:standalone"
+jvm = { client = ["-Dcubature.clientWithoutRenderer=true"] }
+
+[launch.lab.params]
+seed = 8675309
+
+[launch.lab.drivers.run]
+summary = "tools/cubic_lab.py run: the lab's scenarios on a fresh copy of the instance"
+command = ["{python}", "{root}/tools/cubic_lab.py", "run"]
+cwd = "{root}"
+
+[launch.lab.drivers.storage-crash]
+summary = "tools/cubic_lab.py storage-crash: an owned server killed at a storage boundary, then recovered (LAB_DRIVER_ARGS names --crash-boundary)"
+command = ["{python}", "{root}/tools/cubic_lab.py", "storage-crash", "--storage-diagnostics"]
+cwd = "{root}"
 
 # What Cubature adds to any launch it is a member of: the line that says why the game refused to start.
 [launch.member]

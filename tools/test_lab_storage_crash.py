@@ -46,7 +46,8 @@ class CrashControllerTest(unittest.TestCase):
         def endpoint(evidence,process,name):
             # Keep the real lifecycle API's supported endpoints; do not hide an integration mismatch.
             self.assertIn(name,('ready','endBeforeQuit'))
-        patches={'prime':lambda a:None,'load_lab':lambda a:(target,manifest),'record_inputs':lambda m:{}}
+        patches={'record_inputs':lambda m:{}}
+        load=lambda a:(target,manifest)
         process_patches={'argv':lambda *a:['owned-java'],
                  'spawn':spawn,'write_process_receipt':lambda *a:None,'await_line':lambda *a:'CUBICLAB_CRASH_RECOVERED id=fixture PASS',
                  'send':send,'capture_process_endpoint':endpoint,'retain_process_lifecycles':lambda *a:None}
@@ -57,8 +58,8 @@ class CrashControllerTest(unittest.TestCase):
             stack.enter_context(patch.object(lab_input_snapshot,'retain_prelaunch_inputs',lambda *a:{}))
             for name,value in process_patches.items():stack.enter_context(patch.object(lab_process,name,value))
             if wrong_boundary:
-                with self.assertRaisesRegex(RuntimeError,'Wrong storage boundary'):run(args)
-            else:self.assertEqual(0,run(args))
+                with self.assertRaisesRegex(RuntimeError,'Wrong storage boundary'):run(args,load=load)
+            else:self.assertEqual(0,run(args,load=load))
         return processes,json.loads((target/'runs/crash-fixture/result.json').read_text())
 
     def test_only_owned_crash_process_is_killed_and_recovery_must_pass(self):
