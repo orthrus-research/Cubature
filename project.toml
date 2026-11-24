@@ -32,7 +32,7 @@ needs = ["inputs"]
 locks = ["gradle"]
 memory = 6
 steps = [
-  { name = "gradle", run = ["{gradle}", "build", "--no-daemon", "--console=plain"], cwd = "cleanroom" },
+  { name = "gradle", run = ["{gradle}", "build", "--console=plain"], cwd = "cleanroom" },
 ]
 
 [checks.lab]
@@ -41,7 +41,7 @@ needs = ["cleanroom"]
 locks = ["gradle"]
 memory = 6
 steps = [
-  { name = "gradle", run = ["{gradle}", "build", "--no-daemon", "--console=plain"], cwd = "lab" },
+  { name = "gradle", run = ["{gradle}", "build", "--console=plain"], cwd = "lab" },
 ]
 
 [checks.tools]
