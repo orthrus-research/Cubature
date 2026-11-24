@@ -71,7 +71,7 @@ only baseline runs.
 | `src/` | The lab mod: scenarios, probes and their Mixins |
 | `benchmarks/` | Workload definitions and an example campaign |
 | `jfr/` | JFR settings for generation, reload and tail-latency recordings |
-| `profiles/`, `runtime.properties` | Client renderer profiles and the pinned runtime the lab launches |
+| `profiles/` | Client renderer profiles; the runtime the lab launches is the set's platform (`runtime = "cleanroom"` in `[launch.lab]`) |
 
 `-Dcubiclab.lodTrace=<directory>` (no spaces) streams Distant Horizons LOD stage events from JVM
 start until exit to `lod-client.csv` or `lod-server.csv` there, with a `lod-<side>.json` summary
@@ -117,16 +117,16 @@ the observer does no file work inside a measured tick.
 
 ## One-off tours
 
-`tours/` holds tour definitions for Riven's `tools/runtime.py play --tour`, kept for a single
-question each and not part of any suite.
+`tours/` holds tour definitions for `wb play riven --tour <file>`, kept for a single question
+each and not part of any suite.
 
 `tours/stale-mesh-walk-2485331.json` walks the player 540 blocks east in steps of 9 blocks, 5
 seconds at each, then steps back west twice, facing west over the edge the cubes left from (the tour client captures a view only after the player has moved more than 8
 blocks and held still 100 ticks), so cubes leave at the trailing edge one column at a time
 instead of all at once as a long teleport makes them. It asks for a client render distance of
 20 against the server's 12, so that the cubes 13 to 20 cubes away leave the server while still
-inside the client's render distance. Prepare the instance with
-`--seed 2485331 --no-distant-horizons --capture-ticks 100`.
+inside the client's render distance. Play it with `--param seed=2485331 --jvm
+client:-Driven.captureTicks=100` (Riven's launch carries no Distant Horizons).
 
 A tour file is a list of views, or an object with `views` and the view distances the tour
 asks for: `{"viewDistance": {"horizontal": 12, "vertical": 12, "clientRender": 20}, "views":
