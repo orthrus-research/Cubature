@@ -64,6 +64,14 @@ class LaunchStandalone(unittest.TestCase):
             self.assertEqual(driver['command'][:2], ['{python}', '{root}/tools/cubic_lab.py'], name)
             self.assertIn(repr(driver['command'][2]), commands, name)
 
+    def test_the_lab_launch_tours_with_the_lab_observers_tour_client(self):
+        tour = tomllib.loads((ROOT / 'project.toml').read_text(encoding='utf-8'))['launch']['lab']['tour']
+        source = (ROOT / 'lab/src/main/java/io/github/opencubicchunks/cubicchunks/lab/LabTourClient.java').read_text(
+            encoding='utf-8')
+        switch = re.search(r'PROPERTY = "([^"]+)"', source).group(1)
+        self.assertEqual(tour['client_jvm'], [f'-D{switch}=true'])
+        self.assertEqual(tour['captured'], re.search(r'CAPTURED = "([^"]+)"', source).group(1))
+
     def test_the_refusal_line_is_cubatures(self):
         source = (ROOT / 'src/main/java/io/github/opencubicchunks/cubicchunks/core/client/RendererRequirement.java')
         title = re.search(r'TITLE = "([^"]+)"', source.read_text(encoding='utf-8')).group(1)

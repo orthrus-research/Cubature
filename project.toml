@@ -48,7 +48,8 @@ steps = [
 [checks.tools]
 description = "Every Python tool test, under {python}: the environment made from tools/requirements.txt"
 inputs = ["tools/*.py", "tools/requirements.txt", "project.toml", "launch/**",
-          "src/main/java/io/github/opencubicchunks/cubicchunks/core/client/RendererRequirement.java"]
+          "src/main/java/io/github/opencubicchunks/cubicchunks/core/client/RendererRequirement.java",
+          "lab/src/main/java/io/github/opencubicchunks/cubicchunks/lab/LabTourClient.java"]
 steps = [
   { name = "unittest", run = ["{python}", "-B", "-m", "unittest", "discover", "-s", "tools", "-p", "test_*.py"] },
 ]
@@ -112,6 +113,14 @@ jvm = { client = ["-Dcubature.clientWithoutRenderer=true"] }
 
 [launch.lab.params]
 seed = 8675309
+
+# How a Workbench tour session plays this launch (wb play cubature:lab --tour <file>): the server moves the player to
+# each view, and the lab observer's tour client (-Dcubiclab.tour=true, lab/.../LabTourClient.java) takes a screenshot
+# once the player has held still and the view has settled, then prints the line the session waits for.
+[launch.lab.tour]
+setup = ["gamerule spawnRadius 0", "gamerule doDaylightCycle false", "time set 6000", "weather clear 1000000"]
+client_jvm = ["-Dcubiclab.tour=true"]
+captured = "CUBICLAB_TOUR_CAPTURED"
 
 [launch.lab.drivers.run]
 summary = "tools/cubic_lab.py run: the lab's scenarios on a fresh copy of the instance"
