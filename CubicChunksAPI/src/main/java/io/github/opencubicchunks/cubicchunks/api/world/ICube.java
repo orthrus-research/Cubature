@@ -32,6 +32,7 @@ import net.minecraft.block.state.IBlockState;
 import net.minecraft.entity.Entity;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.ClassInheritanceMultiMap;
+import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.EnumSkyBlock;
 import net.minecraft.world.World;
@@ -245,6 +246,24 @@ public interface ICube extends XYZAddressable, ICapabilityProvider {
      * @return true if the contents of thic cube have already been supplied to surface tracker
      */
     boolean isSurfaceTracked();
+
+    /**
+     * Reports block changes made to this cube without {@code setBlockState}, for writers that change its storage
+     * directly. The change joins the server's change bus like any other: coalesced with the cube's other writes this
+     * tick and dispatched at the end of it. Server only; does nothing on a client or under
+     * {@link io.github.opencubicchunks.cubicchunks.api.change.ChangeCauses#GENERATION}.
+     *
+     * @param mask  the 4x4x4 sub-blocks written, bit
+     *              {@link io.github.opencubicchunks.cubicchunks.api.change.CubeChange#subBlockIndex}; 0 means the whole cube
+     * @param cause the cause of the writes
+     */
+    void markEdited(long mask, ResourceLocation cause);
+
+    /**
+     * The version of this cube's latest change on the change bus, or 0 when it has none: generated and never edited,
+     * or saved by a build without the bus. Versions only grow across the server, so a larger one is a later change.
+     */
+    long getEditVersion();
 
     /**
      * Check whether this cube's initial diffuse skylight has been calculated

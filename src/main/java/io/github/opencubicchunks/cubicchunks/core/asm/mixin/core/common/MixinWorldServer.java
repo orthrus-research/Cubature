@@ -30,6 +30,9 @@ import io.github.opencubicchunks.cubicchunks.api.world.ICubicRandomTickListener;
 import static io.github.opencubicchunks.cubicchunks.api.util.Coords.cubeToMinBlock;
 import static io.github.opencubicchunks.cubicchunks.core.util.ReflectionUtil.cast;
 
+import io.github.opencubicchunks.cubicchunks.api.change.ChangeCauses;
+import io.github.opencubicchunks.cubicchunks.api.change.ChangeScope;
+import io.github.opencubicchunks.cubicchunks.api.change.CubeChange;
 import io.github.opencubicchunks.cubicchunks.api.util.Coords;
 import io.github.opencubicchunks.cubicchunks.api.util.CubePos;
 import io.github.opencubicchunks.cubicchunks.api.util.IntRange;
@@ -54,6 +57,10 @@ import io.github.opencubicchunks.cubicchunks.core.util.world.CubeSplitTickList;
 import io.github.opencubicchunks.cubicchunks.core.util.world.CubeSplitTickSet;
 import io.github.opencubicchunks.cubicchunks.core.world.CubeWorldEntitySpawner;
 import io.github.opencubicchunks.cubicchunks.core.world.IWorldEntitySpawner;
+import io.github.opencubicchunks.cubicchunks.core.world.change.ChangeJournal;
+import io.github.opencubicchunks.cubicchunks.core.world.change.ChangeVersions;
+import io.github.opencubicchunks.cubicchunks.core.world.change.CubeBlockCopy;
+import io.github.opencubicchunks.cubicchunks.core.world.change.WorldChangeBus;
 import io.github.opencubicchunks.cubicchunks.core.world.chunkloader.CubicChunkManager;
 import io.github.opencubicchunks.cubicchunks.core.world.cube.Cube;
 import io.github.opencubicchunks.cubicchunks.core.world.provider.ICubicWorldProvider;
@@ -106,6 +113,7 @@ import javax.annotation.ParametersAreNonnullByDefault;
 public abstract class MixinWorldServer extends MixinWorld implements ICubicWorldInternal.Server {
 
     @Unique private final RandomTickListeners cubicchunks$randomTickListeners = new RandomTickListeners();
+    @Unique private final ChangeJournal cubicchunks$changeJournal = new ChangeJournal();
 
     @Shadow @Mutable @Final private PlayerChunkMap playerChunkMap;
     @Shadow @Mutable @Final private WorldEntitySpawner entitySpawner;
@@ -174,6 +182,26 @@ public abstract class MixinWorldServer extends MixinWorld implements ICubicWorld
         if (this.spawnArea != null) {
             this.spawnArea.update((World) (Object) this);
         }
+        cubicchunks$dispatchChanges();
+    }
+
+    /** The end of the tick: this tick's block changes become one batch on the change bus. */
+    @Unique private void cubicchunks$dispatchChanges() {
+        ChangeJournal journal = this.cubicchunks$changeJournal;
+        if (journal.isEmpty()) {
+            return;
+        }
+        World world = (World) (Object) this;
+        List<CubeChange> changes = journal.drain(ChangeVersions.of(world)::next);
+        CubeProviderServer cubes = getCubeCache();
+        WorldChangeBus.INSTANCE.dispatch(world, this.provider.getDimension(), this.worldInfo.getWorldTotalTime(), changes, pos -> {
+            Cube cube = cubes.getLoadedCube(pos);
+            return cube == null ? null : CubeBlockCopy.of(pos, cube.getStorage());
+        });
+    }
+
+    @Override public ChangeJournal getChangeJournal() {
+        return this.cubicchunks$changeJournal;
     }
 
     @Override public CubeProviderServer getCubeCache() {
@@ -292,6 +320,7 @@ public abstract class MixinWorldServer extends MixinWorld implements ICubicWorld
         }
         cbi.cancel();
         TickDiagnostics.enter(TickDiagnostics.Phase.BLOCK_TICKS);
+        ChangeScope.push(ChangeCauses.NATURAL);
         try {
             this.playerCheckLight();
 
@@ -323,6 +352,7 @@ public abstract class MixinWorldServer extends MixinWorld implements ICubicWorld
 
             this.profiler.endSection();
         } finally {
+            ChangeScope.pop();
             TickDiagnostics.exit();
         }
     }

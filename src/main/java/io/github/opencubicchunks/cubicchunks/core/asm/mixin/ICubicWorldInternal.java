@@ -33,6 +33,7 @@ import io.github.opencubicchunks.cubicchunks.api.world.ICube;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubeProvider;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorldServer;
+import io.github.opencubicchunks.cubicchunks.core.world.change.ChangeJournal;
 import io.github.opencubicchunks.cubicchunks.core.client.CubeProviderClient;
 import io.github.opencubicchunks.cubicchunks.core.lighting.ILightingManager;
 import io.github.opencubicchunks.cubicchunks.core.server.CubeProviderServer;
@@ -113,6 +114,9 @@ public interface ICubicWorldInternal extends ICubicWorld {
         void setSpawnArea(SpawnCubes spawn);
 
         CompatGenerationScope doCompatibilityGeneration();
+
+        /** This world's block changes since the last tick, drained into the change bus at the end of each tick. */
+        ChangeJournal getChangeJournal();
 
         boolean isCompatGenerationScope();
     }

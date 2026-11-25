@@ -38,6 +38,7 @@ import net.minecraft.block.Block;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraft.tileentity.TileEntity;
+import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import net.minecraft.world.WorldServer;
@@ -166,6 +167,14 @@ public class IONbtReader {
         cube.setPopulated(nbt.getBoolean("populated"));
         cube.setSurfaceTracked(nbt.getBoolean("isSurfaceTracked")); // previous versions will get their surface tracking redone. This is intended
         cube.setFullyPopulated(nbt.getBoolean("fullyPopulated"));
+        if (nbt.hasKey("editVersion", Constants.NBT.TAG_LONG)) {
+            NBTTagList causeTags = nbt.getTagList("editCauses", Constants.NBT.TAG_STRING);
+            ResourceLocation[] causes = new ResourceLocation[causeTags.tagCount()];
+            for (int i = 0; i < causes.length; i++) {
+                causes[i] = new ResourceLocation(causeTags.getStringTagAt(i));
+            }
+            cube.setEditState(nbt.getLong("editVersion"), causes);
+        }
 
         //this status will get unset again in readLightingInfo() if the lighting engine is changed (LightingInfoType).
         cube.setInitialLightingDone(nbt.getBoolean("initLightDone"));

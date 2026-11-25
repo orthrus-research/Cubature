@@ -38,6 +38,7 @@ import mcp.MethodsReturnNonnullByDefault;
 import net.minecraft.block.Block;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
+import net.minecraft.nbt.NBTTagString;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.world.NextTickListEntry;
@@ -132,6 +133,15 @@ class IONbtWriter {
         cubeNbt.setBoolean("populated", cube.isPopulated());
         cubeNbt.setBoolean("isSurfaceTracked", cube.isSurfaceTracked());
         cubeNbt.setBoolean("fullyPopulated", cube.isFullyPopulated());
+        // the change bus: the cube's latest change, absent until it has one (older builds ignore both tags)
+        if (cube.getEditVersion() != 0) {
+            cubeNbt.setLong("editVersion", cube.getEditVersion());
+            NBTTagList causes = new NBTTagList();
+            for (ResourceLocation cause : cube.getEditCauses()) {
+                causes.appendTag(new NBTTagString(cause.toString()));
+            }
+            cubeNbt.setTag("editCauses", causes);
+        }
 
         cubeNbt.setBoolean("initLightDone", cube.isInitialLightingDone());
 

@@ -31,6 +31,8 @@ import static io.github.opencubicchunks.cubicchunks.api.util.Coords.cubeToMinBlo
 import static io.github.opencubicchunks.cubicchunks.api.util.Coords.localToBlock;
 import static net.minecraftforge.common.MinecraftForge.EVENT_BUS;
 
+import io.github.opencubicchunks.cubicchunks.api.change.ChangeScope;
+import io.github.opencubicchunks.cubicchunks.api.change.CubeChange;
 import io.github.opencubicchunks.cubicchunks.api.util.Coords;
 import io.github.opencubicchunks.cubicchunks.api.util.CubePos;
 import io.github.opencubicchunks.cubicchunks.api.world.CubeEvent;
@@ -42,6 +44,7 @@ import io.github.opencubicchunks.cubicchunks.api.worldgen.CubePrimer;
 import io.github.opencubicchunks.cubicchunks.api.worldgen.ICubeClassification;
 import io.github.opencubicchunks.cubicchunks.api.worldgen.ICubeGenerator;
 import io.github.opencubicchunks.cubicchunks.core.CubicChunks;
+import io.github.opencubicchunks.cubicchunks.core.CubicChunksConfig;
 import io.github.opencubicchunks.cubicchunks.core.asm.mixin.ICubicWorldInternal;
 import io.github.opencubicchunks.cubicchunks.core.asm.mixin.core.common.IBlockStateContainer;
 import io.github.opencubicchunks.cubicchunks.core.asm.mixin.core.common.IExtendedBlockStorage;
@@ -54,6 +57,8 @@ import io.github.opencubicchunks.cubicchunks.core.util.ticket.TicketList;
 import io.github.opencubicchunks.cubicchunks.core.world.EntityContainer;
 import io.github.opencubicchunks.cubicchunks.core.world.IColumnInternal;
 import io.github.opencubicchunks.cubicchunks.core.world.ServerHeightMap;
+import io.github.opencubicchunks.cubicchunks.core.world.change.ChangeJournal;
+import io.github.opencubicchunks.cubicchunks.core.world.change.PendingChange;
 import io.github.opencubicchunks.cubicchunks.core.world.chunkloader.ICubicTicketInternal;
 import mcp.MethodsReturnNonnullByDefault;
 import net.minecraft.block.material.Material;
@@ -64,6 +69,7 @@ import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.BitArray;
 import net.minecraft.util.ClassInheritanceMultiMap;
 import net.minecraft.util.EnumFacing;
+import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.EnumSkyBlock;
 import net.minecraft.world.World;
@@ -197,6 +203,20 @@ public class Cube implements ICube {
     private long lastTicked = Long.MIN_VALUE;
 
     private final CapabilityDispatcher capabilities;
+
+    private static final ResourceLocation[] NO_CAUSES = new ResourceLocation[0];
+
+    /** This cube's writes since the last change-bus drain; made on the first write. Server only. */
+    @Nullable private PendingChange pendingChange;
+
+    /** The version of this cube's latest drained change, 0 for none. Saved. */
+    private long editVersion;
+
+    /** The causes of this cube's latest drained change. Saved. */
+    private ResourceLocation[] editCauses = NO_CAUSES;
+
+    /** World time until which writes are settling after population, not edits. Not saved: a reload ends settling. */
+    private long settlingUntil = Long.MIN_VALUE;
 
     /**
      * Create a new cube in the specified column at the specified location. The newly created cube will only contain air
@@ -924,6 +944,72 @@ public class Cube implements ICube {
      */
     public void markDirty() {
         this.isModified = true;
+    }
+
+    // ==============================================
+    //                 change bus
+    // ==============================================
+
+    /**
+     * A block of this cube changed through {@code setBlockState}: the feed of the change bus. Called once for each
+     * block that really changes, beside {@link #markDirty()}.
+     */
+    public void onBlockWritten(BlockPos pos) {
+        if (this.world.isRemote) {
+            return;
+        }
+        journal(1L << CubeChange.subBlockIndex(pos.getX() & 15, pos.getY() & 15, pos.getZ() & 15), ChangeScope.current());
+    }
+
+    @Override
+    public void markEdited(long mask, ResourceLocation cause) {
+        if (this.world.isRemote) {
+            return;
+        }
+        journal(mask == 0 ? -1L : mask, cause);
+    }
+
+    private void journal(long bits, ResourceLocation cause) {
+        if (!ChangeJournal.admits(cause, CubicChunksConfig.changeCountNaturalTicks, this.settlingUntil, this.world.getTotalWorldTime())) {
+            // TODO milestone 2: a write while the cube settles refreshes its baseline instead
+            return;
+        }
+        PendingChange pending = this.pendingChange;
+        if (pending == null) {
+            pending = this.pendingChange = new PendingChange(this.coords, this::commitChange);
+        }
+        ((ICubicWorldInternal.Server) this.world).getChangeJournal().record(pending, bits, cause);
+    }
+
+    private void commitChange(long version, ResourceLocation[] causes) {
+        this.editVersion = version;
+        this.editCauses = causes;
+        this.isModified = true;
+    }
+
+    /**
+     * Starts the settling window: for {@code changeSettlingTicks} from now, writes to this cube are taken for its
+     * population settling (springs, falling sand, mod fluids) and not journaled. Called once, when the cube is first
+     * fully populated.
+     */
+    public void beginSettling() {
+        this.settlingUntil = this.world.getTotalWorldTime() + CubicChunksConfig.changeSettlingTicks;
+    }
+
+    @Override
+    public long getEditVersion() {
+        return this.editVersion;
+    }
+
+    /** The causes of this cube's latest change, empty when it has none. */
+    public ResourceLocation[] getEditCauses() {
+        return this.editCauses;
+    }
+
+    /** Sets the latest change as saved. For loading only. */
+    public void setEditState(long version, ResourceLocation[] causes) {
+        this.editVersion = version;
+        this.editCauses = causes;
     }
 
     /**

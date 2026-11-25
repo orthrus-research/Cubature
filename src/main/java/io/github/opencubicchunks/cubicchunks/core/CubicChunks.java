@@ -26,6 +26,8 @@ package io.github.opencubicchunks.cubicchunks.core;
 
 import static io.github.opencubicchunks.cubicchunks.core.util.ReflectionUtil.cast;
 
+import io.github.opencubicchunks.cubicchunks.api.change.ChangeApi;
+import io.github.opencubicchunks.cubicchunks.core.world.change.WorldChangeBus;
 import io.github.opencubicchunks.cubicchunks.api.world.storage.ICubicStorage;
 import io.github.opencubicchunks.cubicchunks.api.world.storage.StorageFormatProviderBase;
 import io.github.opencubicchunks.cubicchunks.api.worldgen.VanillaCompatibilityGeneratorProviderBase;
@@ -120,6 +122,7 @@ public class CubicChunks {
     @EventHandler
     public void preInit(FMLPreInitializationEvent e) {
         LOGGER = e.getModLog();
+        ChangeApi.install(WorldChangeBus.INSTANCE);
         // The client draws cubic worlds only through a renderer that takes over the game's chunk system: without
         // Quadrature, loading stops here unless -Dcubature.clientWithoutRenderer=true, under which the game's renderer
         // draws only heights 0 to 255 of a cubic world.

@@ -73,6 +73,15 @@ import javax.annotation.ParametersAreNonnullByDefault;
 @Config(modid = CubicChunks.MODID, category = "general")
 public class CubicChunksConfig {
 
+    @Config.RangeInt(min = 0, max = 72000)
+    @Config.Comment("Server: ticks after a cube is first fully populated during which its block changes are taken for "
+            + "population settling (springs, falling sand, mod fluids) and not journaled on the change bus as edits.")
+    public static int changeSettlingTicks = 200;
+
+    @Config.Comment("Server: journal block changes from random ticks, ice and snow (grass spread, leaf decay, crop growth, "
+            + "snow layers) on the change bus with the cause cubicchunks:natural. Off, they make no journal entries.")
+    public static boolean changeCountNaturalTicks = false;
+
     @Config.RangeInt(min = 1, max = 4096)
     @Config.Comment("Maximum cube+column coordinates processed per periodic autosave tick, per dimension. Explicit saves remain complete.")
     public static int autosaveSnapshotsPerTick = 32;

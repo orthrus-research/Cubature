@@ -40,6 +40,8 @@ import io.github.opencubicchunks.cubicchunks.api.worldgen.CubePrimer;
 import io.github.opencubicchunks.cubicchunks.api.worldgen.ICubeClassification;
 import io.github.opencubicchunks.cubicchunks.api.worldgen.ICubeGenerator;
 import io.github.opencubicchunks.cubicchunks.api.world.ICubeProviderServer;
+import io.github.opencubicchunks.cubicchunks.api.change.ChangeCauses;
+import io.github.opencubicchunks.cubicchunks.api.change.ChangeScope;
 import io.github.opencubicchunks.cubicchunks.api.util.Box;
 import io.github.opencubicchunks.cubicchunks.api.util.CubePos;
 import io.github.opencubicchunks.cubicchunks.api.util.XYZMap;
@@ -666,7 +668,13 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
             }
             // a check for populators that populate more than one cube (vanilla compatibility generator)
             if (!fullPopulationCube.isPopulated()) {
-                cubeGen.populate(fullPopulationCube);
+                // Population writes are the cube's generated state, not edits: the change bus skips them.
+                ChangeScope.push(ChangeCauses.GENERATION);
+                try {
+                    cubeGen.populate(fullPopulationCube);
+                } finally {
+                    ChangeScope.pop();
+                }
                 newlyPopulatedCubes.add(fullPopulationCube);
             }
             return true;
@@ -684,8 +692,14 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
             box.forEachPoint((x, y, z) -> {
                 Cube columnCube = getCube(cubeX + x, 0, cubeZ + z, Requirement.GENERATE, neighbours);
                 if (!columnCube.isPopulated()) {
-                    GameRegistry.generateWorld(cubeX + x, cubeZ + z, world, chunkGenerator, world.getChunkProvider());
+                    ChangeScope.push(ChangeCauses.GENERATION);
+                    try {
+                        GameRegistry.generateWorld(cubeX + x, cubeZ + z, world, chunkGenerator, world.getChunkProvider());
+                    } finally {
+                        ChangeScope.pop();
+                    }
                     columnCube.setFullyPopulated(true);
+                    columnCube.beginSettling();
                 }
             });
         }
@@ -693,6 +707,7 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
             newlyPopulatedCube.setPopulated(true);
         }
         cube.setFullyPopulated(true);
+        cube.beginSettling();
         return true;
     }
 

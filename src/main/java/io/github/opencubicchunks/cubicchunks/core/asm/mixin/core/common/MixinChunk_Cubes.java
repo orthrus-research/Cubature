@@ -506,7 +506,9 @@ public abstract class MixinChunk_Cubes {
     @WrapOperation(method = "setBlockState", at = @At(value = "FIELD", target = "Lnet/minecraft/world/chunk/Chunk;dirty:Z"))
     private void setIsModifiedFromSetBlockState_Field(Chunk chunk, boolean isModifiedIn, Operation<Void> original, BlockPos pos, IBlockState state) {
         if (isColumn) {
-            getWorld().getCubeFromBlockCoords(pos).markDirty();
+            Cube cube = getWorld().getCubeFromBlockCoords(pos);
+            cube.markDirty();
+            cube.onBlockWritten(pos); // the change bus feed: once for each block that really changes
         } else {
             original.call(chunk, isModifiedIn);
         }
