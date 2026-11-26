@@ -184,14 +184,14 @@ be evicted and whose failures remain diagnosable until cancellation or explicit 
 generators keep their existing readiness path; worlds without generation workers still arrive at once.
 Departures and world shutdown release held requests and leases, including late worker results. The
 lab distinguishes a genuinely lost teleport from a destination that is still held for preparation.
-On November 25, 2026, the server gained a change bus ([docs/CHANGE-BUS.md](docs/CHANGE-BUS.md)). Every
-block that `setBlockState` really changes in a cubic world, and every write reported with the new
-`ICube.markEdited`, is journaled on its cube: writes under population (`cubeGen.populate`,
-`GameRegistry.generateWorld`), for a settling window after a cube is first fully populated, and from the
-random-tick pass (unless `changeCountNaturalTicks`) are not. At the end of each tick a world's journal becomes
-one change per cube, stamped from a counter in the save's shared data and dispatched to subscribers of the new
-public package `api.change`. Cubes save their latest change as `editVersion` and `editCauses`, which older builds
-ignore. Nothing is sent to clients, and the world's contents are unchanged.
+On November 25, 2026, the server gained a change bus ([docs/CHANGE-BUS.md](docs/CHANGE-BUS.md)). Every block that
+`setBlockState` really changes in a cubic world, and every write reported with the new `ICube.markEdited`, is
+journaled on its cube: writes under population (`cubeGen.populate`, `GameRegistry.generateWorld`), for a settling
+window after a cube is populated and again after it is first fully populated, and from the random-tick pass (unless
+`changeCountNaturalTicks`) are not. At the end of each tick a world's journal becomes one change per cube, stamped
+from a counter in the save's shared data and dispatched to subscribers of the new public package `api.change`.
+Cubes save their latest change as `editVersion` and `editCauses`, which older builds ignore. Nothing is sent to
+clients, and the world's contents are unchanged.
 The Cubature name and license packaging were adopted on October 19, 2026;
 that change added no terrain or scheduling algorithm.
 

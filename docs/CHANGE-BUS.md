@@ -30,9 +30,11 @@ A thread's writes carry the innermost cause pushed with `ChangeScope.push(cause)
 | `cubicchunks:unknown` | Nobody: the default | Yes |
 | a mod's own | The mod, around its writes | Yes |
 
-For `changeSettlingTicks` (200 by default) after a cube is first fully populated, its writes are not journaled:
-springs, falling sand and mod fluids keep writing for a while after population. The window is not saved, so a
-cube loaded from disk is never settling. Milestone 2 turns these writes into refreshes of the cube's baseline.
+For `changeSettlingTicks` (200 by default) after a cube is populated, and again after it is first fully
+populated, its writes are not journaled: springs, falling sand and mod fluids keep writing for a while after
+population. Both starts matter: a cube's own population places springs that flow before its neighbors are
+populated, and players are sent a cube only once it is fully populated. The window is not saved, so a cube loaded
+from disk is never settling. Milestone 2 turns these writes into refreshes of the cube's baseline.
 
 ## Journal and dispatch
 

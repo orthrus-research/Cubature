@@ -74,8 +74,9 @@ import javax.annotation.ParametersAreNonnullByDefault;
 public class CubicChunksConfig {
 
     @Config.RangeInt(min = 0, max = 72000)
-    @Config.Comment("Server: ticks after a cube is first fully populated during which its block changes are taken for "
-            + "population settling (springs, falling sand, mod fluids) and not journaled on the change bus as edits.")
+    @Config.Comment("Server: ticks after a cube is populated, and again after it is first fully populated, during which "
+            + "its block changes are taken for population settling (springs, falling sand, mod fluids) and not journaled "
+            + "on the change bus as edits.")
     public static int changeSettlingTicks = 200;
 
     @Config.Comment("Server: journal block changes from random ticks, ice and snow (grass spread, leaf decay, crop growth, "

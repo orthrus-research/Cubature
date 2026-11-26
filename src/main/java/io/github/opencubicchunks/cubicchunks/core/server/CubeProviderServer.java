@@ -682,6 +682,7 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
         if (!success) {
             for (Cube newlyPopulatedCube : newlyPopulatedCubes) {
                 newlyPopulatedCube.setPopulated(true);
+                newlyPopulatedCube.beginSettling();
             }
             return false;
         }
@@ -705,6 +706,7 @@ public class CubeProviderServer extends ChunkProviderServer implements ICubeProv
         }
         for (Cube newlyPopulatedCube : newlyPopulatedCubes) {
             newlyPopulatedCube.setPopulated(true);
+            newlyPopulatedCube.beginSettling();
         }
         cube.setFullyPopulated(true);
         cube.beginSettling();

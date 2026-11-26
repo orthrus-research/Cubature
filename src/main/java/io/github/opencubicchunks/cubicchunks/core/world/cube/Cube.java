@@ -989,8 +989,9 @@ public class Cube implements ICube {
 
     /**
      * Starts the settling window: for {@code changeSettlingTicks} from now, writes to this cube are taken for its
-     * population settling (springs, falling sand, mod fluids) and not journaled. Called once, when the cube is first
-     * fully populated.
+     * population settling (springs, falling sand, mod fluids) and not journaled. Called when the cube is populated,
+     * when its own population has placed the springs and sand that go on writing, and again when it is first fully
+     * populated, when its neighbors' population has done the same.
      */
     public void beginSettling() {
         this.settlingUntil = this.world.getTotalWorldTime() + CubicChunksConfig.changeSettlingTicks;

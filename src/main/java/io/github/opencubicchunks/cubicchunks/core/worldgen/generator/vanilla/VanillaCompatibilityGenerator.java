@@ -349,7 +349,9 @@ public class VanillaCompatibilityGenerator implements ICubeGenerator {
             if (cube.getY() >= 0 && cube.getY() < worldHeightCubes) {
                 for (int y = worldHeightCubes - 1; y >= 0; y--) {
                     // normal populators would not do this... but we are populating more than one cube!
-                    ((ICubicWorldInternal) world).getCubeFromCubeCoords(cube.getX(), y, cube.getZ()).setPopulated(true);
+                    Cube columnCube = ((ICubicWorldInternal) world).getCubeFromCubeCoords(cube.getX(), y, cube.getZ());
+                    columnCube.setPopulated(true);
+                    columnCube.beginSettling();
                 }
 
                 try {
