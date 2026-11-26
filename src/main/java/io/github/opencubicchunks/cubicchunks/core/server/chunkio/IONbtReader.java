@@ -32,6 +32,7 @@ import io.github.opencubicchunks.cubicchunks.core.asm.mixin.ICubicWorldInternal;
 import io.github.opencubicchunks.cubicchunks.core.lighting.ILightingManager;
 import io.github.opencubicchunks.cubicchunks.core.util.AddressTools;
 import io.github.opencubicchunks.cubicchunks.core.world.ServerHeightMap;
+import io.github.opencubicchunks.cubicchunks.core.world.change.SurfaceReduction;
 import io.github.opencubicchunks.cubicchunks.core.world.cube.Cube;
 import mcp.MethodsReturnNonnullByDefault;
 import net.minecraft.block.Block;
@@ -174,6 +175,15 @@ public class IONbtReader {
                 causes[i] = new ResourceLocation(causeTags.getStringTagAt(i));
             }
             cube.setEditState(nbt.getLong("editVersion"), causes);
+        }
+        if (nbt.hasKey("baselineHash", Constants.NBT.TAG_LONG)) {
+            int[] baseline = nbt.hasKey("baseline", Constants.NBT.TAG_INT_ARRAY) ? nbt.getIntArray("baseline")
+                    : new int[SurfaceReduction.COLUMNS];
+            if (baseline.length == SurfaceReduction.COLUMNS && SurfaceReduction.hash(baseline) == nbt.getLong("baselineHash")) {
+                cube.loadBaseline(baseline);
+            } else {
+                CubicChunks.LOGGER.warn("Cube {} has a damaged change baseline; it falls back to the terrain preview", cube.getCoords());
+            }
         }
 
         //this status will get unset again in readLightingInfo() if the lighting engine is changed (LightingInfoType).

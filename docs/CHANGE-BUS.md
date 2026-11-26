@@ -1,9 +1,9 @@
 # Change bus
 
-Status: milestone 1 is built: the feed, the scopes, the per-tick batches, the edit version saved with each cube,
-and the public API in package `api.change`. Later milestones are design: the generation baseline, the far-view
-stream that sends distant players the edits that differ from the terrain preview, and the interest and policy
-registries.
+Status: milestones 1 and 2 are built: the feed, the scopes, the per-tick batches, the edit version saved with each
+cube, the public API in package `api.change`, and the generation baseline each cube keeps of its surface. Later
+milestones are design: the far-view stream that sends distant players the edits that differ from the baseline, and
+the interest and policy registries.
 
 The change bus is the server's one stream of block changes in cubic worlds. Every block change that is not
 generation feeds it, and anything that wants to know what changed subscribes to it: distant terrain, maps, claims,
@@ -34,7 +34,26 @@ For `changeSettlingTicks` (200 by default) after a cube is populated, and again 
 populated, its writes are not journaled: springs, falling sand and mod fluids keep writing for a while after
 population. Both starts matter: a cube's own population places springs that flow before its neighbors are
 populated, and players are sent a cube only once it is fully populated. The window is not saved, so a cube loaded
-from disk is never settling. Milestone 2 turns these writes into refreshes of the cube's baseline.
+from disk is never settling. Writes while a cube settles become part of its baseline, taken when the window ends.
+
+Writes into a cube that is not fully populated yet are not journaled either: no player has it, and its neighbors'
+population and fluids are still filling it.
+
+## Baseline
+
+When a fully populated cube's settling window ends, it keeps its surface reduction (`SurfaceReduction`): for each of
+its 256 block columns, whether the column's top opaque block, by the opacity height map, lies in the cube, and if so
+its height in the cube, its map color and whether it is liquid. Edits are judged against this baseline, not against
+the terrain preview, which at full detail differs from native generation in places.
+
+- Plants, snow layers and other blocks of no opacity are never the top, so crops, snow and grass growth do not
+  change the reduction. Glass and other clear blocks of no opacity do not show either.
+- `CubeBaselines.changedColumns(cube, preview)` answers which columns' tops differ now. A cube saved before the
+  baseline existed has none; for it, the server's terrain preview stands in, where the generator has one.
+- The window's end is a queue in the world (`SettlingQueue`), worked at the end of each tick before the journal is
+  drained. A cube unloaded before its window ends has no baseline and falls back to the preview.
+- A cube saves its baseline as `baseline` (256 ints) and `baselineHash`; one whose surface is elsewhere saves the
+  hash alone. A baseline whose hash does not match is dropped with a warning. Older builds ignore both tags.
 
 ## Journal and dispatch
 
@@ -72,7 +91,6 @@ from disk is never settling. Milestone 2 turns these writes into refreshes of th
 
 - Tile-entity changes (`TileEntity.markDirty` for listed classes), and a `player` cause around player block
   placement and breaking. Today those writes carry `unknown`.
-- The generation baseline, the far-view stream, interest domains and far-view policies (milestones 2 to 4 of the
-  spec).
-- A measurement of the feed's cost under a bulk paste. The hot path is a thread-local read, two compares, an OR and
-  a branch; the queue is touched once per cube per tick.
+- The far-view stream, interest domains and far-view policies (milestones 3 and 4 of the spec). The baseline API
+  is core-only until milestone 4 makes it public.
+- Side exposure: cliffs and cave mouths are not part of the reduction, which looks only at column tops.

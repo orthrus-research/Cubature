@@ -46,10 +46,14 @@ public final class ChangeJournal {
     private final ConcurrentLinkedQueue<PendingChange> queue = new ConcurrentLinkedQueue<>();
 
     /**
-     * Whether a write is journaled: not under generation, not a natural tick unless the server counts them, and not
-     * while its cube is settling after population.
+     * Whether a write is journaled: not under generation, not a natural tick unless the server counts them, not into a
+     * cube that is not fully populated yet (no player has it; its neighbors' population and fluids are still filling
+     * it), and not while its cube is settling after population.
      */
-    public static boolean admits(ResourceLocation cause, boolean countNatural, long settlingUntil, long now) {
+    public static boolean admits(ResourceLocation cause, boolean countNatural, boolean fullyPopulated, long settlingUntil, long now) {
+        if (!fullyPopulated) {
+            return false;
+        }
         if (cause == ChangeCauses.GENERATION || cause.equals(ChangeCauses.GENERATION)) {
             return false;
         }

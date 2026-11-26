@@ -58,7 +58,10 @@ import io.github.opencubicchunks.cubicchunks.core.world.EntityContainer;
 import io.github.opencubicchunks.cubicchunks.core.world.IColumnInternal;
 import io.github.opencubicchunks.cubicchunks.core.world.ServerHeightMap;
 import io.github.opencubicchunks.cubicchunks.core.world.change.ChangeJournal;
+import io.github.opencubicchunks.cubicchunks.core.world.change.CubeBaselines;
 import io.github.opencubicchunks.cubicchunks.core.world.change.PendingChange;
+import io.github.opencubicchunks.cubicchunks.core.world.change.SettlingQueue;
+import io.github.opencubicchunks.cubicchunks.core.world.change.SurfaceReduction;
 import io.github.opencubicchunks.cubicchunks.core.world.chunkloader.ICubicTicketInternal;
 import mcp.MethodsReturnNonnullByDefault;
 import net.minecraft.block.material.Material;
@@ -217,6 +220,9 @@ public class Cube implements ICube {
 
     /** World time until which writes are settling after population, not edits. Not saved: a reload ends settling. */
     private long settlingUntil = Long.MIN_VALUE;
+
+    /** The surface reduction when settling ended ({@link CubeBaselines}); null before, or for a cube saved without. Saved. */
+    @Nullable private int[] baseline;
 
     /**
      * Create a new cube in the specified column at the specified location. The newly created cube will only contain air
@@ -970,8 +976,9 @@ public class Cube implements ICube {
     }
 
     private void journal(long bits, ResourceLocation cause) {
-        if (!ChangeJournal.admits(cause, CubicChunksConfig.changeCountNaturalTicks, this.settlingUntil, this.world.getTotalWorldTime())) {
-            // TODO milestone 2: a write while the cube settles refreshes its baseline instead
+        if (!ChangeJournal.admits(cause, CubicChunksConfig.changeCountNaturalTicks, this.isFullyPopulated,
+                this.settlingUntil, this.world.getTotalWorldTime())) {
+            // A write while the cube settles is part of its baseline, taken when settling ends.
             return;
         }
         PendingChange pending = this.pendingChange;
@@ -994,7 +1001,49 @@ public class Cube implements ICube {
      * populated, when its neighbors' population has done the same.
      */
     public void beginSettling() {
+        if (this.world.isRemote) {
+            return;
+        }
         this.settlingUntil = this.world.getTotalWorldTime() + CubicChunksConfig.changeSettlingTicks;
+        if (this.world instanceof ICubicWorldInternal.Server) { // always, but for test fixture worlds
+            ((ICubicWorldInternal.Server) this.world).getSettlingQueue().add(this, this.settlingUntil);
+        }
+    }
+
+    /**
+     * The end of a settling window this cube was queued for: takes its baseline if the window has really ended, the
+     * cube is fully populated and still loaded, and it has none yet. A cube whose surface is not tracked yet is asked
+     * again later. Server thread.
+     */
+    public void onSettlingDeadline(long now) {
+        if (this.baseline != null || !this.isCubeLoaded || !this.isFullyPopulated || this.settlingUntil > now) {
+            return;
+        }
+        if (!this.isSurfaceTracked) {
+            ((ICubicWorldInternal.Server) this.world).getSettlingQueue().add(this, now + 20);
+            return;
+        }
+        CubeBaselines.capture(this);
+    }
+
+    /** The baseline, or null when the cube has none. Do not modify. */
+    @Nullable
+    public int[] getBaseline() {
+        return this.baseline;
+    }
+
+    /** Sets the baseline when settling ends; the cube is saved with it. */
+    public void setBaseline(int[] baseline) {
+        if (baseline.length != SurfaceReduction.COLUMNS) {
+            throw new IllegalArgumentException("A baseline has " + SurfaceReduction.COLUMNS + " columns, not " + baseline.length);
+        }
+        this.baseline = baseline;
+        this.isModified = true;
+    }
+
+    /** Sets the baseline as loaded from disk, without marking the cube for saving. */
+    public void loadBaseline(int[] baseline) {
+        this.baseline = baseline;
     }
 
     @Override

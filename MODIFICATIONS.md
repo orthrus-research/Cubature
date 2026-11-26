@@ -192,6 +192,11 @@ window after a cube is populated and again after it is first fully populated, an
 from a counter in the save's shared data and dispatched to subscribers of the new public package `api.change`.
 Cubes save their latest change as `editVersion` and `editCauses`, which older builds ignore. Nothing is sent to
 clients, and the world's contents are unchanged.
+On November 26, 2026, the change bus stopped journaling writes into cubes that are not fully populated yet, and
+each cube gained a generation baseline: when its settling window ends, a fully populated cube keeps its surface
+reduction (for each block column whose top opaque block lies in it: that block's height, map color and kind), saved
+as `baseline` and `baselineHash`, which older builds ignore. Edits are judged against it; a cube without one falls
+back to the server's terrain preview. Nothing is sent to clients.
 The Cubature name and license packaging were adopted on October 19, 2026;
 that change added no terrain or scheduling algorithm.
 

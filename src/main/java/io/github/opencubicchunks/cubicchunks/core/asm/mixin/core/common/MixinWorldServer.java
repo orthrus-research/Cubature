@@ -60,6 +60,7 @@ import io.github.opencubicchunks.cubicchunks.core.world.IWorldEntitySpawner;
 import io.github.opencubicchunks.cubicchunks.core.world.change.ChangeJournal;
 import io.github.opencubicchunks.cubicchunks.core.world.change.ChangeVersions;
 import io.github.opencubicchunks.cubicchunks.core.world.change.CubeBlockCopy;
+import io.github.opencubicchunks.cubicchunks.core.world.change.SettlingQueue;
 import io.github.opencubicchunks.cubicchunks.core.world.change.WorldChangeBus;
 import io.github.opencubicchunks.cubicchunks.core.world.chunkloader.CubicChunkManager;
 import io.github.opencubicchunks.cubicchunks.core.world.cube.Cube;
@@ -114,6 +115,7 @@ public abstract class MixinWorldServer extends MixinWorld implements ICubicWorld
 
     @Unique private final RandomTickListeners cubicchunks$randomTickListeners = new RandomTickListeners();
     @Unique private final ChangeJournal cubicchunks$changeJournal = new ChangeJournal();
+    @Unique private final SettlingQueue<Cube> cubicchunks$settlingQueue = new SettlingQueue<>();
 
     @Shadow @Mutable @Final private PlayerChunkMap playerChunkMap;
     @Shadow @Mutable @Final private WorldEntitySpawner entitySpawner;
@@ -187,6 +189,8 @@ public abstract class MixinWorldServer extends MixinWorld implements ICubicWorld
 
     /** The end of the tick: this tick's block changes become one batch on the change bus. */
     @Unique private void cubicchunks$dispatchChanges() {
+        long now = this.worldInfo.getWorldTotalTime();
+        this.cubicchunks$settlingQueue.expire(now, cube -> cube.onSettlingDeadline(now));
         ChangeJournal journal = this.cubicchunks$changeJournal;
         if (journal.isEmpty()) {
             return;
@@ -202,6 +206,10 @@ public abstract class MixinWorldServer extends MixinWorld implements ICubicWorld
 
     @Override public ChangeJournal getChangeJournal() {
         return this.cubicchunks$changeJournal;
+    }
+
+    @Override public SettlingQueue<Cube> getSettlingQueue() {
+        return this.cubicchunks$settlingQueue;
     }
 
     @Override public CubeProviderServer getCubeCache() {

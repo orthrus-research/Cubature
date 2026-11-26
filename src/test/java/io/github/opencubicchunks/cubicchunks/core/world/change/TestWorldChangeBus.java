@@ -126,14 +126,16 @@ public class TestWorldChangeBus {
     }
 
     @Test public void generationAndSettlingAreNotJournaledAndNaturalOnlyWhenCounted() {
-        assertFalse("Generation is never an edit", ChangeJournal.admits(ChangeCauses.GENERATION, true, Long.MIN_VALUE, 0));
+        assertFalse("Generation is never an edit", ChangeJournal.admits(ChangeCauses.GENERATION, true, true, Long.MIN_VALUE, 0));
         assertFalse("Not even a copy of the cause",
-                ChangeJournal.admits(new ResourceLocation("cubicchunks", "generation"), true, Long.MIN_VALUE, 0));
-        assertFalse("Natural ticks are left out by default", ChangeJournal.admits(ChangeCauses.NATURAL, false, Long.MIN_VALUE, 0));
-        assertTrue("and journaled when counted", ChangeJournal.admits(ChangeCauses.NATURAL, true, Long.MIN_VALUE, 0));
-        assertTrue(ChangeJournal.admits(ChangeCauses.UNKNOWN, false, Long.MIN_VALUE, 0));
-        assertFalse("A settling cube's writes are not edits", ChangeJournal.admits(PASTE, false, 200, 199));
-        assertTrue("and are again once it settles", ChangeJournal.admits(PASTE, false, 200, 200));
+                ChangeJournal.admits(new ResourceLocation("cubicchunks", "generation"), true, true, Long.MIN_VALUE, 0));
+        assertFalse("Natural ticks are left out by default", ChangeJournal.admits(ChangeCauses.NATURAL, false, true, Long.MIN_VALUE, 0));
+        assertTrue("and journaled when counted", ChangeJournal.admits(ChangeCauses.NATURAL, true, true, Long.MIN_VALUE, 0));
+        assertTrue(ChangeJournal.admits(ChangeCauses.UNKNOWN, false, true, Long.MIN_VALUE, 0));
+        assertFalse("A settling cube's writes are not edits", ChangeJournal.admits(PASTE, false, true, 200, 199));
+        assertTrue("and are again once it settles", ChangeJournal.admits(PASTE, false, true, 200, 200));
+        assertFalse("A cube not yet fully populated has no player and is still filling",
+                ChangeJournal.admits(PASTE, true, false, Long.MIN_VALUE, 0));
     }
 
     @Test public void scopesNestAndDefaultToUnknown() {

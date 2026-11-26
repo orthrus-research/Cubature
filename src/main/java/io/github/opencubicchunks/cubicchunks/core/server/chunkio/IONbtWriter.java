@@ -33,6 +33,7 @@ import io.github.opencubicchunks.cubicchunks.core.asm.mixin.ICubicWorldInternal;
 import io.github.opencubicchunks.cubicchunks.core.lighting.ILightingManager;
 import io.github.opencubicchunks.cubicchunks.core.world.ClientHeightMap;
 import io.github.opencubicchunks.cubicchunks.core.world.ServerHeightMap;
+import io.github.opencubicchunks.cubicchunks.core.world.change.SurfaceReduction;
 import io.github.opencubicchunks.cubicchunks.core.world.cube.Cube;
 import mcp.MethodsReturnNonnullByDefault;
 import net.minecraft.block.Block;
@@ -141,6 +142,14 @@ class IONbtWriter {
                 causes.appendTag(new NBTTagString(cause.toString()));
             }
             cubeNbt.setTag("editCauses", causes);
+        }
+        // the generation baseline: absent until settling ends; an all-absent one saves as its hash alone
+        int[] baseline = cube.getBaseline();
+        if (baseline != null) {
+            cubeNbt.setLong("baselineHash", SurfaceReduction.hash(baseline));
+            if (!SurfaceReduction.isEmpty(baseline)) {
+                cubeNbt.setIntArray("baseline", baseline);
+            }
         }
 
         cubeNbt.setBoolean("initLightDone", cube.isInitialLightingDone());
